@@ -1,14 +1,12 @@
-import { router } from '@/routers'
-import { RPCHandler } from '@orpc/server/fetch'
 import { EvlogHandlerPlugin } from '@orpc/evlog'
-import { messagePublisher } from '@/context'
+import { RPCHandler } from '@orpc/server/fetch'
 import { BatchHandlerPlugin } from '@orpc/server/plugins'
 
+import { messagePublisher } from '@/context'
+import { router } from '@/routers'
+
 export const handler = new RPCHandler(router, {
-  plugins: [
-    new EvlogHandlerPlugin({ logAbort: true }),
-    new BatchHandlerPlugin(),
-  ],
+  plugins: [new EvlogHandlerPlugin({ logAbort: true }), new BatchHandlerPlugin()],
 })
 
 async function handleRequest(request: Request) {

@@ -1,3 +1,3 @@
 it('exports createStandardPeerRequestHandler', async () => {
-  await expect(import('.')).resolves.toHaveProperty('createStandardPeerRequestHandler')
+  await expect(import('./index')).resolves.toHaveProperty('createStandardPeerRequestHandler')
 })

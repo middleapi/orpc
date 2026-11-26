@@ -14,7 +14,8 @@ export type {
    */
   InferClientError as InferClientErrorUnion,
 } from './types'
-export * from './utils'
+export { resolveClientRest, safe } from './utils'
+export type { SafeResult } from './utils'
 
 export type {
   AsyncCleanupFn,
@@ -53,6 +54,7 @@ export {
    * @deprecated Use `streamToAsyncIteratorObject` instead.
    */
   streamToAsyncIteratorObject as streamToEventIterator,
+  TimeoutError,
 } from '@orpc/shared'
 
 export type {
@@ -76,7 +78,11 @@ export type {
 } from '@standard-server/core'
 
 export {
-  ErrorEvent,
+  /**
+   * @deprecated Use `EventStreamErrorEvent` instead.
+   */
+  EventStreamErrorEvent as ErrorEvent,
+  EventStreamErrorEvent,
   /**
    * Retrieves event metadata (such as the event id and retry interval)
    * attached to a single iterator event value.

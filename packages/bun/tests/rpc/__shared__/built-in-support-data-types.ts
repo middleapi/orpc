@@ -10,7 +10,7 @@ enum Test {
 /**
  * The data types that oRPC/rpc guarantees to be supported.
  */
-export const builtInRPCSupportDataTypes: { name: string, value: unknown, expected: unknown }[] = [
+export const builtInRPCSupportDataTypes: { name: string; value: unknown; expected: unknown }[] = [
   {
     name: 'enum',
     value: Test.B,
@@ -93,8 +93,14 @@ export const builtInRPCSupportDataTypes: { name: string, value: unknown, expecte
   },
   {
     name: 'map',
-    value: new Map([[1, 2], [3, 4]]),
-    expected: new Map([[1, 2], [3, 4]]),
+    value: new Map([
+      [1, 2],
+      [3, 4],
+    ]),
+    expected: new Map([
+      [1, 2],
+      [3, 4],
+    ]),
   },
   {
     name: 'set',

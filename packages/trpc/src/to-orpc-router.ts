@@ -1,31 +1,32 @@
-import type { AsyncIteratorClass } from '@orpc/shared'
-import type { AnyProcedure, AnyRouter, inferRouterContext } from '@trpc/server'
-import type { Parser, TrackedData } from '@trpc/server/unstable-core-do-not-import'
 import * as ORPC from '@orpc/server'
-import { isTypescriptObject, set, wrapAsyncIterator } from '@orpc/shared'
+import type { AsyncIteratorClass } from '@orpc/shared'
+import { isNonPrimitive, set, wrapAsyncIterator } from '@orpc/shared'
+import type { AnyProcedure, AnyRouter, inferRouterContext } from '@trpc/server'
 import { isTrackedEnvelope, TRPCError } from '@trpc/server'
+import type { Parser, TrackedData } from '@trpc/server/unstable-core-do-not-import'
 import { isAsyncIterable, isObject } from '@trpc/server/unstable-core-do-not-import'
 
-export type ToORPCOutput<T>
-  = T extends AsyncIterable<infer TData, infer TReturn, infer TNext>
+export type ToORPCOutput<T> =
+  T extends AsyncIterable<infer TData, infer TReturn, infer TNext>
     ? AsyncIteratorClass<TData, TReturn, TNext>
     : T
 
-export type ToORPCRouterResult<TContext extends ORPC.Context, TRecord extends Record<string, any>>
-  = {
-    [K in keyof TRecord]:
-    TRecord[K] extends AnyProcedure
-      ? ORPC.Procedure<
+export type ToORPCRouterResult<
+  TContext extends ORPC.Context,
+  TRecord extends Record<string, any>,
+> = {
+  [K in keyof TRecord]: TRecord[K] extends AnyProcedure
+    ? ORPC.Procedure<
         TContext,
-          object,
-          ORPC.Schema<TRecord[K]['_def']['$types']['input'], unknown>,
-          ORPC.Schema<unknown, ToORPCOutput<TRecord[K]['_def']['$types']['output']>>,
-          object
+        object,
+        ORPC.Schema<TRecord[K]['_def']['$types']['input'], unknown>,
+        ORPC.Schema<unknown, ToORPCOutput<TRecord[K]['_def']['$types']['output']>>,
+        object
       >
-      : TRecord[K] extends Record<string, any>
-        ? ToORPCRouterResult<TContext, TRecord[K]>
-        : never
-  }
+    : TRecord[K] extends Record<string, any>
+      ? ToORPCRouterResult<TContext, TRecord[K]>
+      : never
+}
 
 /**
  * Converts a tRPC router into an oRPC router that works with any oRPC feature.
@@ -37,20 +38,21 @@ export type ToORPCRouterResult<TContext extends ORPC.Context, TRecord extends Re
  */
 export function toORPCRouter<T extends AnyRouter>(
   router: T,
-): ToORPCRouterResult<
-  inferRouterContext<T>,
-  T['_def']['record']
-> {
+): ToORPCRouterResult<inferRouterContext<T>, T['_def']['record']> {
   const result = recordToORPCRouterRecord(router._def.record)
 
   for (const [key, item] of Object.entries(router._def.lazy)) {
-    set(result, key.split('.') as [string, ...string[]], new ORPC.Lazy({
-      meta: {},
-      loader: async () => {
-        const router = await item.ref()
-        return { default: toORPCRouter(router) }
-      },
-    }))
+    set(
+      result,
+      key.split('.') as [string, ...string[]],
+      new ORPC.Lazy({
+        meta: {},
+        loader: async () => {
+          const router = await item.ref()
+          return { default: toORPCRouter(router) }
+        },
+      }),
+    )
   }
 
   return result as any
@@ -64,8 +66,7 @@ function recordToORPCRouterRecord(records: AnyRouter['_def']['record']) {
 
     if (typeof item === 'function') {
       orpcRouter[key] = toORPCProcedure(item)
-    }
-    else {
+    } else {
       orpcRouter[key] = recordToORPCRouterRecord(item)
     }
   }
@@ -74,23 +75,30 @@ function recordToORPCRouterRecord(records: AnyRouter['_def']['record']) {
 }
 
 function toORPCProcedure(procedure: AnyProcedure) {
-  const inputSchema = toStandardSchema(procedure._def.inputs.at(-1))
+  const inputSchemas = procedure._def.inputs
+    .map(toStandardSchema)
+    .filter((schema) => schema !== undefined)
   const outputSchema = toStandardSchema((procedure._def as any).output)
+  const meta = (procedure._def.meta ?? {}) as ORPC.Meta
 
   return new ORPC.Procedure({
     errorMap: {},
-    meta: (procedure._def.meta ?? {}) as ORPC.Meta,
+    meta,
+    // `.router` (and similar) rebuilds meta from its own meta + the procedure's meta plugins,
+    // so the tRPC meta must be a plugin too, otherwise it would be dropped.
+    metaPlugins: [toTRPCMetaPlugin(meta)],
     orderedMiddlewares: [],
-    inputSchemas: inputSchema ? [inputSchema] : undefined,
+    inputSchemas: inputSchemas.length ? inputSchemas : undefined,
     outputSchemas: outputSchema ? [outputSchema] : undefined,
     // tRPC procedure calling already validates the input/output
     disableInputValidation: true,
     disableOutputValidation: true,
     handler: async ({ context, signal, path, input, lastEventId }) => {
       try {
-        const trpcInput = lastEventId !== undefined && (input === undefined || isObject(input))
-          ? { ...input, lastEventId }
-          : input
+        const trpcInput =
+          lastEventId !== undefined && (input === undefined || isObject(input))
+            ? { ...input, lastEventId }
+            : input
 
         const output = await procedure({
           ctx: context,
@@ -111,34 +119,51 @@ function toORPCProcedure(procedure: AnyProcedure) {
 
                 return {
                   done: result.done,
-                  value: ORPC.withEventMeta({
-                    id,
-                    data,
-                  } satisfies TrackedData<unknown>, {
-                    id,
-                  }),
+                  value: ORPC.withEventMeta(
+                    {
+                      id,
+                      data,
+                    } satisfies TrackedData<unknown>,
+                    {
+                      id,
+                    },
+                  ),
                 }
               }
 
               return result
             },
+            mapError: toORPCError,
           })
         }
 
         return output
-      }
-      catch (cause) {
-        if (cause instanceof TRPCError) {
-          throw new ORPC.ORPCError(cause.code, {
-            message: cause.message,
-            cause,
-          })
-        }
-
-        throw cause
+      } catch (cause) {
+        throw toORPCError(cause)
       }
     },
   })
+}
+
+/**
+ * Re-applies tRPC meta on top of the incoming meta, shallow merged like tRPC `.meta` calls.
+ */
+function toTRPCMetaPlugin(trpcMeta: ORPC.Meta): ORPC.AnyMetaPlugin {
+  return {
+    name: '~trpc',
+    init: (meta) => ({ ...meta, ...trpcMeta }),
+  }
+}
+
+function toORPCError<T>(error: T): T | ORPC.ORPCError<string, undefined> {
+  if (error instanceof TRPCError) {
+    return new ORPC.ORPCError(error.code, {
+      message: error.message,
+      cause: error,
+    })
+  }
+
+  return error
 }
 
 /**
@@ -146,7 +171,7 @@ function toORPCProcedure(procedure: AnyProcedure) {
  * so schemas remain usable for type inference and OpenAPI generation.
  */
 function toStandardSchema(schema: undefined | Parser): undefined | ORPC.AnySchema {
-  if (!isTypescriptObject(schema) || !('~standard' in schema) || !isTypescriptObject(schema['~standard'])) {
+  if (!isNonPrimitive(schema) || !('~standard' in schema) || !isNonPrimitive(schema['~standard'])) {
     return undefined
   }
 

@@ -1,9 +1,14 @@
-import type { ProcedureContractBuilderWithInput, ProcedureContractBuilderWithInputOutput, ProcedureContractBuilderWithOutput } from './builder-variants'
+import { describe, expectTypeOf, it } from 'vitest'
+import { z } from 'zod'
+
+import type {
+  ContractBuilderWithInput,
+  ContractBuilderWithInputOutput,
+  ContractBuilderWithOutput,
+} from './builder-variants'
 import type { MergedErrorMap } from './error-utils'
 import type { Meta } from './meta'
 import type { MergedSchema, Schema } from './schema'
-import { describe, expectTypeOf, it } from 'vitest'
-import { z } from 'zod'
 
 const errorMap = {
   BASE: {
@@ -13,20 +18,17 @@ const errorMap = {
 }
 
 // Schemas should have distinct TInput and TOutput types to ensure correct inference.
-const schema1 = z.object({ schema1: z.number().transform(n => `${n}`) })
-const schema2 = z.object({ schema2: z.number().transform(n => `${n}`) })
+const schema1 = z.object({ schema1: z.number().transform((n) => `${n}`) })
+const schema2 = z.object({ schema2: z.number().transform((n) => `${n}`) })
 
-describe('ProcedureContractBuilderWithInput', () => {
-  const builder = {} as ProcedureContractBuilderWithInput<
-        typeof schema1,
-        typeof errorMap
-  >
+describe('ContractBuilderWithInput', () => {
+  const builder = {} as ContractBuilderWithInput<typeof schema1, typeof errorMap>
 
   it('.errors', () => {
     expectTypeOf(builder.errors({ INVALID: { message: 'invalid' } })).toEqualTypeOf<
-      ProcedureContractBuilderWithInput<
-                typeof schema1,
-                MergedErrorMap<typeof errorMap, { INVALID: { message: string } }>
+      ContractBuilderWithInput<
+        typeof schema1,
+        MergedErrorMap<typeof errorMap, { INVALID: { message: string } }>
       >
     >()
 
@@ -39,17 +41,14 @@ describe('ProcedureContractBuilderWithInput', () => {
     expectTypeOf(builder.meta(plugin)).toEqualTypeOf<typeof builder>()
 
     // @ts-expect-error - invalid meta
-    builder.meta({ } as MetaPlugin<Schema<'invalid'>, any, any>)
+    builder.meta({} as MetaPlugin<Schema<'invalid'>, any, any>)
   })
 
   it('.input', () => {
     const extraSchema = z.object({ extra: z.string() })
 
     expectTypeOf(builder.input(extraSchema)).toEqualTypeOf<
-      ProcedureContractBuilderWithInput<
-        MergedSchema<typeof extraSchema, typeof schema1>,
-        typeof errorMap
-      >
+      ContractBuilderWithInput<MergedSchema<typeof extraSchema, typeof schema1>, typeof errorMap>
     >()
 
     // @ts-expect-error - schema is invalid
@@ -58,11 +57,7 @@ describe('ProcedureContractBuilderWithInput', () => {
 
   it('.output', () => {
     expectTypeOf(builder.output(schema2)).toEqualTypeOf<
-      ProcedureContractBuilderWithInputOutput<
-                typeof schema1,
-                typeof schema2,
-                typeof errorMap
-      >
+      ContractBuilderWithInputOutput<typeof schema1, typeof schema2, typeof errorMap>
     >()
 
     // @ts-expect-error - schema is invalid
@@ -70,17 +65,14 @@ describe('ProcedureContractBuilderWithInput', () => {
   })
 })
 
-describe('ProcedureContractBuilderWithOutput', () => {
-  const builder = {} as ProcedureContractBuilderWithOutput<
-    typeof schema2,
-    typeof errorMap
-  >
+describe('ContractBuilderWithOutput', () => {
+  const builder = {} as ContractBuilderWithOutput<typeof schema2, typeof errorMap>
 
   it('.errors', () => {
     expectTypeOf(builder.errors({ INVALID: { message: 'invalid' } })).toEqualTypeOf<
-      ProcedureContractBuilderWithOutput<
-                typeof schema2,
-                MergedErrorMap<typeof errorMap, { INVALID: { message: string } }>
+      ContractBuilderWithOutput<
+        typeof schema2,
+        MergedErrorMap<typeof errorMap, { INVALID: { message: string } }>
       >
     >()
 
@@ -93,16 +85,12 @@ describe('ProcedureContractBuilderWithOutput', () => {
     expectTypeOf(builder.meta(plugin)).toEqualTypeOf<typeof builder>()
 
     // @ts-expect-error - invalid meta
-    builder.meta({ } as MetaPlugin<Schema<'invalid'>, any, any>)
+    builder.meta({} as MetaPlugin<Schema<'invalid'>, any, any>)
   })
 
   it('.input', () => {
     expectTypeOf(builder.input(schema1)).toEqualTypeOf<
-      ProcedureContractBuilderWithInputOutput<
-                typeof schema1,
-                typeof schema2,
-                typeof errorMap
-      >
+      ContractBuilderWithInputOutput<typeof schema1, typeof schema2, typeof errorMap>
     >()
 
     // @ts-expect-error - schema is invalid
@@ -113,10 +101,7 @@ describe('ProcedureContractBuilderWithOutput', () => {
     const extraSchema = z.object({ extra: z.string() })
 
     expectTypeOf(builder.output(extraSchema)).toEqualTypeOf<
-      ProcedureContractBuilderWithOutput<
-        MergedSchema<typeof extraSchema, typeof schema2>,
-        typeof errorMap
-      >
+      ContractBuilderWithOutput<MergedSchema<typeof extraSchema, typeof schema2>, typeof errorMap>
     >()
 
     // @ts-expect-error - schema is invalid
@@ -124,19 +109,19 @@ describe('ProcedureContractBuilderWithOutput', () => {
   })
 })
 
-describe('ProcedureContractBuilderWithInputOutput', () => {
-  const builder = {} as ProcedureContractBuilderWithInputOutput<
-        typeof schema1,
-        typeof schema2,
-        typeof errorMap
+describe('ContractBuilderWithInputOutput', () => {
+  const builder = {} as ContractBuilderWithInputOutput<
+    typeof schema1,
+    typeof schema2,
+    typeof errorMap
   >
 
   it('.errors', () => {
     expectTypeOf(builder.errors({ INVALID: { message: 'invalid' } })).toEqualTypeOf<
-      ProcedureContractBuilderWithInputOutput<
-                typeof schema1,
-                typeof schema2,
-                MergedErrorMap<typeof errorMap, { INVALID: { message: string } }>
+      ContractBuilderWithInputOutput<
+        typeof schema1,
+        typeof schema2,
+        MergedErrorMap<typeof errorMap, { INVALID: { message: string } }>
       >
     >()
 
@@ -149,14 +134,14 @@ describe('ProcedureContractBuilderWithInputOutput', () => {
     expectTypeOf(builder.meta(plugin)).toEqualTypeOf<typeof builder>()
 
     // @ts-expect-error - invalid meta
-    builder.meta({ } as MetaPlugin<Schema<'invalid'>, any, any>)
+    builder.meta({} as MetaPlugin<Schema<'invalid'>, any, any>)
   })
 
   it('.input', () => {
     const extraSchema = z.object({ extra: z.string() })
 
     expectTypeOf(builder.input(extraSchema)).toEqualTypeOf<
-      ProcedureContractBuilderWithInputOutput<
+      ContractBuilderWithInputOutput<
         MergedSchema<typeof extraSchema, typeof schema1>,
         typeof schema2,
         typeof errorMap
@@ -171,7 +156,7 @@ describe('ProcedureContractBuilderWithInputOutput', () => {
     const extraSchema = z.object({ extra: z.string() })
 
     expectTypeOf(builder.output(extraSchema)).toEqualTypeOf<
-      ProcedureContractBuilderWithInputOutput<
+      ContractBuilderWithInputOutput<
         typeof schema1,
         MergedSchema<typeof extraSchema, typeof schema2>,
         typeof errorMap

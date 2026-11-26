@@ -1,7 +1,14 @@
 import type { ThrowableError } from '@orpc/shared'
-import type { StandardHandlerInterceptor, StandardHandlerInterceptorOptions, StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '../adapters/standard'
-import type { Context } from '../context'
 import { toArray } from '@orpc/shared'
+
+import type {
+  StandardHandlerInterceptor,
+  StandardHandlerInterceptorOptions,
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+  StandardHandlerRoutingInterceptor,
+} from '../adapters/standard/index'
+import type { Context } from '../context'
 
 export interface RethrowHandlerPluginOptions<T extends Context> {
   /**
@@ -28,7 +35,7 @@ export interface RethrowHandlerPluginOptions<T extends Context> {
  * @see {@link https://orpc.dev/docs/plugins/rethrow | Rethrow Handler Plugin}
  */
 export class RethrowHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  name = '~rethrow'
+  readonly name = '~rethrow'
 
   private readonly filter: RethrowHandlerPluginOptions<T>['filter']
   private readonly CONTEXT_SYMBOL = Symbol('ORPC_RETHROW_HANDLER_PLUGIN_CONTEXT')
@@ -62,14 +69,15 @@ export class RethrowHandlerPlugin<T extends Context> implements StandardHandlerP
       const pluginContext = options.context[this.CONTEXT_SYMBOL] as PluginContext | undefined
 
       if (!pluginContext) {
-        throw new TypeError('[RethrowHandlerPlugin] Rethrow handler context has been corrupted or modified by another plugin or interceptor')
+        throw new TypeError(
+          '[RethrowHandlerPlugin] Rethrow handler context has been corrupted or modified by another plugin or interceptor',
+        )
       }
 
       try {
         // await is important here to catch both sync and async errors
         return await options.next()
-      }
-      catch (error) {
+      } catch (error) {
         if (this.filter(error as ThrowableError, options)) {
           pluginContext.error = { value: error as ThrowableError }
         }

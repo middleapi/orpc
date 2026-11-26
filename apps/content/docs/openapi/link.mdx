@@ -1,6 +1,6 @@
 ---
-title: "OpenAPI Link"
-description: "Use OpenAPILink to call HTTP endpoints served by OpenAPI Handler or any OpenAPI-compliant server through a typesafe oRPC client."
+title: 'OpenAPI Link'
+description: 'Use OpenAPILink to call HTTP endpoints served by OpenAPI Handler or any OpenAPI-compliant server through a typesafe oRPC client.'
 ---
 
 ## Overview
@@ -18,16 +18,14 @@ const link = new OpenAPILink(contract, {
 
       try {
         return await next()
-      }
-      finally {
+      } finally {
         console.timeEnd(path.join('.'))
       }
     },
   ],
-  plugins: [
-    new RetryAfterLinkPlugin(),
-  ],
-  fetch: (url, init) => { // <- only available in fetch adapter
+  plugins: [new RetryAfterLinkPlugin()],
+  fetch: (url, init) => {
+    // <- only available in fetch adapter
     return globalThis.fetch(url, {
       ...init,
       credentials: 'include', // Include cookies on cross-origin requests
@@ -38,11 +36,10 @@ const link = new OpenAPILink(contract, {
 
 :::warning
 To better support `Blob`, `File`, and `ReadableStream<Uint8Array>` at the root level in cross-origin scenarios,
-extend your [CORS allowlist](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_response_header) to allow clients to send and receive the `Content-Disposition` and `Standard-Server` headers. Learn more in the [Standard Server documentation](https://github.com/middleapi/standard-server#how-body-parsing-works). If you use the [CORS Plugin](/docs/plugins/cors), include them in `allowHeaders` and `exposeHeaders`:
+extend your [CORS allowlist](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_response_header) to allow clients to read the `Content-Disposition` and `Standard-Server` response headers. Learn more in the [Standard Server documentation](https://github.com/middleapi/standard-server#how-body-parsing-works). If you use the [CORS Plugin](/docs/plugins/cors), include them in `exposeHeaders`:
 
 ```ts
 const cors = new CORSHandlerPlugin({
-  allowHeaders: ['Content-Disposition', 'Standard-Server'],
   exposeHeaders: ['Content-Disposition', 'Standard-Server'],
 })
 ```
@@ -60,7 +57,8 @@ import { JsonifiedClient } from '@orpc/openapi'
 import { RouterClient } from '@orpc/server'
 
 // if you are following contract-first approach
-const contractClient: JsonifiedClient<RouterContractClient<typeof contract>> = createORPCClient(link)
+const contractClient: JsonifiedClient<RouterContractClient<typeof contract>> =
+  createORPCClient(link)
 
 // if you are following normal approach
 const routerClient: JsonifiedClient<RouterClient<typeof router>> = createORPCClient(link)
@@ -128,7 +126,7 @@ Each option can also be a function to dynamically customize values per request. 
 
 ```ts
 const link = new OpenAPILink<ClientContext>(contract, {
-  origin: ({ path, context }) => {
+  origin: (options, path) => {
     if (path[0] === 'internal') {
       return 'https://internal.example.com'
     }
@@ -160,12 +158,10 @@ const link = new OpenAPILink(contract, {
       try {
         const output = await next()
         return output
-      }
-      catch (err) {
+      } catch (err) {
         console.error(`${path.join('.')}:`, err)
         throw err
-      }
-      finally {
+      } finally {
         console.timeEnd(path.join('.'))
       }
     },
@@ -204,9 +200,7 @@ Plugins package reusable interceptors. For example, [Retry After Plugin](/docs/p
 
 ```ts
 const link = new OpenAPILink(contract, {
-  plugins: [
-    new RetryAfterLinkPlugin(),
-  ],
+  plugins: [new RetryAfterLinkPlugin()],
 })
 ```
 
@@ -226,40 +220,90 @@ const link = new OpenAPILink(contract, {
 
 ## Custom Error Decoding
 
-If your server returns error responses that don't match oRPC's expected format, use `customErrorResponseBodyDecoder` to customize the decoding logic. This works together with [Custom Error Response](/docs/openapi/handler#custom-error-response) on the server.
+If your server returns error responses that don't match oRPC's expected format, use `errorResponseBodyDecoder` to customize the decoding logic. This works together with [Custom Error Response](/docs/openapi/handler#custom-error-response) on the server.
 
 ```ts
+import { ORPCError } from '@orpc/client'
+
 const link = new OpenAPILink(contract, {
-  customErrorResponseBodyDecoder: (body, response) => {
+  errorResponseBodyDecoder: (body, response, defaultError) => {
     if (response.status === 422 && typeof body === 'object' && body && 'detail' in body) {
       return new ORPCError('BAD_REQUEST', {
         message: String(body.detail),
       })
     }
 
-    // fallback to default error decoding logic by returning null or undefined
-    return null
+    return defaultError()
   },
 })
 ```
 
-## Malformed Responses
-
-When `OpenAPILink` cannot decode a response, for example when a proxy or gateway answers instead of your handler, it produces an `ORPCError` with code `MALFORMED_ORPC_RESPONSE` and a message inferred from the body or status. Its `cause` is a `MalformedResponseError` carrying the resolved response:
+If the handler sets [`errorResponseContentType`](/docs/openapi/handler#custom-error-response), set the same value on the link so those error responses are parsed as JSON:
 
 ```ts
-import { MalformedResponseError, ORPCError, onError } from '@orpc/client'
+const link = new OpenAPILink(contract, {
+  errorResponseContentType: 'application/problem+json',
+})
+```
+
+## Error Responses
+
+When the server answers with an error, `OpenAPILink` throws an `ORPCError` whose `cause` is a `ResponseError` carrying the resolved response, so details that are not part of the error itself, such as its status or headers, stay available (errors returned by [`errorResponseBodyDecoder`](#custom-error-decoding) are thrown as-is):
+
+```ts
+import { onError, ORPCError, ResponseError } from '@orpc/client'
 
 const link = new OpenAPILink(contract, {
   interceptors: [
     onError((error) => {
-      if (error instanceof ORPCError && error.cause instanceof MalformedResponseError) {
-        console.error('Malformed response:', error.cause.response.status, error.cause.response.body)
+      if (error instanceof ORPCError && error.cause instanceof ResponseError) {
+        console.error(
+          'Request failed:',
+          error.cause.response.status,
+          error.cause.response.headers['x-request-id'],
+        )
       }
     }),
   ],
 })
 ```
+
+## Malformed Responses
+
+When `OpenAPILink` cannot decode a response, for example when a proxy or gateway answers instead of your handler, it throws a `MalformedResponseError` instead of an `ORPCError`. It extends `ResponseError`, so it carries the resolved response, and its message is inferred from the body or status:
+
+```ts
+import { MalformedResponseError, onError } from '@orpc/client'
+
+const link = new OpenAPILink(contract, {
+  interceptors: [
+    onError((error) => {
+      if (error instanceof MalformedResponseError) {
+        console.error('Malformed response:', error.response.status, error.response.body)
+      }
+    }),
+  ],
+})
+```
+
+## Redirect Responses
+
+`OpenAPILink` doesn't set the `redirect` option, so how a [redirect response](/docs/openapi/input-and-output-mapping#redirect-response) is handled depends on your `fetch` implementation. Most follow redirects by default and return the final response, but not all do. To make the behavior explicit, set `redirect` in a custom `fetch`: `'follow'` to follow redirects, or `'manual'` to get the `3xx` response as the output:
+
+```ts
+const link = new OpenAPILink(contract, {
+  fetch: (url, init) => {
+    return globalThis.fetch(url, {
+      ...init,
+      redirect: 'manual', // or 'follow'
+    })
+  },
+})
+```
+
+:::warning
+`redirect: 'manual'` works only in server runtimes. Browsers hide manual redirect responses, so the call throws.
+:::
 
 ## Event Stream Options
 
@@ -269,14 +313,15 @@ Configure how an [AsyncIteratorObject](/docs/async-iterator-object) is streamed 
 const link = new OpenAPILink(contract, {
   toFetchRequest: {
     eventStream: {
+      /**
+       * Initial comment sent immediately upon stream start to flush headers. This allows the
+       * receiving side to establish the connection without waiting for the first event.
+       *
+       * `false` disables it, an object customizes it.
+       *
+       * @default true
+       */
       initialComment: {
-        /**
-         * If true, an initial comment is sent immediately upon stream start to flush headers.
-         * This allows the receiving side to establish the connection without waiting for the first event.
-         *
-         * @default true
-         */
-        enabled: true,
         /**
          * The content of the initial comment sent upon stream start. Must not include newline characters.
          *
@@ -284,13 +329,14 @@ const link = new OpenAPILink(contract, {
          */
         comment: '',
       },
+      /**
+       * Ping comment sent periodically to keep the connection alive.
+       *
+       * `false` disables it, an object customizes it.
+       *
+       * @default true
+       */
       keepAlive: {
-        /**
-         * If true, a ping comment is sent periodically to keep the connection alive.
-         *
-         * @default true
-         */
-        enabled: true,
         /**
          * Interval (in milliseconds) between ping comments sent after the last event.
          *

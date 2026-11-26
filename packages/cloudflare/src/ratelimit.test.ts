@@ -1,6 +1,7 @@
-import type { CloudflareRateLimiterOptions } from './ratelimit'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
+
+import type { CloudflareRateLimiterOptions } from './ratelimit'
 import { CloudflareRateLimiter } from './ratelimit'
 
 describe('cloudflareRateLimiter', () => {
@@ -20,9 +21,11 @@ describe('cloudflareRateLimiter', () => {
       try {
         await spend(`user:${crypto.randomUUID()}`)
         return
-      }
-      catch (error) {
-        if (remaining === 1 || Math.floor(started / PERIOD_MS) === Math.floor(Date.now() / PERIOD_MS)) {
+      } catch (error) {
+        if (
+          remaining === 1 ||
+          Math.floor(started / PERIOD_MS) === Math.floor(Date.now() / PERIOD_MS)
+        ) {
           throw error
         }
       }
@@ -70,6 +73,15 @@ describe('cloudflareRateLimiter', () => {
     expect(limit).toHaveBeenNthCalledWith(1, { key: 'prefix:user:123' })
     expect(limit).toHaveBeenNthCalledWith(2, { key: 'prefix:user:123' })
     expect(limit).toHaveBeenNthCalledWith(3, { key: 'prefix:user:123' })
+  })
+
+  it('shares the underlying limiter with limiters created by prefix', async () => {
+    const limit = vi.fn(async () => ({ success: true }))
+    const limiter = new CloudflareRateLimiter({ limit }, { prefix: 'prefix:' })
+
+    await limiter.prefix('tenant:').limit('user:123')
+
+    expect(limit).toHaveBeenCalledExactlyOnceWith({ key: 'prefix:tenant:user:123' })
   })
 
   it('uses the key unmodified when no prefix is configured', async () => {

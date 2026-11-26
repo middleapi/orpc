@@ -1,11 +1,12 @@
-import type { RateLimiter } from './types'
-import { os, type } from '@orpc/server'
+import { ORPCError, os, type } from '@orpc/server'
+
 import { ratelimit } from './middleware'
+import type { RateLimiter, RateLimitResult } from './types'
 
 describe('ratelimit', () => {
   it('can infer context & input & meta types', () => {
     const procedure = os
-      .$context<{ userId: string, rateLimiter: RateLimiter }>()
+      .$context<{ userId: string; rateLimiter: RateLimiter }>()
       .input(type<{ amount: number }>())
       .use(({ next }) => {
         return next({
@@ -36,6 +37,14 @@ describe('ratelimit', () => {
             expectTypeOf(context.db).toBeString()
 
             return 1
+          },
+          error: (result, { context }, input) => {
+            expectTypeOf(result).toEqualTypeOf<RateLimitResult>()
+            expectTypeOf(input.amount).toBeNumber()
+            expectTypeOf(context.userId).toBeString()
+            expectTypeOf(context.db).toBeString()
+
+            return new ORPCError('RATE_LIMITED')
           },
         }),
       )

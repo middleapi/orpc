@@ -1,11 +1,13 @@
 import type { ORPCError } from '@orpc/client'
 import type { ContractClientFactory } from '@orpc/contract'
+import { meta, oc, type } from '@orpc/contract'
+import type { ContractJsonifiedClientFactory } from '@orpc/openapi'
 import type { PromiseWithError } from '@orpc/shared'
+
+import { createContractJsonifiedUtilsFactory, createContractUtilsFactory } from './contract-utils'
 import type { ProcedureUtils } from './procedure-utils'
 import type { SharedUtils } from './shared-utils'
-import type { OperationContext } from './types'
-import { meta, oc, type } from '@orpc/contract'
-import { createContractJsonifiedUtilsFactory, createContractUtilsFactory } from './contract-utils'
+import type { TanstackQueryOperationContext } from './types'
 
 const contract = {
   ping: oc.meta(meta.path(['ping'])),
@@ -18,21 +20,20 @@ const contract = {
   },
 }
 
-describe('createContractUtilsFactory', () => {
-  const clientFactory = {} as ContractClientFactory<{ cache?: boolean }>
+const clientFactory = {} as ContractClientFactory<{ cache?: boolean }>
+const jsonifiedClientFactory = {} as ContractJsonifiedClientFactory<{ cache?: boolean }>
 
+describe('createContractUtilsFactory', () => {
   it('infers interceptor input, output, errors types', () => {
     createContractUtilsFactory(clientFactory, {
       mutationInterceptors: [
         async ({ context, next, input }) => {
           expectTypeOf(input).toEqualTypeOf<unknown>()
-          expectTypeOf(context).toEqualTypeOf<{ cache?: boolean } & OperationContext>()
+          expectTypeOf(context).toEqualTypeOf<{ cache?: boolean } & TanstackQueryOperationContext>()
 
           const result = next()
 
-          expectTypeOf(result).toEqualTypeOf<
-            PromiseWithError<unknown, unknown>
-          >()
+          expectTypeOf(result).toEqualTypeOf<PromiseWithError<unknown, unknown>>()
 
           return result
         },
@@ -42,7 +43,9 @@ describe('createContractUtilsFactory', () => {
           queryInterceptors: [
             async ({ context, next, input }) => {
               expectTypeOf(input).toEqualTypeOf<unknown>()
-              expectTypeOf(context).toEqualTypeOf<{ cache?: boolean } & OperationContext>()
+              expectTypeOf(context).toEqualTypeOf<
+                { cache?: boolean } & TanstackQueryOperationContext
+              >()
 
               const result = next()
 
@@ -59,7 +62,9 @@ describe('createContractUtilsFactory', () => {
             mutationInterceptors: [
               async ({ context, next, input }) => {
                 expectTypeOf(input).toEqualTypeOf<unknown>()
-                expectTypeOf(context).toEqualTypeOf<{ cache?: boolean } & OperationContext>()
+                expectTypeOf(context).toEqualTypeOf<
+                  { cache?: boolean } & TanstackQueryOperationContext
+                >()
 
                 const result = next()
 
@@ -81,7 +86,10 @@ describe('createContractUtilsFactory', () => {
     const utils = createUtils(contract.nested.pong)
 
     expectTypeOf(utils).toEqualTypeOf<
-      & Omit<ProcedureUtils<{ cache?: boolean }, string, Date, Error | ORPCError<'BAD_GATEWAY', URL>>, 'path' | 'options'>
+      Omit<
+        ProcedureUtils<{ cache?: boolean }, string, Date, Error | ORPCError<'BAD_GATEWAY', URL>>,
+        'path' | 'options'
+      >
     >()
   })
 
@@ -90,7 +98,10 @@ describe('createContractUtilsFactory', () => {
     const utils = createUtils(contract)
 
     expectTypeOf(utils.nested.pong).toEqualTypeOf<
-      & Omit<ProcedureUtils<{ cache?: boolean }, string, Date, Error | ORPCError<'BAD_GATEWAY', URL>>, 'path' | 'options'>
+      Omit<
+        ProcedureUtils<{ cache?: boolean }, string, Date, Error | ORPCError<'BAD_GATEWAY', URL>>,
+        'path' | 'options'
+      >
     >()
 
     expectTypeOf(utils.key).toEqualTypeOf<SharedUtils<unknown>['key']>()
@@ -98,20 +109,16 @@ describe('createContractUtilsFactory', () => {
 })
 
 describe('createContractJsonifiedUtilsFactory', () => {
-  const clientFactory = {} as ContractClientFactory<{ cache?: boolean }>
-
   it('infers interceptor input, output, errors types', () => {
-    createContractJsonifiedUtilsFactory(clientFactory, {
+    createContractJsonifiedUtilsFactory(jsonifiedClientFactory, {
       mutationInterceptors: [
         async ({ context, next, input }) => {
           expectTypeOf(input).toEqualTypeOf<unknown>()
-          expectTypeOf(context).toEqualTypeOf<{ cache?: boolean } & OperationContext>()
+          expectTypeOf(context).toEqualTypeOf<{ cache?: boolean } & TanstackQueryOperationContext>()
 
           const result = next()
 
-          expectTypeOf(result).toEqualTypeOf<
-            PromiseWithError<unknown, unknown>
-          >()
+          expectTypeOf(result).toEqualTypeOf<PromiseWithError<unknown, unknown>>()
 
           return result
         },
@@ -121,7 +128,9 @@ describe('createContractJsonifiedUtilsFactory', () => {
           queryInterceptors: [
             async ({ context, next, input }) => {
               expectTypeOf(input).toEqualTypeOf<unknown>()
-              expectTypeOf(context).toEqualTypeOf<{ cache?: boolean } & OperationContext>()
+              expectTypeOf(context).toEqualTypeOf<
+                { cache?: boolean } & TanstackQueryOperationContext
+              >()
 
               const result = next()
 
@@ -138,7 +147,9 @@ describe('createContractJsonifiedUtilsFactory', () => {
             mutationInterceptors: [
               async ({ context, next, input }) => {
                 expectTypeOf(input).toEqualTypeOf<unknown>()
-                expectTypeOf(context).toEqualTypeOf<{ cache?: boolean } & OperationContext>()
+                expectTypeOf(context).toEqualTypeOf<
+                  { cache?: boolean } & TanstackQueryOperationContext
+                >()
 
                 const result = next()
 
@@ -156,20 +167,36 @@ describe('createContractJsonifiedUtilsFactory', () => {
   })
 
   it('return jsonified general and procedure utils', () => {
-    const createUtils = createContractJsonifiedUtilsFactory(clientFactory, {})
+    const createUtils = createContractJsonifiedUtilsFactory(jsonifiedClientFactory, {})
     const utils = createUtils(contract.nested.pong)
 
     expectTypeOf(utils).toEqualTypeOf<
-      & Omit<ProcedureUtils<{ cache?: boolean }, string, string, Error | ORPCError<'BAD_GATEWAY', string>>, 'path' | 'options'>
+      Omit<
+        ProcedureUtils<
+          { cache?: boolean },
+          string,
+          string,
+          Error | ORPCError<'BAD_GATEWAY', string>
+        >,
+        'path' | 'options'
+      >
     >()
   })
 
   it('returns jsonified router utils when a router contract is passed', () => {
-    const createUtils = createContractJsonifiedUtilsFactory(clientFactory, {})
+    const createUtils = createContractJsonifiedUtilsFactory(jsonifiedClientFactory, {})
     const utils = createUtils(contract)
 
     expectTypeOf(utils.nested.pong).toEqualTypeOf<
-      & Omit<ProcedureUtils<{ cache?: boolean }, string, string, Error | ORPCError<'BAD_GATEWAY', string>>, 'path' | 'options'>
+      Omit<
+        ProcedureUtils<
+          { cache?: boolean },
+          string,
+          string,
+          Error | ORPCError<'BAD_GATEWAY', string>
+        >,
+        'path' | 'options'
+      >
     >()
   })
 })

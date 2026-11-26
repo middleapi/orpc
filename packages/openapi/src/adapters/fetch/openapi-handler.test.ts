@@ -1,7 +1,11 @@
-import type { StandardHandlerPlugin } from '@orpc/server/standard'
+import { createORPCClient, ORPCError } from '@orpc/client'
 import { os } from '@orpc/server'
+import { RethrowHandlerPlugin } from '@orpc/server/plugins'
+import type { StandardHandlerPlugin } from '@orpc/server/standard'
+
 import { openapi } from '../../meta'
 import { OpenAPIHandler } from './openapi-handler'
+import { OpenAPILink } from './openapi-link'
 
 describe('openapiHandler', () => {
   beforeEach(() => {
@@ -48,6 +52,43 @@ describe('openapiHandler', () => {
     expect(misMatchPrefixResult.response).toBeUndefined()
   })
 
+  it('routes an OpenAPILink call with a raw char to its static route, not a dynamic sibling', async () => {
+    const router = {
+      beta: os.meta(openapi({ method: 'GET', path: '/v1^beta/items' })).handler(() => 'beta'),
+      version: os
+        .meta(openapi({ method: 'GET', path: '/{version}/items' }))
+        .handler(() => 'version'),
+    }
+
+    const handler = new OpenAPIHandler(router)
+
+    const fetch = vi.fn(async (url: string, init: RequestInit) => {
+      const { matched, response } = await handler.handle(new Request(url, init), { prefix: '/api' })
+
+      if (!matched || !response) {
+        throw new Error('No procedure match')
+      }
+
+      return response
+    })
+
+    const client = createORPCClient<any>(
+      new OpenAPILink(router, {
+        fetch,
+        origin: 'http://localhost:3000',
+        url: '/api',
+      }),
+    )
+
+    await expect(client.beta()).resolves.toBe('beta')
+    expect(fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/api/v1^beta/items',
+      expect.anything(),
+      expect.anything(),
+      ['beta'],
+    )
+  })
+
   it('supports standard handler plugins', async () => {
     const plugin: StandardHandlerPlugin<any> = {
       name: 'test',
@@ -55,7 +96,10 @@ describe('openapiHandler', () => {
         return {
           ...options,
           routingInterceptors: [
-            async () => ({ matched: true, response: { status: 200, headers: {}, body: 'intercepted' } }),
+            async () => ({
+              matched: true,
+              response: { status: 200, headers: {}, body: 'intercepted' },
+            }),
           ],
         }
       },
@@ -69,5 +113,26 @@ describe('openapiHandler', () => {
     expect(response).toBeInstanceOf(Response)
     expect(response!.status).toBe(200)
     return expect(response!.text()).resolves.toBe('"intercepted"')
+  })
+})
+
+describe('openapiHandler with RethrowHandlerPlugin', () => {
+  const ping = vi.fn()
+  const handler = new OpenAPIHandler(
+    { ping: os.meta(openapi({ method: 'POST', path: '/ping' })).handler(ping) },
+    { plugins: [new RethrowHandlerPlugin({ filter: (error) => !(error instanceof ORPCError) })] },
+  )
+
+  it('responds 400 to a malformed body instead of rethrowing it', async () => {
+    const { response } = await handler.handle(
+      new Request('http://localhost/ping', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{bad',
+      }),
+    )
+
+    expect(response?.status).toBe(400)
+    expect(ping).not.toHaveBeenCalled()
   })
 })

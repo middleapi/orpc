@@ -1,5 +1,6 @@
 import { ORPCError, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
+
 import { RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL, RateLimitHandlerPlugin } from './handler-plugin'
 
 describe('ratelimitHandlerPlugin', () => {
@@ -7,9 +8,16 @@ describe('ratelimitHandlerPlugin', () => {
   const procedure = os.handler(handlerFn)
   const handler = new RPCHandler(procedure, {
     allowMethods: ['GET'], // tests below send GET requests
-    plugins: [
-      new RateLimitHandlerPlugin(),
-    ],
+    plugins: [new RateLimitHandlerPlugin()],
+  })
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_700_000_000_000)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('adds rate limit headers to a successful response after a limit check', async () => {
@@ -32,7 +40,7 @@ describe('ratelimitHandlerPlugin', () => {
 
     expect(response!.headers.get('ratelimit-limit')).toBe('100')
     expect(response!.headers.get('ratelimit-remaining')).toBe('50')
-    expect(response!.headers.get('ratelimit-reset')).toBe(reset.toString())
+    expect(response!.headers.get('ratelimit-reset')).toBe('60') // seconds until reset
     expect(response!.headers.get('retry-after')).toBe(null)
   })
 
@@ -58,8 +66,51 @@ describe('ratelimitHandlerPlugin', () => {
 
     expect(response!.headers.get('ratelimit-limit')).toBe('100')
     expect(response!.headers.get('ratelimit-remaining')).toBe('50')
-    expect(response!.headers.get('ratelimit-reset')).toBe(reset.toString())
+    expect(response!.headers.get('ratelimit-reset')).toBe('60') // seconds until reset
     expect(response!.headers.get('retry-after')).toBe('60') // 60s
+  })
+
+  it('reports ratelimit-reset as seconds until reset, rounded up and never negative', async () => {
+    for (const [offset, expected] of [
+      [1500, '2'],
+      [1000, '1'],
+      [1, '1'],
+      [0, '0'],
+      [-5000, '0'],
+    ] as const) {
+      handlerFn.mockImplementationOnce(({ context, path, procedure }) => {
+        context[RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL].checks.push({
+          path,
+          procedure,
+          result: { success: false, limit: 10, remaining: 0, reset: Date.now() + offset },
+        })
+
+        throw new ORPCError('TOO_MANY_REQUESTS')
+      })
+
+      const { response } = await handler.handle(new Request('http://localhost:3000'))
+
+      expect(response!.headers.get('ratelimit-reset')).toBe(expected)
+      expect(response!.headers.get('retry-after')).toBe(expected)
+    }
+  })
+
+  it('omits ratelimit-reset and retry-after when the limiter reports no reset', async () => {
+    handlerFn.mockImplementationOnce(({ context, path, procedure }) => {
+      context[RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL].checks.push({
+        path,
+        procedure,
+        result: { success: false },
+      })
+
+      throw new ORPCError('TOO_MANY_REQUESTS')
+    })
+
+    const { response } = await handler.handle(new Request('http://localhost:3000'))
+
+    expect(response!.status).toBe(429)
+    expect(response!.headers.get('ratelimit-reset')).toBe(null)
+    expect(response!.headers.get('retry-after')).toBe(null)
   })
 
   it('skips rate limit headers when no limit check ran for the request', async () => {
@@ -130,7 +181,7 @@ describe('ratelimitHandlerPlugin', () => {
 
     expect(response!.headers.get('ratelimit-limit')).toBe('100')
     expect(response!.headers.get('ratelimit-remaining')).toBe('2')
-    expect(response!.headers.get('ratelimit-reset')).toBe(reset.toString())
+    expect(response!.headers.get('ratelimit-reset')).toBe('60') // seconds until reset
     expect(response!.headers.get('retry-after')).toBe(null)
   })
 })

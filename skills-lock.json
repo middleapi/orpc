@@ -5,19 +5,19 @@
       "source": "haydenbleasel/blume",
       "sourceType": "github",
       "skillPath": "skills/blume/SKILL.md",
-      "computedHash": "bba88e2dccc4170e16220e21054b4978f37e6f52afaff072f7ad66e192821a40"
+      "computedHash": "282e79ef5cd50b10371134b1d172fc528c60ae9a3cc12a03e9f192df858961ad"
     },
     "blume-migrate": {
       "source": "haydenbleasel/blume",
       "sourceType": "github",
       "skillPath": "skills/blume-migrate/SKILL.md",
-      "computedHash": "dd17b5708dd58d294a1a9e0115b4557cbc56b6ae45035031ccbac755e8e0a920"
+      "computedHash": "99e3e64d4d541b1a3043cca323511a8392004817a2dbd89855f4554fb224e493"
     },
     "blume-update-docs": {
       "source": "haydenbleasel/blume",
       "sourceType": "github",
       "skillPath": "skills/blume-update-docs/SKILL.md",
-      "computedHash": "0b49689a8d949583b7773b5914a219d5d998547a54143c3bf9532ede06b778df"
+      "computedHash": "484f1f58068762161d7322dfb52383684156b52a8998c44d918e80e9d91ec7a3"
     }
   }
 }

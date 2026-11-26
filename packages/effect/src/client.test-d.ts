@@ -1,13 +1,25 @@
-import type { Client, ClientContext, ORPCError } from '@orpc/client'
-import type { EffectClient } from './client'
+import type {
+  AnyNestedClient,
+  Client,
+  ClientContext,
+  InferClientContext,
+  ORPCError,
+} from '@orpc/client'
 import { isDefinedError } from '@orpc/client'
 import { Effect } from 'effect'
+
+import type { EffectClient } from './client'
 import { createEffectClient } from './client'
 import { catchORPCErrorCodes } from './error'
 
 describe('createEffectClient', () => {
   const client = {} as {
-    ping: Client<ClientContext, string, number, Error | ORPCError<'BAD_GATEWAY', { val: string }> | ORPCError<'NOT_FOUND', { id: number }>>
+    ping: Client<
+      ClientContext,
+      string,
+      number,
+      Error | ORPCError<'BAD_GATEWAY', { val: string }> | ORPCError<'NOT_FOUND', { id: number }>
+    >
     optional: Client<ClientContext, string | undefined, number, Error>
     nested: {
       pong: Client<{ cache: boolean }, { id: number }, { result: string }, Error>
@@ -18,7 +30,10 @@ describe('createEffectClient', () => {
 
   it('procedures return effects with output and error types preserved', () => {
     expectTypeOf(effectClient.ping('test')).toEqualTypeOf<
-      Effect.Effect<number, Error | ORPCError<'BAD_GATEWAY', { val: string }> | ORPCError<'NOT_FOUND', { id: number }>>
+      Effect.Effect<
+        number,
+        Error | ORPCError<'BAD_GATEWAY', { val: string }> | ORPCError<'NOT_FOUND', { id: number }>
+      >
     >()
 
     expectTypeOf(effectClient.nested.pong({ id: 123 }, { context: { cache: true } })).toEqualTypeOf<
@@ -77,5 +92,36 @@ describe('createEffectClient', () => {
     )
 
     expectTypeOf(recovered).toEqualTypeOf<Effect.Effect<number | 'recovered', Error>>()
+  })
+})
+
+describe('EffectClient', () => {
+  it('maps optional procedures', () => {
+    const effectClient = {} as EffectClient<{
+      ping?: Client<ClientContext, string, number, Error>
+      nested?: {
+        pong?: Client<ClientContext, { id: number }, { result: string }, Error>
+      }
+    }>
+
+    expectTypeOf(effectClient.ping?.('test')).toEqualTypeOf<
+      Effect.Effect<number, Error> | undefined
+    >()
+    expectTypeOf(effectClient.nested?.pong?.({ id: 123 })).toEqualTypeOf<
+      Effect.Effect<{ result: string }, Error> | undefined
+    >()
+  })
+
+  it('maps with a recursive contextual type', () => {
+    // Inferring `T` must not flow back through the recursive mapped type, or TS fails with TS2321.
+    type Recursive = { [k: string]: Recursive } | object
+    type Options<T extends AnyNestedClient> = { context?: InferClientContext<T> }
+    const client = {} as { nested: { ping: Client<ClientContext, string, number, Error> } }
+
+    const effect = {} as <T extends AnyNestedClient>(
+      client: T,
+      options: Options<T>,
+    ) => EffectClient<T>
+    const _effect: Recursive = effect(client, { context: {} })
   })
 })

@@ -1,20 +1,42 @@
-import type { AnyORPCError, ClientContext, ClientOptions } from '@orpc/client'
+import type { ClientContext, ClientOptions } from '@orpc/client'
+import {
+  createORPCErrorFromJson,
+  isORPCErrorJson,
+  MalformedResponseError,
+  ResponseError,
+} from '@orpc/client'
 import type { StandardLinkCodec, StandardLinkCodecDecodedResponse } from '@orpc/client/standard'
 import type { AnyProcedureContract, RouterContract } from '@orpc/contract'
-import type { Promisable, Public, Value } from '@orpc/shared'
-import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standard-server/core'
-import type { OpenAPIMeta } from '../../meta'
-import { createORPCErrorFromJson, createORPCErrorFromMalformedResponse, isORPCErrorJson } from '@orpc/client'
 import { getRouterContract, ProcedureContract } from '@orpc/contract'
 import { unlazy } from '@orpc/server'
-import { isTypescriptObject, mergeHttpPath, pathToHttpPath, safeEncodeURIComponent, stringifyJSON, value } from '@orpc/shared'
-import { mergeStandardHeaders, parseStandardUrl } from '@standard-server/core'
+import type { Promisable, Public, Value } from '@orpc/shared'
+import {
+  isNonPrimitive,
+  mergeHttpPath,
+  pathToHttpPath,
+  safeEncodeURIComponent,
+  stringifyJSON,
+  value,
+} from '@orpc/shared'
+import type {
+  StandardHeaders,
+  StandardLazyResponse,
+  StandardRequest,
+  StandardUrl,
+} from '@standard-server/core'
+import {
+  flattenStandardHeader,
+  mergeStandardHeaders,
+  parseStandardUrl,
+} from '@standard-server/core'
 import { toStandardHeaders } from '@standard-server/fetch'
+
 import {
   DEFAULT_OPENAPI_INPUT_STRUCTURE,
   DEFAULT_OPENAPI_METHOD,
   DEFAULT_OPENAPI_OUTPUT_STRUCTURE,
 } from '../../constants'
+import type { OpenAPIMeta } from '../../meta'
 import { getOpenAPIMeta } from '../../meta'
 import { OpenAPISerializer } from '../../openapi-serializer'
 import { getDynamicPathParams, isBodylessMethod } from '../../utils'
@@ -27,36 +49,61 @@ export interface OpenAPILinkCodecOptions<T extends ClientContext> {
    * @example '/api'
    * @default '/'
    */
-  url?: Value<Promisable<StandardUrl>, [options: ClientOptions<T>, path: string[], input: unknown]>
+  url?:
+    | Value<Promisable<StandardUrl>, [options: ClientOptions<T>, path: string[], input: unknown]>
+    | undefined
 
   /**
    * Inject headers into the request.
    */
-  headers?: Value<Promisable<StandardHeaders | Headers>, [options: ClientOptions<T>, path: string[], input: unknown]>
+  headers?:
+    | Value<
+        Promisable<StandardHeaders | Headers>,
+        [options: ClientOptions<T>, path: string[], input: unknown]
+      >
+    | undefined
 
   /**
    * Override the default OpenAPI serializer.
    */
-  serializer?: Public<OpenAPISerializer>
+  serializer?: Public<OpenAPISerializer> | undefined
 
   /**
-   * Customize how an error response body is converted into an ORPC error.
-   * Return `null` or `undefined` to fall back to the default decoding behavior.
+   * Customize how an error response body is converted into the error thrown by the client.
+   *
+   * @remarks
+   * - Return `defaultError()` to keep the default decoding (a `MalformedResponseError` for bodies that are not ORPC errors)
+   *
+   * @default ((body, response, defaultError) => defaultError())
    */
-  customErrorResponseBodyDecoder?: (
-    deserializedBody: unknown,
-    response: StandardLazyResponse,
-  ) => AnyORPCError | null | undefined
+  errorResponseBodyDecoder?:
+    | ((
+        deserializedBody: unknown,
+        response: StandardLazyResponse,
+        defaultError: () => Error,
+      ) => Error)
+    | undefined
+
+  /**
+   * Parse error responses with this `content-type` as JSON, ignoring case and parameters such as `charset`.
+   * Should match the handler's `errorResponseContentType`.
+   *
+   * @example 'application/problem+json'
+   */
+  errorResponseContentType?: string | undefined
 }
 
-const END_SLASH_REGEX = /\/$/
 const DOT_SEGMENT_REGEX = /(?:^|\/)\.{1,2}(?:\/|$)/
 
 export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCodec<T> {
   private readonly baseUrl: Exclude<OpenAPILinkCodecOptions<T>['url'], undefined>
   private readonly headers: Exclude<OpenAPILinkCodecOptions<T>['headers'], undefined>
   private readonly serializer: Exclude<OpenAPILinkCodecOptions<T>['serializer'], undefined>
-  private readonly customErrorResponseBodyDecoder: OpenAPILinkCodecOptions<T>['customErrorResponseBodyDecoder']
+  private readonly errorResponseBodyDecoder: Exclude<
+    OpenAPILinkCodecOptions<T>['errorResponseBodyDecoder'],
+    undefined
+  >
+  private readonly errorResponseMediaType: string | undefined
 
   constructor(
     private readonly router: RouterContract,
@@ -65,10 +112,16 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     this.baseUrl = options.url ?? '/'
     this.headers = options.headers ?? {}
     this.serializer = options.serializer ?? new OpenAPISerializer()
-    this.customErrorResponseBodyDecoder = options.customErrorResponseBodyDecoder
+    this.errorResponseBodyDecoder =
+      options.errorResponseBodyDecoder ?? ((_body, _response, defaultError) => defaultError())
+    this.errorResponseMediaType = toMediaType(options.errorResponseContentType)
   }
 
-  async encodeInput(input: unknown, path: string[], options: ClientOptions<T>): Promise<StandardRequest> {
+  async encodeInput(
+    input: unknown,
+    path: string[],
+    options: ClientOptions<T>,
+  ): Promise<StandardRequest> {
     let headers = toResolvedStandardHeaders(await value(this.headers, options, path, input))
     if (options.lastEventId !== undefined) {
       headers = mergeStandardHeaders(headers, { 'last-event-id': options.lastEventId })
@@ -92,9 +145,9 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       let data = input
 
       if (dynamicParams?.length) {
-        if (!isTypescriptObject(input)) {
+        if (!isNonPrimitive(input)) {
           throw new TypeError(
-            `Input must be an object with "compact" input structure when the path has dynamic params (${dynamicParams.map(p => p.parameterName).join(', ')}) in call to procedure (${path.join('.')}).`,
+            `Input must be an object with "compact" input structure when the path has dynamic params (${dynamicParams.map((p) => p.parameterName).join(', ')}) in call to procedure (${path.join('.')}).`,
           )
         }
 
@@ -102,15 +155,21 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
         for (let i = dynamicParams.length - 1; i >= 0; i--) {
           const param = dynamicParams[i]!
-          const encoded = this.encodePathParam(input[param.parameterName], param, meta?.paramsStyles?.[param.parameterName], path)
-          pathname = `${pathname.slice(0, param.startIndex)}${encoded}${pathname.slice(param.startIndex + param.segment.length)}` as `/${string}`
+          const encoded = this.encodePathParam(
+            input[param.parameterName],
+            param,
+            meta?.paramsStyles?.[param.parameterName],
+            path,
+          )
+          pathname =
+            `${pathname.slice(0, param.startIndex)}${encoded}${pathname.slice(param.startIndex + param.segment.length)}` as `/${string}`
           delete remaining[param.parameterName]
         }
 
         data = Object.keys(remaining).length > 0 ? remaining : undefined
       }
 
-      pathname = `${basePathname.replace(END_SLASH_REGEX, '')}${pathname}` as `/${string}`
+      pathname = mergeHttpPath(basePathname, pathname)
 
       if (isBodylessMethod(method)) {
         const queryString = this.serializeQueryString(data, meta?.queryStyles)
@@ -154,15 +213,21 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     if (dynamicParams?.length) {
       if (!input?.params) {
         throw new TypeError(
-          `The "params" property is required for "detailed" input when the path has dynamic params (${dynamicParams.map(p => p.parameterName).join(', ')}) in call to procedure (${path.join('.')}).`,
+          `The "params" property is required for "detailed" input when the path has dynamic params (${dynamicParams.map((p) => p.parameterName).join(', ')}) in call to procedure (${path.join('.')}).`,
         )
       }
 
       for (let i = dynamicParams.length - 1; i >= 0; i--) {
         const param = dynamicParams[i]!
         const val = input.params[param.parameterName]
-        const encoded = this.encodePathParam(val, param, meta?.paramsStyles?.[param.parameterName], path)
-        pathname = `${pathname.slice(0, param.startIndex)}${encoded}${pathname.slice(param.startIndex + param.segment.length)}` as `/${string}`
+        const encoded = this.encodePathParam(
+          val,
+          param,
+          meta?.paramsStyles?.[param.parameterName],
+          path,
+        )
+        pathname =
+          `${pathname.slice(0, param.startIndex)}${encoded}${pathname.slice(param.startIndex + param.segment.length)}` as `/${string}`
       }
     }
 
@@ -170,7 +235,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       headers = mergeStandardHeaders(headers, serializeHeaders(input.headers, this.serializer))
     }
 
-    pathname = `${basePathname.replace(END_SLASH_REGEX, '')}${pathname}` as `/${string}`
+    pathname = mergeHttpPath(basePathname, pathname)
     const queryString = this.serializeQueryString(input?.query, meta?.queryStyles)
     const search = combineSearch(baseSearch, queryString)
     const url = `${pathname}${search ?? ''}${baseHash ?? ''}` as StandardUrl
@@ -196,7 +261,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
   private encodePathParam(
     val: unknown,
-    param: { parameterName: string, allowsSlash: boolean, segment: string },
+    param: { parameterName: string; allowsSlash: boolean; segment: string },
     style: Exclude<OpenAPIMeta['paramsStyles'], undefined>[string],
     path: string[],
   ): string {
@@ -204,45 +269,67 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
 
     if (style === 'comma-delimited-array' && Array.isArray(val)) {
       encoded = val
-        .map(val => this.serializer.serialize(val))
-        .filter(val => val !== undefined && val !== null)
-        .map(val => safeEncodeURIComponent(String(val)))
+        .map((val) => this.serializeURLValue(val))
+        .filter((val) => val !== undefined && val !== null)
+        // oxlint-disable-next-line typescript/no-base-to-string
+        .map((val) => safeEncodeURIComponent(String(val)))
         .join(',')
-    }
-    else if (style === 'comma-delimited-object' && isTypescriptObject(val)) {
+    } else if (style === 'comma-delimited-object' && isNonPrimitive(val)) {
       encoded = Object.entries(val)
-        .map(([key, val]) => [key, this.serializer.serialize(val)])
+        .map(([key, val]) => [key, this.serializeURLValue(val)])
         .filter(([, val]) => val !== undefined && val !== null)
-        .map(([key, val]) => `${safeEncodeURIComponent(String(key))},${safeEncodeURIComponent(String(val))}`)
+        .map(
+          ([key, val]) =>
+            `${safeEncodeURIComponent(String(key))},${safeEncodeURIComponent(String(val))}`,
+        )
         .join(',')
-    }
-    else {
-      const serialized = this.serializer.serialize(val)
+    } else {
+      const serialized = this.serializeURLValue(val)
 
       if (serialized !== undefined && serialized !== null) {
         if (param.allowsSlash) {
+          // oxlint-disable-next-line typescript/no-base-to-string
           encoded = String(serialized).split('/').map(safeEncodeURIComponent).join('/')
-        }
-        else {
+        } else {
+          // oxlint-disable-next-line typescript/no-base-to-string
           encoded = safeEncodeURIComponent(String(serialized))
         }
       }
     }
 
     if (!encoded) {
-      throw new TypeError(`Path param "${param.parameterName}" cannot be empty in call to procedure (${path.join('.')}).`)
+      throw new TypeError(
+        `Path param "${param.parameterName}" cannot be empty in call to procedure (${path.join('.')}).`,
+      )
     }
 
     // URL parsing (e.g. in fetch) resolves "." and ".." segments, which would send the request to a different endpoint
     if (DOT_SEGMENT_REGEX.test(encoded)) {
-      throw new TypeError(`Path param "${param.parameterName}" cannot contain "." or ".." segments in call to procedure (${path.join('.')}).`)
+      throw new TypeError(
+        `Path param "${param.parameterName}" cannot contain "." or ".." segments in call to procedure (${path.join('.')}).`,
+      )
+    }
+
+    if (encoded.startsWith('/')) {
+      encoded = `%2F${encoded.slice(1)}`
     }
 
     return encoded
   }
 
-  private serializeQueryString(data: unknown, queryStyles: OpenAPIMeta['queryStyles']): string | undefined {
-    if (!queryStyles || !isTypescriptObject(data)) {
+  /**
+   * Serializes a single path/query value, like header values, so body-level
+   * serialize defaults (e.g. `asFormData`) never apply to URLs.
+   */
+  private serializeURLValue(value: unknown): unknown {
+    return value === undefined ? undefined : this.serializer.serializeJson(value).json
+  }
+
+  private serializeQueryString(
+    data: unknown,
+    queryStyles: OpenAPIMeta['queryStyles'],
+  ): string | undefined {
+    if (!queryStyles || !isNonPrimitive(data)) {
       return toURLSearchParams(
         this.serializer.serialize(data, { asFormData: true }) as FormData,
       ).toString()
@@ -260,100 +347,85 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
       delete remaining[key]
 
       if (style === 'primitive') {
-        const serialized = this.serializer.serialize(value)
+        const serialized = this.serializeURLValue(value)
         if (serialized !== undefined && serialized !== null) {
+          // oxlint-disable-next-line typescript/no-base-to-string
           query += `&${encodeURLSearchParamComponent(key)}=${encodeURLSearchParamComponent(String(serialized))}`
         }
-      }
-
-      else if (style === 'array' && Array.isArray(value)) {
+      } else if (style === 'array' && Array.isArray(value)) {
         const encodedKey = encodeURLSearchParamComponent(key)
 
         value.forEach((v) => {
-          const s = this.serializer.serialize(v)
+          const s = this.serializeURLValue(v)
           if (s !== undefined && s !== null) {
+            // oxlint-disable-next-line typescript/no-base-to-string
             query += `&${encodedKey}=${encodeURLSearchParamComponent(String(s))}`
           }
         })
-      }
-
-      else if (style === 'json') {
-        const serialized = this.serializer.serialize(value)
+      } else if (style === 'json') {
+        const serialized = this.serializeURLValue(value)
 
         if (serialized !== undefined) {
           query += `&${encodeURLSearchParamComponent(key)}=${encodeURLSearchParamComponent(stringifyJSON(serialized))}`
         }
-      }
-
-      else if (style === 'comma-delimited-array' && Array.isArray(value)) {
+      } else if (style === 'comma-delimited-array' && Array.isArray(value)) {
         const encodedValue = encodeDelimitedArray(
-          value.map(v => this.serializer.serialize(v)),
+          value.map((v) => this.serializeURLValue(v)),
           ',',
         )
 
         if (encodedValue !== undefined) {
           query += `&${encodeURLSearchParamComponent(key)}=${encodedValue}`
         }
-      }
-
-      else if (style === 'comma-delimited-object' && isTypescriptObject(value)) {
+      } else if (style === 'comma-delimited-object' && isNonPrimitive(value)) {
         const encodedValue = encodeDelimitedObject(
-          Object.entries(value).map(([key, value]) => [key, this.serializer.serialize(value)]),
+          Object.entries(value).map(([key, value]) => [key, this.serializeURLValue(value)]),
           ',',
         )
 
         if (encodedValue !== undefined) {
           query += `&${encodeURLSearchParamComponent(key)}=${encodedValue}`
         }
-      }
-
-      else if (style === 'pipe-delimited-array' && Array.isArray(value)) {
+      } else if (style === 'pipe-delimited-array' && Array.isArray(value)) {
         const encodedValue = encodeDelimitedArray(
-          value.map(v => this.serializer.serialize(v)),
+          value.map((v) => this.serializeURLValue(v)),
           '%7C' /* '/' */,
         )
 
         if (encodedValue !== undefined) {
           query += `&${encodeURLSearchParamComponent(key)}=${encodedValue}`
         }
-      }
-
-      else if (style === 'pipe-delimited-object' && isTypescriptObject(value)) {
+      } else if (style === 'pipe-delimited-object' && isNonPrimitive(value)) {
         const encodedValue = encodeDelimitedObject(
-          Object.entries(value).map(([key, value]) => [key, this.serializer.serialize(value)]),
+          Object.entries(value).map(([key, value]) => [key, this.serializeURLValue(value)]),
           '%7C' /* '/' */,
         )
 
         if (encodedValue !== undefined) {
           query += `&${encodeURLSearchParamComponent(key)}=${encodedValue}`
         }
-      }
-
-      else if (style === 'space-delimited-array' && Array.isArray(value)) {
+      } else if (style === 'space-delimited-array' && Array.isArray(value)) {
         const encodedValue = encodeDelimitedArray(
-          value.map(v => this.serializer.serialize(v)),
+          value.map((v) => this.serializeURLValue(v)),
           '%20' /* ' ' */,
         )
 
         if (encodedValue !== undefined) {
           query += `&${encodeURLSearchParamComponent(key)}=${encodedValue}`
         }
-      }
-
-      else if (style === 'space-delimited-object' && isTypescriptObject(value)) {
+      } else if (style === 'space-delimited-object' && isNonPrimitive(value)) {
         const encodedValue = encodeDelimitedObject(
-          Object.entries(value).map(([key, value]) => [key, this.serializer.serialize(value)]),
+          Object.entries(value).map(([key, value]) => [key, this.serializeURLValue(value)]),
           '%20' /* ' ' */,
         )
 
         if (encodedValue !== undefined) {
           query += `&${encodeURLSearchParamComponent(key)}=${encodedValue}`
         }
-      }
-
-      else {
-        const serialized = this.serializer.serialize(value)
+      } else {
+        const serialized = this.serializeURLValue(value)
         if (serialized !== undefined && serialized !== null) {
+          // oxlint-disable-next-line typescript/no-base-to-string
           query += `&${encodeURLSearchParamComponent(key)}=${encodeURLSearchParamComponent(String(serialized))}`
         }
       }
@@ -378,14 +450,21 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     const procedure = await this.resolveProcedure(path)
     const meta = getOpenAPIMeta(procedure)
 
-    const body = await response.resolveBody(meta?.responseBodyHint)
+    const errorBodyHint =
+      !isOk &&
+      this.errorResponseMediaType !== undefined &&
+      toMediaType(flattenStandardHeader(response.headers['content-type'])) ===
+        this.errorResponseMediaType
+        ? 'json'
+        : undefined
+
+    const body = await response.resolveBody(isOk ? meta?.responseBodyHint : errorBodyHint)
 
     const deserialized = await (async () => {
       try {
         return this.serializer.deserialize(body)
-      }
-      catch (error) {
-        throw createORPCErrorFromMalformedResponse({
+      } catch (error) {
+        throw new MalformedResponseError({
           message: 'Invalid OpenAPI response format.',
           response: { status: response.status, headers: response.headers, body },
           cause: error,
@@ -394,19 +473,23 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
     })()
 
     if (!isOk) {
-      const customError = this.customErrorResponseBodyDecoder?.(deserialized, response)
+      const defaultError = (): Error => {
+        if (isORPCErrorJson(deserialized)) {
+          return createORPCErrorFromJson(deserialized, {
+            cause: new ResponseError({
+              response: { status: response.status, headers: response.headers, body },
+            }),
+          })
+        }
 
-      if (customError !== undefined && customError !== null) {
-        return { kind: 'error', error: customError }
-      }
-
-      if (isORPCErrorJson(deserialized)) {
-        return { kind: 'error', error: createORPCErrorFromJson(deserialized) }
+        return new MalformedResponseError({
+          response: { headers: response.headers, status: response.status, body },
+        })
       }
 
       return {
         kind: 'error',
-        error: createORPCErrorFromMalformedResponse({ response: { headers: response.headers, status: response.status, body } }),
+        error: this.errorResponseBodyDecoder(deserialized, response, defaultError),
       }
     }
 
@@ -435,7 +518,10 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
   }
 }
 
-function combineSearch(baseSearch: `?${string}` | undefined, additionalSearch: string | undefined): `?${string}` | undefined {
+function combineSearch(
+  baseSearch: `?${string}` | undefined,
+  additionalSearch: string | undefined,
+): `?${string}` | undefined {
   if (!baseSearch && !additionalSearch) {
     return undefined
   }
@@ -451,6 +537,13 @@ function combineSearch(baseSearch: `?${string}` | undefined, additionalSearch: s
   return `${baseSearch}&${additionalSearch}` as `?${string}`
 }
 
+/**
+ * Strips parameters and normalizes case, e.g. `Application/Problem+JSON; charset=utf-8` -> `application/problem+json`.
+ */
+function toMediaType(contentType: string | undefined): string | undefined {
+  return contentType?.split(';')[0]?.trim().toLowerCase()
+}
+
 function toResolvedStandardHeaders(headers: Headers | StandardHeaders): StandardHeaders {
   /**
    * Headers class might not be available in some environments,
@@ -464,22 +557,27 @@ function toResolvedStandardHeaders(headers: Headers | StandardHeaders): Standard
   return headers as StandardHeaders
 }
 
-function isValidDetailedInput(
-  input: unknown,
-): input is undefined | { params?: Record<string, unknown>, query?: Record<string, unknown>, headers?: object, body?: unknown } {
-  if (!isTypescriptObject(input)) {
+function isValidDetailedInput(input: unknown): input is
+  | undefined
+  | {
+      params?: Record<string, unknown>
+      query?: Record<string, unknown>
+      headers?: object
+      body?: unknown
+    } {
+  if (!isNonPrimitive(input)) {
     return input === undefined
   }
 
-  if (input.params !== undefined && !isTypescriptObject(input.params)) {
+  if (input.params !== undefined && !isNonPrimitive(input.params)) {
     return false
   }
 
-  if (input.query !== undefined && !isTypescriptObject(input.query)) {
+  if (input.query !== undefined && !isNonPrimitive(input.query)) {
     return false
   }
 
-  if (input.headers !== undefined && !isTypescriptObject(input.headers)) {
+  if (input.headers !== undefined && !isNonPrimitive(input.headers)) {
     return false
   }
 
@@ -497,13 +595,17 @@ function encodeURLSearchParamComponent(value: string): string {
 function toURLSearchParams(form: FormData): URLSearchParams {
   const params = new URLSearchParams()
   for (const [key, value] of form) {
+    // oxlint-disable-next-line typescript/no-base-to-string
     params.append(key, String(value))
   }
   return params
 }
 
-function encodeDelimitedArray(serializedValues: unknown[], encodedDelimiter: string): string | undefined {
-  const strings = serializedValues.filter(v => v !== null && v !== undefined).map(String)
+function encodeDelimitedArray(
+  serializedValues: unknown[],
+  encodedDelimiter: string,
+): string | undefined {
+  const strings = serializedValues.filter((v) => v !== null && v !== undefined).map(String)
 
   if (!strings.length) {
     return undefined
@@ -512,7 +614,10 @@ function encodeDelimitedArray(serializedValues: unknown[], encodedDelimiter: str
   return strings.map(encodeURLSearchParamComponent).join(encodedDelimiter)
 }
 
-function encodeDelimitedObject(entries: [string, unknown][], encodedDelimiter: string): string | undefined {
+function encodeDelimitedObject(
+  entries: [string, unknown][],
+  encodedDelimiter: string,
+): string | undefined {
   const strings = entries
     .filter(([, v]) => v !== null && v !== undefined)
     .map(([k, v]) => [k, String(v)]) as [string, string][]
@@ -523,7 +628,8 @@ function encodeDelimitedObject(entries: [string, unknown][], encodedDelimiter: s
 
   return strings
     .map(
-      ([key, value]) => `${encodeURLSearchParamComponent(key)}${encodedDelimiter}${encodeURLSearchParamComponent(value)}`,
+      ([key, value]) =>
+        `${encodeURLSearchParamComponent(key)}${encodedDelimiter}${encodeURLSearchParamComponent(value)}`,
     )
     .join(encodedDelimiter)
 }

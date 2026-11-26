@@ -1,19 +1,32 @@
 import type { Context } from '@orpc/server'
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptorOptions } from '@orpc/server/standard'
+import type {
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+  StandardHandlerRoutingInterceptorOptions,
+} from '@orpc/server/standard'
 import type { Promisable, Value } from '@orpc/shared'
+import {
+  getTracer,
+  matchesHttpPath,
+  mergeHttpPath,
+  stringifyJSON,
+  toArray,
+  value,
+} from '@orpc/shared'
 import type { ApiReferenceConfiguration as ScalarProviderConfig } from '@scalar/api-reference'
 import type { StandardUrl } from '@standard-server/core'
 import type { SwaggerUIOptions } from 'swagger-ui'
+
 import type { OpenAPIDocument, OpenAPIVersion } from '../types'
-import { getTracer, matchesHttpPath, mergeHttpPath, stringifyJSON, toArray, value } from '@orpc/shared'
 
 export type OpenAPIReferenceHandlerPluginProvider = 'scalar' | 'swagger'
 
-export interface OpenAPIReferenceHandlerPluginScalarConfig extends Partial<ScalarProviderConfig> {
-}
+export interface OpenAPIReferenceHandlerPluginScalarConfig extends Partial<ScalarProviderConfig> {}
 
-export interface OpenAPIReferenceHandlerPluginSwaggerConfig extends Partial<Omit<SwaggerUIOptions, 'dom_id' | 'presets' | 'plugins'>> {
-  dom_id?: undefined | never
+export interface OpenAPIReferenceHandlerPluginSwaggerConfig extends Partial<
+  Omit<SwaggerUIOptions, 'dom_id' | 'presets' | 'plugins'>
+> {
+  dom_id?: undefined
 
   /**
    * Paths to global variables holding the presets, resolved in the browser,
@@ -21,7 +34,7 @@ export interface OpenAPIReferenceHandlerPluginSwaggerConfig extends Partial<Omit
    *
    * @default ['SwaggerUIBundle.presets.apis']
    */
-  presets?: undefined | string[]
+  presets?: string[] | undefined
 
   /**
    * Paths to global variables holding the plugins, resolved in the browser,
@@ -29,15 +42,21 @@ export interface OpenAPIReferenceHandlerPluginSwaggerConfig extends Partial<Omit
    *
    * @default ['SwaggerUIBundle.plugins.DownloadUrl']
    */
-  plugins?: undefined | string[]
+  plugins?: string[] | undefined
 }
 
-export interface OpenAPIReferenceHandlerPluginOptions<T extends Context, TProvider extends OpenAPIReferenceHandlerPluginProvider> {
+export interface OpenAPIReferenceHandlerPluginOptions<
+  T extends Context,
+  TProvider extends OpenAPIReferenceHandlerPluginProvider,
+> {
   /**
    * A static or dynamic OpenAPI document to serve.
    * Receives routing interceptor options when provided as a function.
    */
-  spec: Value<Promisable<OpenAPIDocument<OpenAPIVersion>>, [StandardHandlerRoutingInterceptorOptions<T>]>
+  spec: Value<
+    Promisable<OpenAPIDocument<OpenAPIVersion>>,
+    [StandardHandlerRoutingInterceptorOptions<T>]
+  >
 
   /**
    * Determines whether the docs UI and OpenAPI JSON are allowed to be served for a request.
@@ -45,59 +64,59 @@ export interface OpenAPIReferenceHandlerPluginOptions<T extends Context, TProvid
    * as if the plugin were not installed. Useful for restricting access
    * to authenticated users.
    */
-  allow?: Value<Promisable<boolean>, [StandardHandlerRoutingInterceptorOptions<T>]>
+  allow?: Value<Promisable<boolean>, [StandardHandlerRoutingInterceptorOptions<T>]> | undefined
 
   /**
    * The URL path at which to serve the OpenAPI JSON.
    *
    * @default '/spec.json'
    */
-  specPath?: StandardUrl
+  specPath?: StandardUrl | undefined
 
   /**
    * The UI provider to use for rendering the API reference.
    *
    * @default 'scalar'
    */
-  provider?: TProvider
+  provider?: TProvider | undefined
 
   /**
    * Provider-specific configuration passed directly to the chosen UI library.
    * Options differ depending on `provider`.
    */
-  providerConfig?: undefined | (
-    TProvider extends 'swagger'
-      ? OpenAPIReferenceHandlerPluginSwaggerConfig
-      : OpenAPIReferenceHandlerPluginScalarConfig
-  )
+  providerConfig?:
+    | (TProvider extends 'swagger'
+        ? OpenAPIReferenceHandlerPluginSwaggerConfig
+        : OpenAPIReferenceHandlerPluginScalarConfig)
+    | undefined
 
   /**
    * URL for the provider's main script bundle.
    *
    * @default 'https://cdn.jsdelivr.net/npm/@scalar/api-reference' | 'https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js'
    */
-  providerScriptUrl?: undefined | string
+  providerScriptUrl?: string | undefined
 
   /**
    * URL for the provider's stylesheet.
    *
    * @default undefined | 'https://unpkg.com/swagger-ui-dist/swagger-ui.css'
    */
-  providerCssUrl?: undefined | string
+  providerCssUrl?: string | undefined
 
   /**
    * The URL path at which to serve the API reference UI.
    *
    * @default '/'
    */
-  docsPath?: StandardUrl
+  docsPath?: StandardUrl | undefined
 
   /**
    * The document title for the API reference UI.
    *
    * @default spec.info.title
    */
-  docsTitle?: Value<Promisable<string>, [StandardHandlerRoutingInterceptorOptions<T>]>
+  docsTitle?: Value<Promisable<string>, [StandardHandlerRoutingInterceptorOptions<T>]> | undefined
 
   /**
    * Raw HTML to inject into the `<head>` of the API reference page.
@@ -105,7 +124,7 @@ export interface OpenAPIReferenceHandlerPluginOptions<T extends Context, TProvid
    *
    * @default ''
    */
-  docsHead?: Value<Promisable<string>, [StandardHandlerRoutingInterceptorOptions<T>]>
+  docsHead?: Value<Promisable<string>, [StandardHandlerRoutingInterceptorOptions<T>]> | undefined
 }
 
 /**
@@ -121,24 +140,45 @@ export class OpenAPIReferenceHandlerPlugin<
   T extends Context,
   TProvider extends OpenAPIReferenceHandlerPluginProvider,
 > implements StandardHandlerPlugin<T> {
-  name = '~openapi-reference'
+  readonly name = '~openapi-reference'
 
   private readonly spec: OpenAPIReferenceHandlerPluginOptions<T, TProvider>['spec']
   private readonly allow: OpenAPIReferenceHandlerPluginOptions<T, TProvider>['allow']
-  private readonly specPath: Exclude<OpenAPIReferenceHandlerPluginOptions<T, TProvider>['specPath'], undefined>
-  private readonly provider: Exclude<OpenAPIReferenceHandlerPluginOptions<T, TProvider>['provider'], undefined>
-  private readonly providerConfig: OpenAPIReferenceHandlerPluginOptions<T, TProvider>['providerConfig']
-  private readonly providerScriptUrl: OpenAPIReferenceHandlerPluginOptions<T, TProvider>['providerScriptUrl']
-  private readonly providerCssUrl: OpenAPIReferenceHandlerPluginOptions<T, TProvider>['providerCssUrl']
-  private readonly docsPath: Exclude<OpenAPIReferenceHandlerPluginOptions<T, TProvider>['docsPath'], undefined>
+  private readonly specPath: Exclude<
+    OpenAPIReferenceHandlerPluginOptions<T, TProvider>['specPath'],
+    undefined
+  >
+  private readonly provider: Exclude<
+    OpenAPIReferenceHandlerPluginOptions<T, TProvider>['provider'],
+    undefined
+  >
+  private readonly providerConfig: OpenAPIReferenceHandlerPluginOptions<
+    T,
+    TProvider
+  >['providerConfig']
+  private readonly providerScriptUrl: OpenAPIReferenceHandlerPluginOptions<
+    T,
+    TProvider
+  >['providerScriptUrl']
+  private readonly providerCssUrl: OpenAPIReferenceHandlerPluginOptions<
+    T,
+    TProvider
+  >['providerCssUrl']
+  private readonly docsPath: Exclude<
+    OpenAPIReferenceHandlerPluginOptions<T, TProvider>['docsPath'],
+    undefined
+  >
   private readonly docsTitle: OpenAPIReferenceHandlerPluginOptions<T, TProvider>['docsTitle']
-  private readonly docsHead: Exclude<OpenAPIReferenceHandlerPluginOptions<T, TProvider>['docsHead'], undefined>
+  private readonly docsHead: Exclude<
+    OpenAPIReferenceHandlerPluginOptions<T, TProvider>['docsHead'],
+    undefined
+  >
 
   constructor(options: OpenAPIReferenceHandlerPluginOptions<T, TProvider>) {
     this.spec = options.spec
     this.allow = options.allow
     this.specPath = options.specPath ?? '/spec.json'
-    this.provider = options.provider ?? 'scalar' as TProvider
+    this.provider = options.provider ?? ('scalar' as TProvider)
     this.providerConfig = options.providerConfig
     this.providerScriptUrl = options.providerScriptUrl
     this.providerCssUrl = options.providerCssUrl
@@ -162,19 +202,23 @@ export class OpenAPIReferenceHandlerPlugin<
 
           const isSpecPath = matchesHttpPath(
             routingInterceptorOptions.request.url,
-            routingInterceptorOptions.prefix ? mergeHttpPath(routingInterceptorOptions.prefix, this.specPath) : this.specPath,
+            routingInterceptorOptions.prefix
+              ? mergeHttpPath(routingInterceptorOptions.prefix, this.specPath)
+              : this.specPath,
           )
 
           const isDocsPath = matchesHttpPath(
             routingInterceptorOptions.request.url,
-            routingInterceptorOptions.prefix ? mergeHttpPath(routingInterceptorOptions.prefix, this.docsPath) : this.docsPath,
+            routingInterceptorOptions.prefix
+              ? mergeHttpPath(routingInterceptorOptions.prefix, this.docsPath)
+              : this.docsPath,
           )
 
           if (!isSpecPath && !isDocsPath) {
             return result
           }
 
-          if (await value(this.allow, routingInterceptorOptions) === false) {
+          if ((await value(this.allow, routingInterceptorOptions)) === false) {
             return result
           }
 
@@ -182,7 +226,9 @@ export class OpenAPIReferenceHandlerPlugin<
           const spec = await value(this.spec, routingInterceptorOptions)
 
           if (isSpecPath) {
-            span?.updateName(`${routingInterceptorOptions.request.method} ${routingInterceptorOptions.request.url} (openapi spec)`)
+            span?.updateName(
+              `${routingInterceptorOptions.request.method} ${routingInterceptorOptions.request.url} (openapi spec)`,
+            )
 
             const specFile = new File([stringifyJSON(spec)], `${spec.info.title}.json`, {
               type: 'application/json',
@@ -190,14 +236,18 @@ export class OpenAPIReferenceHandlerPlugin<
             return { matched: true, response: { status: 200, headers: {}, body: specFile } }
           }
 
-          span?.updateName(`${routingInterceptorOptions.request.method} ${routingInterceptorOptions.request.url} (${this.provider} ui)`)
+          span?.updateName(
+            `${routingInterceptorOptions.request.method} ${routingInterceptorOptions.request.url} (${this.provider} ui)`,
+          )
 
-          const docsTitle = (await value(this.docsTitle, routingInterceptorOptions)) ?? spec.info.title
+          const docsTitle =
+            (await value(this.docsTitle, routingInterceptorOptions)) ?? spec.info.title
           const docsHead = await value(this.docsHead, routingInterceptorOptions)
           let html: string | undefined
 
           if (this.provider === 'swagger') {
-            const scriptUrl = this.providerScriptUrl ?? 'https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js'
+            const scriptUrl =
+              this.providerScriptUrl ?? 'https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js'
             const cssUrl = this.providerCssUrl ?? 'https://unpkg.com/swagger-ui-dist/swagger-ui.css'
             const config = {
               dom_id: '#app',
@@ -240,14 +290,13 @@ export class OpenAPIReferenceHandlerPlugin<
             </body>
             </html>
             `
-          }
-
-          else {
-            const scriptUrl = this.providerScriptUrl ?? 'https://cdn.jsdelivr.net/npm/@scalar/api-reference'
+          } else {
+            const scriptUrl =
+              this.providerScriptUrl ?? 'https://cdn.jsdelivr.net/npm/@scalar/api-reference'
             const cssUrl = this.providerCssUrl
             const config: ScalarProviderConfig = {
               content: stringifyJSON(spec),
-              ...this.providerConfig as any,
+              ...(this.providerConfig as any),
             }
 
             html = `

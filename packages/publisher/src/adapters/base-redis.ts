@@ -1,10 +1,15 @@
 import type { RPCJsonSerialization } from '@orpc/client'
-import type { Public, ThrowableError } from '@orpc/shared'
-import type { EventMeta } from '@standard-server/core'
-import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../publisher'
 import { RPCJsonSerializer } from '@orpc/client'
+import type { Public, ThrowableError } from '@orpc/shared'
 import { once, parseEmptyableJSON, stringifyJSON } from '@orpc/shared'
+import type { EventMeta } from '@standard-server/core'
 import { getEventMeta, unwrapEvent, withEventMeta } from '@standard-server/core'
+
+import type {
+  PublisherOptions,
+  PublisherResumeOptions,
+  PublisherSubscribeListenerOptions,
+} from '../publisher'
 import { Publisher } from '../publisher'
 
 /**
@@ -12,7 +17,7 @@ import { Publisher } from '../publisher'
  * trimming and setting a TTL when `ARGV[2..4]` are given. One script keeps Pub/Sub order
  * equal to stream order. Kept on one line because `EVAL` sends it with every call.
  */
-const PUBLISH_SCRIPT = `local id=redis.call('XADD',KEYS[1],'*','data',ARGV[1]) if ARGV[2] then redis.call('XTRIM',KEYS[1],'MINID',ARGV[2],ARGV[3]) redis.call('EXPIRE',KEYS[1],ARGV[4]) end redis.call('PUBLISH',KEYS[1],'{"data":'..ARGV[1]..',"id":"'..id..'"}')`
+const PUBLISH_SCRIPT = `local id=redis.call('XADD',KEYS[1],'*','data',ARGV[1]) if ARGV[2] then redis.call('XTRIM',KEYS[1],'MINID',ARGV[2],ARGV[3]) redis.call('PEXPIRE',KEYS[1],ARGV[4]) end redis.call('PUBLISH',KEYS[1],'{"data":'..ARGV[1]..',"id":"'..id..'"}')`
 
 /**
  * Options shared by every Redis-backed publisher adapter.
@@ -26,44 +31,25 @@ export interface BaseRedisPublisherOptions extends PublisherOptions {
    *
    * @default ''
    */
-  prefix?: string
+  prefix?: string | undefined
 
   /**
    * Serializer for serialize and deserialize payloads.
    *
    * @default RPCJsonSerializer
    */
-  serializer?: undefined | Public<RPCJsonSerializer>
+  serializer?: Public<RPCJsonSerializer> | undefined
 
   /**
-   * Configuration for event resume support.
+   * Event resume support. `true` enables it,
+   * {@link PublisherResumeOptions} enables and customizes it.
    *
    * When enabled, published events are temporarily stored so new
    * subscribers can resume from a previous position using `lastEventId`.
    *
-   * @default { enabled: false }
+   * @default false
    */
-  resume?: {
-    /**
-     * Whether event resume support is enabled.
-     *
-     * When enabled, published events are temporarily stored so new
-     * subscribers can resume from a previous position using `lastEventId`.
-     *
-     * @default false
-     */
-    enabled: boolean
-
-    /**
-     * How long (in seconds) to retain events for resume.
-     *
-     * Expired events are cleaned up lazily for performance reasons, so
-     * some events may remain available slightly longer than this period.
-     *
-     * @default 300 (5 min)
-     */
-    seconds?: number
-  }
+  resume?: boolean | PublisherResumeOptions | undefined
 }
 
 /**
@@ -85,7 +71,7 @@ export interface RedisStreamEntry {
 
 interface SerializedEvent {
   payload: RPCJsonSerialization
-  meta?: undefined | EventMeta
+  meta?: EventMeta | undefined
 }
 
 /**
@@ -98,25 +84,25 @@ interface SerializedEvent {
  * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
  */
 export abstract class BaseRedisPublisher<T extends Record<string, object>> extends Publisher<T> {
-  protected readonly prefix: string
+  protected readonly keyPrefix: string
   protected readonly serializer: Public<RPCJsonSerializer>
   protected readonly resumeEnabled: boolean
-  protected readonly resumeSeconds: number
+  protected readonly resumeTtl: number
 
   /**
    * Tests switch this to `=` for deterministic trimming.
    */
-  protected readonly xTrimExactness: '~' | '=' = '~'
+  private readonly xTrimExactness: '~' | '=' = '~'
 
   private readonly lastTrimTimes = new Map<string, number>()
 
   constructor({ prefix, serializer, resume, ...options }: BaseRedisPublisherOptions = {}) {
     super(options)
 
-    this.prefix = prefix ?? ''
+    this.keyPrefix = prefix ?? ''
     this.serializer = serializer ?? new RPCJsonSerializer()
-    this.resumeEnabled = resume?.enabled ?? false
-    this.resumeSeconds = resume?.seconds ?? 300
+    this.resumeEnabled = resume !== undefined && resume !== false
+    this.resumeTtl = (typeof resume === 'object' ? resume.ttl : undefined) ?? 300_000
   }
 
   /**
@@ -153,7 +139,7 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
   protected abstract readStreamEntries(key: string, lastId: string): Promise<RedisStreamEntry[]>
 
   async publish<K extends keyof T & string>(event: K, payload: T[K]): Promise<void> {
-    const channel = `${this.prefix}${event}`
+    const channel = `${this.keyPrefix}${event}`
     const data = this.serializePayload(payload)
 
     if (!this.resumeEnabled) {
@@ -162,11 +148,10 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
     }
 
     const now = Date.now()
-    const windowMs = this.resumeSeconds * 1000
 
     // Entries are inserted in time order, so expired ones come first.
     for (const [trimmedChannel, trimTime] of this.lastTrimTimes) {
-      if (trimTime + windowMs >= now) {
+      if (trimTime + this.resumeTtl >= now) {
         break
       }
 
@@ -180,9 +165,9 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
 
       args.push(
         this.xTrimExactness,
-        `${now - windowMs}-0`,
+        `${now - this.resumeTtl}-0`,
         // 2x so entries added late in a window outlive it until the next trim refreshes the TTL.
-        String(this.resumeSeconds * 2),
+        String(this.resumeTtl * 2),
       )
     }
 
@@ -194,7 +179,7 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
     listener: (payload: T[K]) => void,
     { lastEventId, onError }: PublisherSubscribeListenerOptions = {},
   ): Promise<() => Promise<void>> {
-    const channel = `${this.prefix}${event}`
+    const channel = `${this.keyPrefix}${event}`
 
     let pendingPayloads: T[K][] | undefined = []
     const resumedIds = new Set<string>()
@@ -213,10 +198,9 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
 
     const messageListener = (message: unknown) => {
       try {
-        const { id, data } = parseIfText(message) as { id?: string, data: SerializedEvent }
+        const { id, data } = parseIfText(message) as { id?: string; data: SerializedEvent }
         deduplicatingListener(this.deserializePayload(id, data) as T[K])
-      }
-      catch (error) {
+      } catch (error) {
         onError?.(error as ThrowableError)
       }
     }
@@ -235,8 +219,7 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
       const pending = pendingPayloads
       pendingPayloads = undefined
       pending.forEach(deduplicatingListener)
-    }
-    catch (error) {
+    } catch (error) {
       await unsubscribe()
       throw error
     }
@@ -246,13 +229,13 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
 
   private serializePayload(payload: object): SerializedEvent {
     const [original, meta] = unwrapEvent(payload)
-    const { json, meta: jsonMeta } = this.serializer.serialize(original)
+    const { json, meta: jsonMeta } = this.serializer.serializeJson(original)
     return { payload: { json, meta: jsonMeta }, meta }
   }
 
   private deserializePayload(id: string | undefined, { payload, meta }: SerializedEvent): object {
     return withEventMeta(
-      this.serializer.deserialize(payload) as object,
+      this.serializer.deserializeJson(payload) as object,
       id === undefined ? { ...meta } : { ...meta, id },
     )
   }

@@ -1,7 +1,14 @@
-import type { AnySchema, Context, ErrorMap, Lazyable, Procedure, ProcedureClientOptions } from '@orpc/server'
-import type { MaybeOptionalOptions } from '@orpc/shared'
-import { BracketNotationSerializer } from '@orpc/openapi'
+import { parseFormData } from '@orpc/openapi/helpers'
+import type {
+  AnySchema,
+  Context,
+  ErrorMap,
+  Lazyable,
+  Procedure,
+  ProcedureClientOptions,
+} from '@orpc/server'
 import { createProcedureClient } from '@orpc/server'
+import type { MaybeOptionalOptions } from '@orpc/shared'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
 
 export interface ServerFormFunction {
@@ -14,32 +21,19 @@ export function createServerFormFunction<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
 >(
-  procedure: Lazyable<Procedure<
-    TInitialContext,
-    any,
-    TInputSchema,
-    TOutputSchema,
-    TErrorMap
-  >>,
+  procedure: Lazyable<Procedure<TInitialContext, any, TInputSchema, TOutputSchema, TErrorMap>>,
   ...rest: MaybeOptionalOptions<
-    ProcedureClientOptions<
-      TInitialContext,
-      TOutputSchema,
-      TErrorMap,
-      object
-    >
+    ProcedureClientOptions<TInitialContext, TOutputSchema, TErrorMap, object>
   >
 ): ServerFormFunction {
   const options = resolveMaybeOptionalOptions(rest)
   const client = createProcedureClient(procedure, options)
-  const serializer = new BracketNotationSerializer()
 
   return async (form) => {
     if (!(form instanceof FormData)) {
       throw new TypeError('Server form function expects FormData.')
     }
 
-    const input = serializer.deserialize([...form])
-    await client(input as any)
+    await client(parseFormData(form))
   }
 }

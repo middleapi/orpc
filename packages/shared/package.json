@@ -1,52 +1,50 @@
 {
   "name": "@orpc/shared",
-  "type": "module",
-  "version": "2.0.0-beta.42",
+  "version": "2.0.0-beta.53",
   "description": "Internal utilities shared across oRPC packages",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "orpc"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/shared"
   },
-  "keywords": [
-    "orpc"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
-  "publishConfig": {
-    "exports": {
-      "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
-      }
-    }
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts"
   },
-  "files": [
-    "dist"
-  ],
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      }
+    }
+  },
   "scripts": {
-    "prepack": "unbuild",
-    "type:check": "tsc -b"
+    "prepack": "tsdown"
   },
   "dependencies": {
-    "@standard-server/shared": "~0.10.1",
-    "radash": "^12.1.1",
-    "type-fest": "^5.3.1"
+    "@standard-server/shared": "~0.16.0",
+    "type-fest": "^5.10.0"
   },
   "devDependencies": {
-    "arktype": "^2.2.1",
+    "arktype": "^2.2.9",
     "valibot": "^1.5.0",
-    "zod": "^4.5.4"
+    "zod": "^4.6.7"
   }
 }

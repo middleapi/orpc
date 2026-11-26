@@ -1,7 +1,13 @@
 import type { Value } from '@orpc/shared'
-import type { StandardLinkInterceptor, StandardLinkInterceptorOptions, StandardLinkOptions, StandardLinkPlugin } from '../adapters/standard'
+import { anyAbortSignal, TimeoutError, toArray, value } from '@orpc/shared'
+
+import type {
+  StandardLinkInterceptor,
+  StandardLinkInterceptorOptions,
+  StandardLinkOptions,
+  StandardLinkPlugin,
+} from '../adapters/standard/index'
 import type { ClientContext } from '../types'
-import { AbortError, anyAbortSignal, toArray, value } from '@orpc/shared'
 
 export interface TimeoutLinkPluginOptions<T extends ClientContext> {
   /**
@@ -12,19 +18,20 @@ export interface TimeoutLinkPluginOptions<T extends ClientContext> {
 }
 
 /**
- * The Timeout Link Plugin aborts requests that exceed a configured timeout with an `AbortError`.
+ * The Timeout Link Plugin aborts requests that exceed a configured timeout with a `TimeoutError`.
  *
  * @see {@link https://orpc.dev/docs/plugins/timeout | Timeout Plugin}
  */
 export class TimeoutLinkPlugin<T extends ClientContext> implements StandardLinkPlugin<T> {
   private readonly timeout: TimeoutLinkPluginOptions<T>['timeout']
 
-  name = '~timeout'
+  readonly name = '~timeout'
 
   /**
-   * Should abort if the total retry time exceeds the configured timeout
+   * Wraps retry: one timeout applies until the call returns, not to each attempt.
+   * It does not cover retries while an async iterator is consumed.
    */
-  after = ['~retry']
+  readonly after: readonly string[] = ['~retry']
 
   constructor(options: NoInfer<TimeoutLinkPluginOptions<T>>) {
     this.timeout = options.timeout
@@ -40,15 +47,14 @@ export class TimeoutLinkPlugin<T extends ClientContext> implements StandardLinkP
 
       const controller = new AbortController()
       const timeoutId = setTimeout(() => {
-        controller.abort(new AbortError(`Request timed out after ${timeoutMs}ms`))
+        controller.abort(new TimeoutError(`Request timed out after ${timeoutMs}ms`))
       }, timeoutMs)
 
       const signal = anyAbortSignal([interceptorOptions.signal, controller.signal])
 
       try {
         return await interceptorOptions.next({ ...interceptorOptions, signal })
-      }
-      finally {
+      } finally {
         clearTimeout(timeoutId)
       }
     }

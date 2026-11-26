@@ -1,12 +1,26 @@
+import type { CompressionEncoding } from '@orpc/shared'
+import {
+  estimateUtf8ByteLength,
+  estimateCompressibleFormDataSize,
+  isAcceptableEncoding,
+  isAsyncIteratorObject,
+  isCompressibleContentType,
+  isNoTransformCacheControl,
+  parseAcceptEncodingQualities,
+  toArray,
+  varyByAcceptEncoding,
+} from '@orpc/shared'
 import type { StandardBodyHint, StandardHeaders, StandardResponse } from '@standard-server/core'
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
-import type { Context } from '../context'
-import { isAcceptableEncoding, isAsyncIteratorObject, isCompressibleContentType, isNoTransformCacheControl, parseAcceptEncodingQualities, stringifyJSON, toArray, varyByAcceptEncoding } from '@orpc/shared'
 import { flattenStandardHeader, generateContentDisposition } from '@standard-server/core'
+import { toFetchBody } from '@standard-server/fetch'
 
-// Rough UTF-8 estimate. Mostly ASCII text stays close to 1 byte/char;
-// occasional multi-byte characters increase the average.
-const AVG_BYTES_PER_CHAR = 1.2
+import type {
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+  StandardHandlerRoutingInterceptor,
+  StandardHandlerRoutingInterceptorOptions,
+} from '../adapters/standard/index'
+import type { Context } from '../context'
 
 export interface ResponseCompressionHandlerPluginOptions<T extends Context> {
   /**
@@ -16,7 +30,7 @@ export interface ResponseCompressionHandlerPluginOptions<T extends Context> {
    *
    * @default ['gzip', 'deflate']
    */
-  encodings?: readonly ('gzip' | 'deflate' | 'deflate-raw')[]
+  encodings?: readonly CompressionEncoding[] | undefined
 
   /**
    * The minimum response size in bytes required to trigger compression.
@@ -25,7 +39,7 @@ export interface ResponseCompressionHandlerPluginOptions<T extends Context> {
    *
    * @default 1024 (1KB)
    */
-  threshold?: number
+  threshold?: number | undefined
 
   /**
    * Determines whether a response with the given Content-Type should be compressed.
@@ -34,7 +48,12 @@ export interface ResponseCompressionHandlerPluginOptions<T extends Context> {
    *
    * @default isCompressibleContentType (covers common text-based formats)
    */
-  isCompressibleContentType?: (contentType: string | null | undefined, options: StandardHandlerRoutingInterceptorOptions<T>) => boolean
+  isCompressibleContentType?:
+    | ((
+        contentType: string | null | undefined,
+        options: StandardHandlerRoutingInterceptorOptions<T>,
+      ) => boolean)
+    | undefined
 }
 
 /**
@@ -43,18 +62,29 @@ export interface ResponseCompressionHandlerPluginOptions<T extends Context> {
  *
  * @see {@link https://orpc.dev/docs/plugins/response-compression | Response Compression Plugin}
  */
-export class ResponseCompressionHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  name = '~response-compression'
+export class ResponseCompressionHandlerPlugin<
+  T extends Context,
+> implements StandardHandlerPlugin<T> {
+  readonly name = '~response-compression'
 
   /**
-   * Compression should be done after batching, to compress the final response.
-   * Compression should also be done after response headers are set, to access final headers like Content-Type and Cache-Control.
+   * Wraps batch and response headers: compresses the final response
+   * and sees final headers like Content-Type and Cache-Control.
    */
-  after = ['~batch', '~response-headers']
+  readonly after: readonly string[] = ['~batch', '~response-headers']
 
-  private readonly encodings: Exclude<ResponseCompressionHandlerPluginOptions<T>['encodings'], undefined>
-  private readonly threshold: Exclude<ResponseCompressionHandlerPluginOptions<T>['threshold'], undefined>
-  private readonly isCompressibleContentType: Exclude<ResponseCompressionHandlerPluginOptions<T>['isCompressibleContentType'], undefined>
+  private readonly encodings: Exclude<
+    ResponseCompressionHandlerPluginOptions<T>['encodings'],
+    undefined
+  >
+  private readonly threshold: Exclude<
+    ResponseCompressionHandlerPluginOptions<T>['threshold'],
+    undefined
+  >
+  private readonly isCompressibleContentType: Exclude<
+    ResponseCompressionHandlerPluginOptions<T>['isCompressibleContentType'],
+    undefined
+  >
 
   constructor(options: ResponseCompressionHandlerPluginOptions<T> = {}) {
     this.encodings = options.encodings ?? ['gzip', 'deflate']
@@ -63,7 +93,10 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
-    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({ next, ...interceptorOptions }) => {
+    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({
+      next,
+      ...interceptorOptions
+    }) => {
       const result = await next()
 
       if (!result.matched) {
@@ -71,7 +104,11 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
       }
 
       const response = result.response
-      const encoding = negotiateResponseCompressionEncoding(response, interceptorOptions.request.headers, this.encodings)
+      const encoding = negotiateResponseCompressionEncoding(
+        response,
+        interceptorOptions.request.headers,
+        this.encodings,
+      )
 
       if (encoding === undefined) {
         return result
@@ -84,31 +121,32 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
         const contentLength = Number(flattenStandardHeader(headers['content-length']))
 
         if (
-          (!Number.isFinite(contentLength) || contentLength >= this.threshold)
-          && this.isCompressibleContentType(flattenStandardHeader(headers['content-type']), interceptorOptions)
+          (!Number.isFinite(contentLength) || contentLength >= this.threshold) &&
+          this.isCompressibleContentType(
+            flattenStandardHeader(headers['content-type']),
+            interceptorOptions,
+          )
         ) {
           return {
             ...result,
             response: {
               ...response,
               body: body.pipeThrough(new CompressionStream(encoding)),
-              headers: {
-                ...toCompressedHeaders(headers, encoding),
-                'standard-server': 'octet-stream' satisfies StandardBodyHint,
-              },
+              headers: toCompressedHeaders(headers, encoding),
             },
           }
         }
-      }
+      } else if (body instanceof Blob) {
+        // Adapters only fall back to the blob type when no Content-Type header is set
+        const contentType = headers['content-type'] ?? body.type
 
-      else if (body instanceof Blob) {
         if (
-          (!Number.isFinite(body.size) || body.size >= this.threshold)
-          && this.isCompressibleContentType(body.type, interceptorOptions)
+          (!Number.isFinite(body.size) || body.size >= this.threshold) &&
+          this.isCompressibleContentType(flattenStandardHeader(contentType), interceptorOptions)
         ) {
-          const contentDisposition = headers['content-disposition'] ?? generateContentDisposition(
-            body instanceof File ? body.name : 'blob',
-          )
+          const contentDisposition =
+            headers['content-disposition'] ??
+            generateContentDisposition(body instanceof File ? body.name : 'blob')
 
           return {
             ...result,
@@ -117,43 +155,18 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
               body: body.stream().pipeThrough(new CompressionStream(encoding)),
               headers: {
                 ...toCompressedHeaders(headers, encoding),
-                'standard-server': 'file' satisfies StandardBodyHint,
-                'content-type': body.type,
+                'standard-server':
+                  headers['standard-server'] ?? ('file' satisfies StandardBodyHint),
+                'content-type': contentType,
                 'content-disposition': contentDisposition,
               },
             },
           }
         }
-      }
-
-      else if (body instanceof FormData) {
-        const PART_OVERHEAD = 64 // approx bytes for boundary + Content-Disposition/Content-Type headers per part
-
-        let contentLength = 0
-        for (const [key, value] of body) {
-          contentLength += PART_OVERHEAD + key.length
-
-          if (value instanceof Blob) {
-            if (!Number.isFinite(value.size)) { // Bun-s3 can use NaN for size
-              if (!this.isCompressibleContentType(value.type, interceptorOptions)) {
-                // Unknown non-compressible part size makes the estimate unreliable
-                contentLength = -Infinity
-                break
-              }
-
-              // Unknown size for compressible content - still apply compression
-              contentLength = Infinity
-            }
-            else {
-              contentLength += this.isCompressibleContentType(value.type, interceptorOptions)
-                ? value.size
-                : -value.size
-            }
-          }
-          else {
-            contentLength += value.length * AVG_BYTES_PER_CHAR
-          }
-        }
+      } else if (body instanceof FormData) {
+        const contentLength = estimateCompressibleFormDataSize(body, (contentType) =>
+          this.isCompressibleContentType(contentType, interceptorOptions),
+        )
 
         if (contentLength >= this.threshold) {
           const res = new Response(body)
@@ -172,38 +185,35 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
             },
           }
         }
-      }
-
-      else if (body instanceof URLSearchParams) {
+      } else if (body instanceof URLSearchParams) {
         const string = body.toString()
-        if (string.length * AVG_BYTES_PER_CHAR >= this.threshold) {
+        if (estimateUtf8ByteLength(string) >= this.threshold) {
+          const [, bodyHeaders] = toFetchBody(body, headers)
+
           return {
             ...result,
             response: {
               ...response,
               body: new Blob([string]).stream().pipeThrough(new CompressionStream(encoding)),
               headers: {
-                ...toCompressedHeaders(headers, encoding),
-                'standard-server': [],
-                'content-type': 'application/x-www-form-urlencoded',
+                ...toCompressedHeaders(bodyHeaders, encoding),
+                // An empty hint rather than none, so the adapter does not hint the compressed stream as `octet-stream`
+                'standard-server': bodyHeaders['standard-server'] ?? [],
               },
             },
           }
         }
-      }
-
-      else if (body !== undefined && !isAsyncIteratorObject(body)) {
-        const string = stringifyJSON(body)
-        if (string.length * AVG_BYTES_PER_CHAR >= this.threshold) {
+      } else if (body !== undefined && !isAsyncIteratorObject(body)) {
+        const [string, bodyHeaders] = toFetchBody(body, headers) as [string, StandardHeaders]
+        if (estimateUtf8ByteLength(string) >= this.threshold) {
           return {
             ...result,
             response: {
               ...response,
               body: new Blob([string]).stream().pipeThrough(new CompressionStream(encoding)),
               headers: {
-                ...toCompressedHeaders(headers, encoding),
-                'standard-server': [],
-                'content-type': 'application/json',
+                ...toCompressedHeaders(bodyHeaders, encoding),
+                'standard-server': bodyHeaders['standard-server'] ?? [],
               },
             },
           }
@@ -215,10 +225,7 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
 
     return {
       ...options,
-      routingInterceptors: [
-        routingInterceptor,
-        ...toArray(options.routingInterceptors),
-      ],
+      routingInterceptors: [routingInterceptor, ...toArray(options.routingInterceptors)],
     }
   }
 }
@@ -233,7 +240,8 @@ export function negotiateResponseCompressionEncoding<TEncoding extends string>(
   requestHeaders: StandardHeaders,
   encodings: readonly TEncoding[],
 ): TEncoding | undefined {
-  if (flattenStandardHeader(response.headers['content-encoding']) !== undefined) { // already compressed, do not compress again
+  if (flattenStandardHeader(response.headers['content-encoding']) !== undefined) {
+    // already compressed, do not compress again
     return undefined
   }
 
@@ -241,7 +249,10 @@ export function negotiateResponseCompressionEncoding<TEncoding extends string>(
    * A partial response body is a byte range of the identity representation, so compressing it
    * would leave `Content-Range` describing offsets the client never receives.
    */
-  if (response.status === 206 || flattenStandardHeader(response.headers['content-range']) !== undefined) {
+  if (
+    response.status === 206 ||
+    flattenStandardHeader(response.headers['content-range']) !== undefined
+  ) {
     return undefined
   }
 
@@ -250,9 +261,11 @@ export function negotiateResponseCompressionEncoding<TEncoding extends string>(
     return undefined
   }
 
-  const acceptEncodings = parseAcceptEncodingQualities(flattenStandardHeader(requestHeaders['accept-encoding']))
+  const acceptEncodings = parseAcceptEncodingQualities(
+    flattenStandardHeader(requestHeaders['accept-encoding']),
+  )
 
-  return encodings.find(encoding => isAcceptableEncoding(acceptEncodings, encoding))
+  return encodings.find((encoding) => isAcceptableEncoding(acceptEncodings, encoding))
 }
 
 /**

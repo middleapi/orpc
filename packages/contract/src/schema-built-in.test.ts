@@ -2,12 +2,19 @@ import type { AnyORPCError } from '@orpc/client'
 import { ORPCError } from '@orpc/client'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
 import * as z from 'zod'
+
 import { ValidationError } from './error'
-import { asyncIteratorObject, getAsyncIteratorObjectSchemaDetails } from './schema-built-in'
+import {
+  asyncIteratorObject,
+  getAsyncIteratorObjectSchemaDetails,
+  getAsyncIteratorObjectSchemasDetails,
+} from './schema-built-in'
 
 const ORDER_SCHEMA = z.object({ order: z.number() })
 
-function assertValidationSuccess<T extends { issues?: unknown }>(result: T): asserts result is T & { issues: undefined } {
+function assertValidationSuccess<T extends { issues?: unknown }>(
+  result: T,
+): asserts result is T & { issues: undefined } {
   if (result.issues) {
     throw new Error('Validation failed')
   }
@@ -23,11 +30,13 @@ describe('asyncIteratorObject', () => {
   it('can validate yields and preserve meta', async () => {
     const schema = asyncIteratorObject(ORDER_SCHEMA)
 
-    const result = await schema['~standard'].validate((async function* () {
-      yield { order: 1 }
-      yield withEventMeta({ order: 2 }, { id: 'id-2' })
-      yield { order: '3' }
-    })())
+    const result = await schema['~standard'].validate(
+      (async function* () {
+        yield { order: 1 }
+        yield withEventMeta({ order: 2 }, { id: 'id-2' })
+        yield { order: '3' }
+      })(),
+    )
 
     assertValidationSuccess(result)
 
@@ -44,8 +53,7 @@ describe('asyncIteratorObject', () => {
     try {
       await result.value.next()
       throw new Error('Expected AsyncIteratorObject validation to fail')
-    }
-    catch (error) {
+    } catch (error) {
       expect(error).toBeInstanceOf(ORPCError)
       expect((error as AnyORPCError).code).toEqual('ASYNC_ITERATOR_OBJECT_VALIDATION_FAILED')
       expect((error as AnyORPCError).cause).toBeInstanceOf(ValidationError)
@@ -57,9 +65,11 @@ describe('asyncIteratorObject', () => {
   it('can validate returns and preserve meta', async () => {
     const schema = asyncIteratorObject(ORDER_SCHEMA, ORDER_SCHEMA)
 
-    const result = await schema['~standard'].validate((async function* () {
-      return { order: 1 }
-    })())
+    const result = await schema['~standard'].validate(
+      (async function* () {
+        return { order: 1 }
+      })(),
+    )
 
     assertValidationSuccess(result)
 
@@ -72,9 +82,11 @@ describe('asyncIteratorObject', () => {
   it('not required returns schema', async () => {
     const schema = asyncIteratorObject(ORDER_SCHEMA)
 
-    const result = await schema['~standard'].validate((async function* () {
-      return 'anything'
-    })())
+    const result = await schema['~standard'].validate(
+      (async function* () {
+        return 'anything'
+      })(),
+    )
 
     assertValidationSuccess(result)
 
@@ -85,16 +97,17 @@ describe('asyncIteratorObject', () => {
     let cleanupCalled = false
     const schema = asyncIteratorObject(ORDER_SCHEMA)
 
-    const result = await schema['~standard'].validate((async function* () {
-      try {
-        yield { order: 1 }
-        yield { order: '2' }
-        yield { order: 3 }
-      }
-      finally {
-        cleanupCalled = true
-      }
-    })())
+    const result = await schema['~standard'].validate(
+      (async function* () {
+        try {
+          yield { order: 1 }
+          yield { order: '2' }
+          yield { order: 3 }
+        } finally {
+          cleanupCalled = true
+        }
+      })(),
+    )
 
     assertValidationSuccess(result)
 
@@ -112,4 +125,22 @@ it('getAsyncIteratorObjectSchemaDetails', async () => {
   expect(getAsyncIteratorObjectSchemaDetails(schema)).toEqual({ yieldSchema, returnSchema })
   expect(getAsyncIteratorObjectSchemaDetails(undefined)).toBeUndefined()
   expect(getAsyncIteratorObjectSchemaDetails(z.object({}))).toBeUndefined()
+})
+
+it('getAsyncIteratorObjectSchemasDetails', async () => {
+  const yieldSchema = ORDER_SCHEMA
+  const returnSchema = z.object({ done: z.boolean() })
+
+  expect(
+    getAsyncIteratorObjectSchemasDetails([
+      asyncIteratorObject(yieldSchema, returnSchema),
+      asyncIteratorObject(yieldSchema),
+    ]),
+  ).toEqual({ yieldSchemas: [yieldSchema, yieldSchema], returnSchemas: [returnSchema] })
+
+  expect(
+    getAsyncIteratorObjectSchemasDetails([asyncIteratorObject(yieldSchema), z.object({})]),
+  ).toBeUndefined()
+  expect(getAsyncIteratorObjectSchemasDetails([])).toBeUndefined()
+  expect(getAsyncIteratorObjectSchemasDetails(undefined)).toBeUndefined()
 })

@@ -1,12 +1,25 @@
 import type { Promisable, Public, Value } from '@orpc/shared'
-import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standard-server/core'
-import type { ClientContext, ClientOptions } from '../../types'
-import type { StandardLinkCodec, StandardLinkCodecDecodedResponse } from '../standard'
-import { isAsyncIteratorObject, pathToHttpPath, stringifyJSON, value } from '@orpc/shared'
+import {
+  isAsyncIteratorObject,
+  mergeHttpPath,
+  pathToHttpPath,
+  stringifyJSON,
+  value,
+} from '@orpc/shared'
+import type {
+  StandardHeaders,
+  StandardLazyResponse,
+  StandardRequest,
+  StandardUrl,
+} from '@standard-server/core'
 import { mergeStandardHeaders, parseStandardUrl } from '@standard-server/core'
 import { toStandardHeaders } from '@standard-server/fetch'
-import { createORPCErrorFromJson, createORPCErrorFromMalformedResponse, isORPCErrorJson } from '../../error-utils'
+
+import { MalformedResponseError, ResponseError } from '../../error'
+import { createORPCErrorFromJson, isORPCErrorJson } from '../../error-utils'
 import { RPCSerializer } from '../../rpc-serializer'
+import type { ClientContext, ClientOptions } from '../../types'
+import type { StandardLinkCodec, StandardLinkCodecDecodedResponse } from '../standard/index'
 
 export interface RPCLinkCodecOptions<T extends ClientContext> {
   /**
@@ -16,7 +29,9 @@ export interface RPCLinkCodecOptions<T extends ClientContext> {
    *
    * @default '/'
    */
-  url?: Value<Promisable<StandardUrl>, [options: ClientOptions<T>, path: string[], input: unknown]>
+  url?:
+    | Value<Promisable<StandardUrl>, [options: ClientOptions<T>, path: string[], input: unknown]>
+    | undefined
 
   /**
    * The maximum length of the URL.
@@ -25,14 +40,21 @@ export interface RPCLinkCodecOptions<T extends ClientContext> {
    *
    * @default 2083
    */
-  maxUrlLength?: Value<Promisable<number>, [options: ClientOptions<T>, path: string[], input: unknown]>
+  maxUrlLength?:
+    | Value<Promisable<number>, [options: ClientOptions<T>, path: string[], input: unknown]>
+    | undefined
 
   /**
    * The method used to make the request.
    *
    * @default 'POST'
    */
-  method?: Value<Promisable<'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'QUERY'>, [options: ClientOptions<T>, path: string[], input: unknown]>
+  method?:
+    | Value<
+        Promisable<'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'QUERY'>,
+        [options: ClientOptions<T>, path: string[], input: unknown]
+      >
+    | undefined
 
   /**
    * The method to use when the payload cannot safely pass to the server with method return from method function.
@@ -40,20 +62,23 @@ export interface RPCLinkCodecOptions<T extends ClientContext> {
    *
    * @default 'POST'
    */
-  fallbackMethod?: 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'QUERY'
+  fallbackMethod?: 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'QUERY' | undefined
 
   /**
    * Inject headers to the request.
    */
-  headers?: Value<Promisable<StandardHeaders | Headers>, [options: ClientOptions<T>, path: string[], input: unknown]>
+  headers?:
+    | Value<
+        Promisable<StandardHeaders | Headers>,
+        [options: ClientOptions<T>, path: string[], input: unknown]
+      >
+    | undefined
 
   /**
    * Override the default RPC serializer.
    */
-  serializer?: Public<RPCSerializer>
+  serializer?: Public<RPCSerializer> | undefined
 }
-
-const END_SLASH_REGEX = /\/$/
 
 export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<T> {
   private readonly baseUrl: Exclude<RPCLinkCodecOptions<T>['url'], undefined>
@@ -63,9 +88,7 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
   private readonly headers: Exclude<RPCLinkCodecOptions<T>['headers'], undefined>
   private readonly serializer: Exclude<RPCLinkCodecOptions<T>['serializer'], undefined>
 
-  constructor(
-    options: RPCLinkCodecOptions<T>,
-  ) {
+  constructor(options: RPCLinkCodecOptions<T>) {
     this.baseUrl = options.url ?? '/'
     this.maxUrlLength = options.maxUrlLength ?? 2083
     this.fallbackMethod = options.fallbackMethod ?? 'POST'
@@ -74,7 +97,11 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
     this.serializer = options.serializer ?? new RPCSerializer()
   }
 
-  async encodeInput(input: unknown, path: string[], options: ClientOptions<T>): Promise<StandardRequest> {
+  async encodeInput(
+    input: unknown,
+    path: string[],
+    options: ClientOptions<T>,
+  ): Promise<StandardRequest> {
     let headers = toResolvedStandardHeaders(await value(this.headers, options, path, input))
     if (options.lastEventId !== undefined) {
       headers = mergeStandardHeaders(headers, { 'last-event-id': options.lastEventId })
@@ -84,15 +111,15 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
     const baseUrl = await value(this.baseUrl, options, path, input)
 
     const [pathname, search, hash] = parseStandardUrl(baseUrl)
-    const newPathname = `${pathname.replace(END_SLASH_REGEX, '')}${pathToHttpPath(path)}` as StandardUrl
+    const newPathname: StandardUrl = mergeHttpPath(pathname, pathToHttpPath(path))
     const serialized = this.serializer.serialize(input)
 
     if (
-      expectedMethod === 'GET'
-      && !(serialized instanceof Blob)
-      && !(serialized instanceof ReadableStream)
-      && !(serialized instanceof FormData)
-      && !isAsyncIteratorObject(serialized)
+      expectedMethod === 'GET' &&
+      !(serialized instanceof Blob) &&
+      !(serialized instanceof ReadableStream) &&
+      !(serialized instanceof FormData) &&
+      !isAsyncIteratorObject(serialized)
     ) {
       const maxUrlLength = await value(this.maxUrlLength, options, path, input)
       const mergedSearch = new URLSearchParams(search)
@@ -129,10 +156,9 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
     const deserialized = await (async () => {
       try {
         return this.serializer.deserialize(body)
-      }
-      catch (cause) {
-        throw createORPCErrorFromMalformedResponse({
-          message: 'Invalid RPC response format.',
+      } catch (cause) {
+        throw new MalformedResponseError({
+          message: isOk ? 'Invalid RPC response format.' : undefined,
           response: { status: response.status, headers: response.headers, body },
           cause,
         })
@@ -141,13 +167,19 @@ export class RPCLinkCodec<T extends ClientContext> implements StandardLinkCodec<
 
     if (!isOk) {
       if (isORPCErrorJson(deserialized)) {
-        return { kind: 'error', error: createORPCErrorFromJson(deserialized) }
+        return {
+          kind: 'error',
+          error: createORPCErrorFromJson(deserialized, {
+            cause: new ResponseError({
+              response: { status: response.status, headers: response.headers, body },
+            }),
+          }),
+        }
       }
 
-      return {
-        kind: 'error',
-        error: createORPCErrorFromMalformedResponse({ response: { headers: response.headers, status: response.status, body } }),
-      }
+      throw new MalformedResponseError({
+        response: { headers: response.headers, status: response.status, body },
+      })
     }
 
     return { kind: 'output', output: deserialized }

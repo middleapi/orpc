@@ -1,6 +1,7 @@
 import { os } from '@orpc/server'
 import { promiseWithResolvers } from '@orpc/shared'
 import { z } from 'zod'
+
 import { builtInRPCSupportDataTypes } from './__shared__/built-in-support-data-types'
 import { Person } from './__shared__/client-server'
 import { createCompressionCrosswsClientServerTest } from './__shared__/client-server.compression-crossws'
@@ -94,7 +95,7 @@ describe.each([
 
     // The source holds everything after its first chunk until the test releases it, so a transport
     // that buffered the stream would hang here instead of resolving.
-    const result = await client.ping(stream) as ReadableStream<Uint8Array>
+    const result = (await client.ping(stream)) as ReadableStream<Uint8Array>
 
     const reader = result.getReader()
 
@@ -131,11 +132,11 @@ describe.each([
       yield new Person('Order 3', 3)
       await completion.promise
       return new Date('2024-01-01')
-    }())
+    })()
 
     // The source holds everything after its first event until the test releases it, so a transport
     // that buffered the stream would hang here instead of resolving.
-    const result = await client.ping(stream) as AsyncIteratorObject<unknown>
+    const result = (await client.ping(stream)) as AsyncIteratorObject<unknown>
     await expect(result.next()).resolves.toEqual({ value: 'order 1', done: false })
 
     order2.resolve()

@@ -1,8 +1,8 @@
 ---
-title: "Tmp File Upload Plugin"
-description: "Stream large file uploads into temporary files instead of memory, so requests far larger than available memory are parsed safely."
+title: 'Tmp File Upload Plugin'
+description: 'Stream large file uploads into temporary files instead of memory, so requests far larger than available memory are parsed safely.'
 sidebar:
-  label: "Tmp File Upload"
+  label: 'Tmp File Upload'
 ---
 
 ## Installation
@@ -13,7 +13,7 @@ npm install @orpc/node@beta
 
 ## Setup
 
-Use `TmpFileUploadHandlerPlugin` to parse file uploads into temporary files. Bodies the standard parser would buffer into an in-memory [File](https://developer.mozilla.org/en-US/docs/Web/API/File), and [`multipart/form-data`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/MIME_types#multipartform-data) file parts, stream to disk instead. Every other body is left to the standard parser.
+Use `TmpFileUploadHandlerPlugin` to parse file uploads into temporary files. Bodies the standard parser would buffer into an in-memory [File](https://developer.mozilla.org/en-US/docs/Web/API/File), and [`multipart/form-data`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/MIME_types#multipartform-data) file parts, stream to disk instead once they outgrow the [spool threshold](#keeping-small-uploads-in-memory). Every other body is left to the standard parser.
 
 ```ts
 import { TmpFileUploadHandlerPlugin } from '@orpc/node'
@@ -30,6 +30,13 @@ const handler = new RPCHandler(router, {
        * @default os.tmpdir()
        */
       tmpDir: './uploads',
+
+      // Required, see "Limiting Body Sizes" below
+      maxBodySize: {
+        memory: 1024 * 1024, // 1MB
+        file: 500 * 1024 * 1024, // 500MB
+        stream: 500 * 1024 * 1024, // 500MB
+      },
     }),
   ],
 })
@@ -41,19 +48,21 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 
 ## Working with Uploaded Files
 
-Procedures receive ordinary `File` instances and read them lazily from disk, in constant memory. Each one is a `TmpFile` exposing the `path` of its backing file, so an upload can be kept with a cheap [rename](https://nodejs.org/api/fs.html#fspromisesrenameoldpath-newpath) instead of a copy:
+Procedures receive ordinary `File` instances. An upload spooled to disk is a `TmpFile`, read lazily in constant memory and exposing the `path` of its backing file, so it can be kept with a cheap [rename](https://nodejs.org/api/fs.html#fspromisesrenameoldpath-newpath) instead of a copy. A smaller upload stays in memory as a plain `File` without a `path`, so check which one you received:
 
 ```ts
 import { TmpFile } from '@orpc/node'
-import { rename } from 'node:fs/promises'
+import { rename, writeFile } from 'node:fs/promises'
 
-const uploadVideo = os
-  .input(z.object({ video: z.file() }))
-  .handler(async ({ input }) => {
-    if (input.video instanceof TmpFile) {
-      await rename(input.video.path, `./videos/${crypto.randomUUID()}`)
-    }
-  })
+const uploadVideo = os.input(z.object({ video: z.file() })).handler(async ({ input }) => {
+  const destination = `./videos/${crypto.randomUUID()}`
+
+  if (input.video instanceof TmpFile) {
+    await rename(input.video.path, destination)
+  } else {
+    await writeFile(destination, input.video.stream())
+  }
+})
 ```
 
 :::warning
@@ -66,7 +75,7 @@ Node's [`fs.openAsBlob`](https://nodejs.org/api/fs.html#fsopenasblobpath-options
 
 ## Limiting Body Sizes
 
-Use `maxBodySize` to limit each kind of request body by what it actually costs. All three kinds are required together, so none is left unbounded by accident; set a kind to `Number.POSITIVE_INFINITY` to deliberately leave it unlimited. A body over its limit rejects with `PAYLOAD_TOO_LARGE`.
+`maxBodySize` is required and limits each kind of request body by what it actually costs. All three kinds are required, so none is left unbounded by accident; set a kind to `Number.POSITIVE_INFINITY` to deliberately leave it unlimited. A body over its limit rejects with `PAYLOAD_TOO_LARGE`.
 
 ```ts
 const handler = new RPCHandler(router, {
@@ -75,14 +84,14 @@ const handler = new RPCHandler(router, {
       maxBodySize: {
         /**
          * Content buffered into memory: JSON, URL-encoded forms,
-         * multipart fields and part headers, and each event of an event
-         * stream. Usually the lowest limit.
+         * multipart fields, part headers and in-memory files, and each
+         * event of an event stream. Usually the lowest limit.
          */
         memory: 1024 * 1024, // 1MB
 
         /**
-         * Content streamed into temporary files: file bodies and the
-         * file parts of a multipart body combined.
+         * Uploaded files: file bodies and the file parts of a multipart
+         * body combined, whether held in memory or spooled to disk.
          */
         file: 500 * 1024 * 1024, // 500MB
 
@@ -99,9 +108,43 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-A multipart body splits across the first two limits, fields and part headers against `memory` and file parts against `file`, and as a whole, framing included, it is bounded by the sum of both. An event stream counts against `stream` in total and each of its events against `memory`, since the decoder buffers an event until its blank line arrives. A raw binary stream reaches the procedure chunk by chunk, so only `stream` applies. A declared [Content-Length](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Length) over the applicable limit rejects immediately, and enforcement continues while the body streams in, so a lying length cannot bypass it.
+A multipart body splits across the first two limits, fields and part headers against `memory` and file parts against `file`, those held in memory against `memory` as well, and as a whole, framing included, it is bounded by the sum of both. An event stream counts against `stream` in total and each of its events against `memory`, since the decoder buffers an event until its blank line arrives. A raw binary stream reaches the procedure chunk by chunk, so only `stream` applies. A declared [Content-Length](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Length) over the applicable limit rejects immediately, and enforcement continues while the body streams in, so a lying length cannot bypass it.
 
-With all three limits configured, the plugin subsumes the [Request Limit Plugin](/docs/plugins/request-limit). When the [Request Compression Plugin](/docs/plugins/request-compression) is present, limits apply to the decompressed payload rather than the compressed wire size.
+The plugin subsumes the [Request Limit Plugin](/docs/plugins/request-limit). When the [Request Compression Plugin](/docs/plugins/request-compression) is present, limits apply to the decompressed payload rather than the compressed wire size.
+
+To reject with your own error instead, use `error`. It is [defined](/docs/error-handling#orpcerror-compatibility) when its `code` and `data` match an error the matched procedure declares. A custom code responds with `400` unless you map it in [`errorStatusMap`](/docs/rpc/handler#custom-error-response).
+
+```ts
+new TmpFileUploadHandlerPlugin({
+  maxBodySize: { memory: 1024 * 1024, file: 100 * 1024 * 1024, stream: 1024 * 1024 * 1024 },
+  error: () => new ORPCError('TOO_BIG'),
+})
+```
+
+## Keeping Small Uploads in Memory
+
+Uploads up to `spoolThreshold` stay in memory as plain `File`s, so small and empty files never cost a temporary file.
+
+```ts
+const handler = new RPCHandler(router, {
+  plugins: [
+    new TmpFileUploadHandlerPlugin({
+      maxBodySize: { memory: 1024 * 1024, file: 500 * 1024 * 1024, stream: 500 * 1024 * 1024 },
+
+      /**
+       * The size in bytes an uploaded file must exceed before it is
+       * spooled to a temporary file. Set to `0` to spool every
+       * non-empty upload.
+       *
+       * @default 64 * 1024
+       */
+      spoolThreshold: 256 * 1024, // 256KB
+    }),
+  ],
+})
+```
+
+In-memory uploads count against `maxBodySize.memory`, shared with the body's fields, and spool to disk once they no longer fit, so size `memory` for both.
 
 ## Per-Request Limits
 
@@ -113,9 +156,10 @@ const handler = new RPCHandler(router, {
     new TmpFileUploadHandlerPlugin({
       maxBodySize: async ({ context }) => ({
         memory: 1024 * 1024, // 1MB
-        file: context.user === undefined
-          ? 5 * 1024 * 1024 // 5MB for guests
-          : 500 * 1024 * 1024, // 500MB for authenticated users
+        file:
+          context.user === undefined
+            ? 5 * 1024 * 1024 // 5MB for guests
+            : 500 * 1024 * 1024, // 500MB for authenticated users
         stream: 500 * 1024 * 1024, // 500MB
       }),
     }),

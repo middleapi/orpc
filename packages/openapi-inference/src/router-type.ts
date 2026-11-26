@@ -1,0 +1,332 @@
+import { SyntaxKind } from 'typescript/unstable/ast'
+import type { Checker, Program, Symbol as TSSymbol, Type } from 'typescript/unstable/sync'
+import { TypeFlags } from 'typescript/unstable/sync'
+
+import { ExpansionGuard } from './expansion'
+import { getIndexKeyType, toPattern } from './key-patterns'
+import { TypeQueries } from './type-queries'
+import { getAssignedSymbol, getCallReturnType, getPromisedType, isMappedType } from './utils'
+
+/** The state of a search for a procedure in a router type (see `RouterTypeResolver#holdsProcedure`) */
+interface ProcedureSearch {
+  readonly expansion: ExpansionGuard
+  /** The types searched, by the expansion depth they were searched at, and whether it was cut */
+  readonly searched: Map<number, { depth: number; cut: boolean }>
+  /** How many times the search came to a type whose search was cut */
+  skipped: number
+}
+
+export interface ResolvedRouterType {
+  type: Type
+  /** The symbol the router or procedure is declared with, carrying its JSDoc */
+  symbol: TSSymbol | undefined
+}
+
+/**
+ * Reads procedure types structurally, so it works for procedures, contracts,
+ * and lazy routers without resolving oRPC's own types by name.
+ */
+export class RouterTypeResolver {
+  private readonly types: TypeQueries
+
+  constructor(
+    private readonly checker: Checker,
+    program: Program,
+    private readonly root: ResolvedRouterType,
+  ) {
+    this.types = new TypeQueries(checker, program)
+  }
+
+  /**
+   * Resolves the type at a router path, unwrapping lazy routers on the way. A router typed `any`,
+   * like one of an import the compiler does not find, is the type of its procedures too.
+   */
+  resolve(path: readonly string[]): ResolvedRouterType | undefined {
+    let current: ResolvedRouterType = { ...this.root, type: this.unlazy(this.root.type) }
+
+    // an export written as `any` is no router, unlike one of an import the compiler does not find
+    if (current.type.flags & TypeFlags.Any && !current.type.isErrorType()) {
+      return undefined
+    }
+
+    for (const segment of path) {
+      if (current.type.flags & TypeFlags.Any) {
+        return current
+      }
+
+      const found = this.resolveSegment(current.type, segment)
+
+      if (!found) {
+        return undefined
+      }
+
+      // optional sub-routers and procedures, like `...(dev ? { debug } : {})`
+      const type = this.stripNullish(found.type)
+      const unlazied = this.unlazy(type)
+      const loaded =
+        found.symbol && this.holdsNoRouter(type, unlazied)
+          ? this.getWrittenLoadedAny(found.symbol)
+          : undefined
+      current = { type: loaded ?? unlazied, symbol: found.symbol }
+    }
+
+    return current
+  }
+
+  /**
+   * Whether a lazy router loads the `AnyRouter` its type parameter is constrained to, as it does
+   * when its type is inferred from a loader resolving `any`, instead of a router it is given, like
+   * `os.lazy<typeof usersRouter>(...)` or `const users: Lazy<Users> = os.lazy(...)`.
+   */
+  private holdsNoRouter(lazy: Type, unlazied: Type): boolean {
+    if (unlazied.id === lazy.id || !unlazied.isUnionType()) {
+      return false
+    }
+
+    // `Procedure<...> | { [k: string]: Lazyable<Router<...>> }`
+    return this.types.memo('holdsNoRouter', unlazied.id, () => {
+      const members = this.types.getMembers(unlazied)
+      return (
+        members.some((member) => this.checker.getIndexInfosOfType(member).length > 0) &&
+        members.some((member) => this.isProcedure(member))
+      )
+    })
+  }
+
+  /**
+   * The `any` the loader of a lazy router resolves as it is written, like the `import()` of a
+   * module the compiler does not find, or the `any` it is given (`os.lazy<any>(...)`), which the
+   * type of the lazy router does not show: it holds a router of any procedures instead.
+   */
+  private getWrittenLoadedAny(symbol: TSSymbol): Type | undefined {
+    return this.types.memo('writtenLoadedAny', symbol.id, () => {
+      // `users: os.lazy(...)`, or `{ users }` and `users: usersRouter` of a variable
+      const calls = [symbol, getAssignedSymbol(this.checker, symbol)].flatMap((s) =>
+        (s?.declarations ?? []).flatMap((declaration) => {
+          const initializer = (declaration.resolve() as any)?.initializer
+          return initializer?.kind === SyntaxKind.CallExpression ? [initializer] : []
+        }),
+      )
+      // `os.lazy<any>(...)` is given the `any` it loads
+      const given = calls.flatMap((call) => [...(call.typeArguments ?? [])])
+      const loaders = calls.flatMap((call) => [...call.arguments])
+
+      if (!given.length && !loaders.length) {
+        return undefined
+      }
+
+      const types = this.checker.getTypeAtLocation([...given, ...loaders])
+      const givenAny = types
+        .slice(0, given.length)
+        .find((type) => type && type.flags & TypeFlags.Any)
+
+      return (
+        givenAny ??
+        types.slice(given.length).flatMap((loader) => {
+          const promise = getCallReturnType(this.checker, loader)
+          const loaded = promise && getPromisedType(this.checker, promise)
+          const router =
+            loaded && !(loaded.flags & TypeFlags.Any)
+              ? this.getPropertyType(loaded, 'default')
+              : loaded
+          return router && router.flags & TypeFlags.Any ? [router] : []
+        })[0]
+      )
+    })
+  }
+
+  private resolveSegment(type: Type, segment: string): ResolvedRouterType | undefined {
+    const symbol = this.types.getProperty(type, segment)
+
+    if (symbol) {
+      const propertyType = this.types.getSymbolTypes([symbol])[0]
+      return propertyType && { type: propertyType, symbol }
+    }
+
+    // routers of a union, like `isDev ? { ...base, debug } : base`, at a key only some members have
+    if (type.isUnionType()) {
+      const found = this.types
+        .getMembers(type)
+        .map((member) => this.resolveSegment(this.unlazy(member), segment))
+        .filter((member) => member !== undefined)
+
+      return found.every((member) => member.type.id === found[0]?.type.id) ? found[0] : undefined
+    }
+
+    // routers typed with an index signature, like `Record<string, typeof procedure>`
+    const valueType = this.checker.getIndexInfosOfType(type).find((info) => {
+      const key = getIndexKeyType(this.types, info.keyType)
+      return key && new RegExp(`^(?:${toPattern(this.types, key)})$`, 'u').test(segment)
+    })?.valueType
+
+    return valueType && { type: valueType, symbol: undefined }
+  }
+
+  /**
+   * Whether the type is a procedure or contract, which carries a `~orpc` definition.
+   */
+  isProcedure(type: Type): boolean {
+    return this.getPath(type, ['~orpc']) !== undefined
+  }
+
+  /**
+   * Whether a procedure or contract is anywhere in the type, so a router of other paths
+   * is told apart from an export that is no router at all.
+   */
+  holdsProcedure(): boolean {
+    return this.holdsProcedureIn(this.root.type, {
+      expansion: new ExpansionGuard(this.types),
+      searched: new Map(),
+      skipped: 0,
+    })
+  }
+
+  private holdsProcedureIn(type: Type, search: ProcedureSearch): boolean {
+    const current = this.unlazy(this.stripNullish(type))
+    const depth = search.expansion.depth
+    const searched = search.searched.get(current.id)
+
+    // a search cut on the way was not done, the type may reach further where it comes back less
+    // deeply nested. Searching it again only then, not on each path to it, keeps the search of a
+    // type graph sharing such a type (`{ a: Shared; b: Shared }`) from growing with its paths
+    if (searched && !(searched.cut && depth < searched.depth)) {
+      // what comes to it relies on its search, which was cut
+      if (searched.cut) {
+        search.skipped++
+      }
+      return false
+    }
+
+    const entry = { depth, cut: false }
+    search.searched.set(current.id, entry)
+
+    const cuts = search.expansion.cuts + search.skipped
+    const held = this.searchProcedure(current, search)
+    entry.cut = search.expansion.cuts + search.skipped !== cuts
+
+    return held
+  }
+
+  private searchProcedure(current: Type, search: ProcedureSearch): boolean {
+    const types = this.types
+
+    if (this.isProcedure(current)) {
+      return true
+    }
+
+    // optional routers, and the `{ users } & { posts }` of `Object.assign`
+    if (current.flags & TypeFlags.UnionOrIntersection) {
+      return types.getMembers(current).some((member) => this.holdsProcedureIn(member, search))
+    }
+
+    if (!this.canBeRouter(current)) {
+      return false
+    }
+
+    // every instantiation of `interface Grow<T> { next: Grow<T[]> }` is a new type
+    return (
+      search.expansion.expand(
+        current,
+        () =>
+          types
+            .getPropertyTypes(current)
+            .some(
+              (property) => property !== undefined && this.holdsProcedureIn(property, search),
+            ) ||
+          this.checker
+            .getIndexInfosOfType(current)
+            .some((info) => this.holdsProcedureIn(info.valueType, search)),
+      ) ?? false
+    )
+  }
+
+  /**
+   * Whether the type can hold routers like an object of procedures, lazy routers and nested
+   * routers does: a plain object, a class instance or a function with properties, but no
+   * primitive, array or default library type (`Record<K, T>` and the other mapped types aside),
+   * whose members hold no procedure.
+   */
+  private canBeRouter(type: Type): boolean {
+    if (!(type.flags & TypeFlags.Object) || this.types.getReferenceKind(type)) {
+      return false
+    }
+
+    const symbol = type.getSymbol()
+
+    return !symbol || isMappedType(type) || this.types.getSymbolSourceKind(symbol) !== 'default'
+  }
+
+  /**
+   * The input or output type of a procedure, read from its `~orpc` definition.
+   */
+  getSchemaType(procedure: Type, direction: 'input' | 'output'): Type | undefined {
+    const schema = direction === 'input' ? '__TInputSchema' : '__TOutputSchema'
+    return this.getStandardSchemaType(this.getPath(procedure, ['~orpc', schema, 'type']), direction)
+  }
+
+  /**
+   * The output type of an error's `data` schema.
+   */
+  getErrorDataType(procedure: Type, code: string): Type | undefined {
+    const data = this.getPath(procedure, ['~orpc', 'errorMap', code, 'data'])
+    return this.getStandardSchemaType(data, 'output')
+  }
+
+  private getStandardSchemaType(
+    schema: Type | undefined,
+    direction: 'input' | 'output',
+  ): Type | undefined {
+    const types = this.getPath(schema, ['~standard', 'types'])
+    // the input/output type itself is kept as is, including `null` and `undefined`
+    return types && this.getPropertyType(types, direction)
+  }
+
+  /**
+   * Follows properties by their non-nullable types, so optional properties can be followed.
+   */
+  private getPath(type: Type | undefined, names: readonly string[]): Type | undefined {
+    return names.reduce<Type | undefined>((current, name) => {
+      const propertyType = current && this.getPropertyType(current, name)
+      return propertyType && this.stripNullish(propertyType)
+    }, type)
+  }
+
+  private getPropertyType(type: Type, name: string): Type | undefined {
+    const symbol = this.types.getProperty(type, name)
+    return symbol && this.types.getSymbolTypes([symbol])[0]
+  }
+
+  private stripNullish(type: Type): Type {
+    if (!type.isUnionType()) {
+      return type
+    }
+
+    const members = this.types.getMembers(type)
+    const concrete = members.filter((t) => !(t.flags & (TypeFlags.Undefined | TypeFlags.Null)))
+
+    if (concrete.length === members.length) {
+      return type
+    }
+
+    // `Procedure | undefined` needs no compiler request
+    return concrete.length === 1 ? concrete[0]! : this.types.getNonNullable(type)
+  }
+
+  private unlazy(type: Type): Type {
+    return this.types.memo('unlazy', type.id, () => this.load(type))
+  }
+
+  private load(type: Type): Type {
+    const loader = this.getPath(type, ['~orpc', 'loader'])
+
+    if (!loader) {
+      return type
+    }
+
+    const promise = getCallReturnType(this.checker, loader)
+    const resolved = promise && getPromisedType(this.checker, promise)
+    const loaded = this.getPath(resolved, ['default'])
+
+    return loaded ? this.unlazy(loaded) : type
+  }
+}

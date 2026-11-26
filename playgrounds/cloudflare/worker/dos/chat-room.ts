@@ -1,4 +1,8 @@
-import { encodeHibernationRPCEvent, HibernationAsyncIteratorClass, HibernationHandlerPlugin } from '@orpc/hibernation'
+import {
+  encodeHibernationRPCEvent,
+  HibernationAsyncIteratorClass,
+  HibernationHandlerPlugin,
+} from '@orpc/hibernation'
 import { onError, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/websocket'
 import { DurableObject } from 'cloudflare:workers'
@@ -38,9 +42,7 @@ const handler = new RPCHandler(chatRoomRouter, {
       console.error(error)
     }),
   ],
-  plugins: [
-    new HibernationHandlerPlugin(),
-  ],
+  plugins: [new HibernationHandlerPlugin()],
 })
 
 export class ChatRoomDO extends DurableObject {

@@ -1,4 +1,4 @@
-// eslint-disable-next-line no-restricted-imports
+// oxlint-disable-next-line no-restricted-imports
 import type * as OpenAPIV3_2 from '@openapi-spec/types/v3.2'
 
 /**

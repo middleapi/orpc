@@ -1,8 +1,8 @@
 ---
-title: "Next.js Adapter"
-description: "Use oRPC inside a Next.js project by mounting a handler in a route handler."
+title: 'Next.js Adapter'
+description: 'Use oRPC inside a Next.js project by mounting a handler in an App Router route handler or Pages Router API route, with a client that also works during SSR.'
 sidebar:
-  label: "Next.js"
+  label: 'Next.js'
 ---
 
 [Next.js](https://nextjs.org/) is a leading React framework for server-rendered apps. oRPC works with both the [App Router](https://nextjs.org/docs/app/getting-started/installation) and [Pages Router](https://nextjs.org/docs/pages/getting-started/installation) through the [Fetch API Adapter](/docs/adapters/fetch-api) and [Node HTTP Adapter](/docs/adapters/node-http) respectively.
@@ -30,7 +30,7 @@ const handler = new RPCHandler(router, {
 async function handleRequest(request: Request) {
   const { response } = await handler.handle(request, {
     prefix: '/rpc',
-    context: {} // Provide initial context if needed, can be an async function
+    context: {}, // Provide initial context if needed, can be an async function
   })
 
   return response ?? new Response('Not found', { status: 404 })
@@ -72,7 +72,7 @@ export const config = {
 export default async (req: NextApiRequest, res: NextApiResponse) => {
   const { matched } = await handler.handle(req, res, {
     prefix: '/api/rpc',
-    context: {} // Provide initial context if needed, can be an async function
+    context: {}, // Provide initial context if needed, can be an async function
   })
 
   if (matched) {
@@ -153,7 +153,6 @@ export const client: RouterClient<typeof router> = globalThis.$client ?? createO
 
 ```ts title="lib/orpc.server.ts"
 import { createRouterClient } from '@orpc/server'
-import { headers } from 'next/headers'
 
 globalThis.$client = createRouterClient(router, {
   /**
@@ -163,14 +162,18 @@ globalThis.$client = createRouterClient(router, {
    * only include context that's safe to reuse globally.
    * For per-request context, use middleware context or pass a function as the initial context.
    */
-  context: async () => ({
-    headers: await headers(), // provide headers if initial context required
-  }),
+  context: async () => {
+    const { headers } = await import('next/headers')
+
+    return {
+      headers: await headers(), // provide headers if initial context required
+    }
+  },
 })
 ```
 
 </CodeGroup>
 
 :::warning
-`import.meta.env.SSR` requires [Turbopack](https://nextjs.org/docs/app/api-reference/turbopack), the default bundler since Next.js 16. On webpack builds, guard with `typeof window === 'undefined'` instead, which Next.js also replaces at build time. Either way, do not add `import 'server-only'` to `orpc.server.ts`: it would fail the build.
+`import.meta.env.SSR` requires [Turbopack](https://nextjs.org/docs/app/api-reference/turbopack), the default bundler since Next.js 16. On webpack builds, guard with `typeof window === 'undefined'` instead, which Next.js also replaces at build time. Either way, do not add `import 'server-only'` or a static `next/headers` import to `orpc.server.ts`: either would fail the build.
 :::

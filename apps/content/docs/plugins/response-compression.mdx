@@ -1,8 +1,8 @@
 ---
-title: "Response Compression Plugin"
-description: "Compress response bodies on the server and decompress them on the client to reduce bandwidth usage and improve performance."
+title: 'Response Compression Plugin'
+description: 'Compress response bodies on the server and decompress them on the client to reduce bandwidth usage and improve performance.'
 sidebar:
-  label: "Response Compression"
+  label: 'Response Compression'
 ---
 
 ## Server
@@ -62,7 +62,10 @@ const handler = new RPCHandler(router, {
        * @default isCompressibleContentType (covers common text-based formats)
        */
       isCompressibleContentType: (contentType, { request }) => {
-        return /^application\/x-custom-format(?:[;\s]|$)/i.test(contentType ?? '') && request.headers['x-no-compression'] === undefined
+        return (
+          /^application\/x-custom-format(?:[;\s]|$)/i.test(contentType ?? '') &&
+          request.headers['x-no-compression'] === undefined
+        )
       },
     }),
   ],

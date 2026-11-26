@@ -1,14 +1,24 @@
 import type { ErrorMap } from '@orpc/contract'
-import type { Context, Middleware, MiddlewareDone, MiddlewareNextOptions, MiddlewareOptions, MiddlewareResult, ORPCErrorConstructorMap } from '@orpc/server'
+import type {
+  Context,
+  Middleware,
+  MiddlewareDone,
+  MiddlewareNextOptions,
+  MiddlewareOptions,
+  MiddlewareResult,
+  ORPCErrorConstructorMap,
+} from '@orpc/server'
 import type { MaybeOptionalOptions } from '@orpc/shared'
-import type { InferEffectServices, WithEffectContext } from './context'
+import { listenAbort, resolveMaybeOptionalOptions } from '@orpc/shared'
 import { Effect, Context as EffectContext } from 'effect'
+
+import type { InferEffectServices, WithEffectContext } from './context'
 import { runPromise } from './runtime'
 
 export interface MiddlewareGenNext<TOutput> {
   <U extends Context = object>(
     ...rest: MaybeOptionalOptions<MiddlewareNextOptions<U>>
-  ): Effect.Effect<Awaited<MiddlewareResult<U, TOutput>>, unknown>
+  ): Effect.Effect<MiddlewareResult<U, TOutput>, unknown>
 }
 
 export interface MiddlewareGenOptions<
@@ -24,18 +34,14 @@ export interface MiddlewareGen<
   TOutContext extends Context,
   TInput,
   TOutput,
-  TYield extends Effect.Effect<any, any, InferEffectServices<TInContext>>,
   TErrorConstructorMap extends ORPCErrorConstructorMap<any>,
+  TYield extends Effect.Effect<any, any, InferEffectServices<TInContext>>,
 > {
   (
     opts: MiddlewareGenOptions<TInContext, TOutput, TErrorConstructorMap>,
     input: TInput,
     done: MiddlewareDone<TOutput>,
-  ): Generator<
-    TYield,
-    MiddlewareResult<TOutContext, TOutput>,
-    never
-  >
+  ): Generator<TYield, MiddlewareResult<TOutContext, TOutput>, never>
 }
 
 export type AnyMiddlewareGen = MiddlewareGen<any, any, any, any, any, any>
@@ -53,32 +59,115 @@ export function middlewareGen<
   TOutContext extends Context = object,
   TInput = unknown,
   TOutput = any, // TOutput = any by default is important to make middleware can be used in any output by default
-  TErrorMap extends ErrorMap = Record<never, never>,
-  TYield extends Effect.Effect<any, any, InferEffectServices<TInContext>> = Effect.Effect<any, any, InferEffectServices<TInContext>>,
+  TErrorMap extends ErrorMap = {},
+  TYield extends Effect.Effect<any, any, InferEffectServices<TInContext>> = Effect.Effect<
+    any,
+    any,
+    InferEffectServices<TInContext>
+  >,
 >(
-  middleware: MiddlewareGen<TInContext, TOutContext, TInput, TOutput, TYield, ORPCErrorConstructorMap<TErrorMap>>,
+  middleware: MiddlewareGen<
+    TInContext,
+    TOutContext,
+    TInput,
+    TOutput,
+    ORPCErrorConstructorMap<TErrorMap>,
+    TYield
+  >,
 ): Middleware<TInContext, TOutContext, TInput, TOutput, TErrorMap> {
-  const mid: Middleware<TInContext, TOutContext, TInput, TOutput, TErrorMap> = (opts, input, done) => {
-    const next: MiddlewareGenNext<TOutput> = <U extends Context = object>(...rest: MaybeOptionalOptions<MiddlewareNextOptions<U>>) => Effect.tryPromise({
-      try: async () => opts.next<U>(...rest),
-      catch: error => error,
+  const mid: Middleware<TInContext, TOutContext, TInput, TOutput, TErrorMap> = (
+    opts,
+    input,
+    done,
+  ) => {
+    const next: MiddlewareGenNext<TOutput> = <U extends Context = object>(
+      ...rest: MaybeOptionalOptions<MiddlewareNextOptions<U>>
+    ) =>
+      Effect.contextWith((fiberContext) =>
+        Effect.callback<MiddlewareResult<U, TOutput>, unknown>((resume) => {
+          const nextOptions = resolveMaybeOptionalOptions(rest)
+          const upstream = nextOptions.signal ?? opts.signal
+
+          // Not `AbortSignal.any`: Node flattens its sources, O(N²) across nested middlewares.
+          const controller = upstream?.aborted ? undefined : new AbortController()
+          const unlisten = controller && listenAbort(upstream, controller.abort.bind(controller))
+
+          const promise = Promise.resolve(
+            opts.next<U>({
+              context: {
+                ...nextOptions.context,
+                'effect/context': layerChangedServices(
+                  fiberContext,
+                  nextOptions.context?.['effect/context'],
+                  opts.context['effect/context'],
+                ),
+              },
+              signal: controller?.signal ?? upstream,
+            } as any),
+          )
+
+          promise.then(
+            (result) => resume(Effect.succeed(result)),
+            (error) => resume(Effect.fail(error)),
+          )
+
+          // On interruption, wait for the chain to settle.
+          return Effect.promise(() => {
+            unlisten?.()
+            controller?.abort(upstream?.reason)
+            return promise.catch(() => {})
+          })
+        }),
+      )
+
+    const effectContext = opts.context['effect/context']
+    const wrap = opts.context['effect/wrap'] as WithEffectContext<any>['effect/wrap']
+    const ef = Effect.gen(() => middleware({ ...opts, next }, input, done)) as Effect.Effect<
+      MiddlewareResult<TOutContext, TOutput>,
+      unknown
+    >
+
+    let wrapped = ef
+    if (typeof wrap === 'function') {
+      const { next: _next, ...rest } = opts
+      wrapped = wrap(ef, { ...rest, kind: 'middleware', input })
+    }
+
+    return runPromise(wrapped, {
+      context: EffectContext.isContext(effectContext) ? effectContext : undefined,
+      signal: opts.signal,
     })
-
-    let ef = Effect.gen(() => middleware({ ...opts, next }, input, done)) as Effect.Effect<MiddlewareResult<TOutContext, TOutput>, unknown>
-
-    if (EffectContext.isContext(opts.context['effect/context'])) {
-      ef = ef.pipe(Effect.provide(opts.context['effect/context']))
-    }
-
-    if (typeof opts.context['effect/wrap'] === 'function') {
-      const intercept = opts.context['effect/wrap'] as Exclude<WithEffectContext<any>['effect/wrap'], undefined>
-      ef = intercept(ef, opts)
-    }
-
-    return runPromise(ef, { signal: opts.signal })
   }
 
   Object.defineProperty(mid, 'name', { value: middleware.name })
 
   return mid
+}
+
+/**
+ * An `effect/context` passed to `next` is the incoming one plus changes, so only the changed services
+ * are layered over the fiber context, keeping the fiber's newer services, spans and log annotations.
+ */
+function layerChangedServices(
+  fiberContext: EffectContext.Context<never>,
+  nextServices: unknown,
+  incomingServices: unknown,
+): EffectContext.Context<never> {
+  if (!EffectContext.isContext(nextServices) || nextServices === incomingServices) {
+    return fiberContext
+  }
+
+  const services = new Map(fiberContext.mapUnsafe)
+
+  for (const [key, service] of nextServices.mapUnsafe) {
+    if (
+      !EffectContext.isContext(incomingServices) ||
+      !incomingServices.mapUnsafe.has(key) ||
+      incomingServices.mapUnsafe.get(key) !== service
+    ) {
+      services.set(key, service)
+    }
+  }
+
+  return EffectContext.makeUnsafe(services)
 }

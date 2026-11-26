@@ -7,7 +7,6 @@ import {
   setTracer,
   startSpan,
   toSpanAttributeValue,
-  toTracingException,
 } from './tracing'
 
 function createMockSpan() {
@@ -87,10 +86,7 @@ describe('tracing', () => {
       const error = new Error('test')
       recordSpanError(mockSpan, error)
 
-      expect(mockSpan.recordException).toHaveBeenCalledWith(
-        'error',
-        expect.objectContaining({ message: 'test', name: 'Error' }),
-      )
+      expect(mockSpan.recordException).toHaveBeenCalledWith('error', error)
     })
 
     it('records AbortError at info level', () => {
@@ -99,10 +95,16 @@ describe('tracing', () => {
       error.name = 'AbortError'
       recordSpanError(mockSpan, error)
 
-      expect(mockSpan.recordException).toHaveBeenCalledWith(
-        'info',
-        expect.objectContaining({ message: 'aborted', name: 'AbortError' }),
-      )
+      expect(mockSpan.recordException).toHaveBeenCalledWith('info', error)
+    })
+
+    it.each(['TimeoutError', 'ConnectionClosedError'])('records %s at error level', (name) => {
+      const mockSpan = createMockSpan() as any
+      const error = new Error('failed')
+      error.name = name
+      recordSpanError(mockSpan, error)
+
+      expect(mockSpan.recordException).toHaveBeenCalledWith('error', error)
     })
   })
 
@@ -121,34 +123,6 @@ describe('tracing', () => {
       const mockSpan = createMockSpan() as any
       setSpanAttributeIfDefined(mockSpan, 'key', 'value')
       expect(mockSpan.setAttribute).toHaveBeenCalledWith('key', 'value')
-    })
-  })
-
-  describe('toTracingException', () => {
-    it('converts error to exception', () => {
-      const error = new Error('test')
-      error.stack = 'stack'
-      const exception = toTracingException(error)
-      expect(exception).toEqual({ message: 'test', name: 'Error', stack: 'stack' })
-    })
-
-    it('includes numeric code', () => {
-      const error = new Error('test') as any
-      error.code = 123
-      const exception = toTracingException(error)
-      expect(exception.code).toBe(123)
-    })
-
-    it('includes string code', () => {
-      const error = new Error('test') as any
-      error.code = 'CODE'
-      const exception = toTracingException(error)
-      expect(exception.code).toBe('CODE')
-    })
-
-    it('converts non-error to exception', () => {
-      expect(toTracingException('test')).toEqual({ message: 'test' })
-      expect(toTracingException(123)).toEqual({ message: '123' })
     })
   })
 
@@ -178,6 +152,28 @@ describe('tracing', () => {
       expect(fn).toHaveBeenCalledWith()
     })
 
+    describe('without tracer', () => {
+      it('returns the promise from fn as is', () => {
+        const promise = Promise.resolve('out')
+        expect(runWithSpan('test', () => promise)).toBe(promise)
+      })
+
+      it('wraps a sync value in a promise', async () => {
+        const result = runWithSpan('test', () => 'out')
+        expect(result).toBeInstanceOf(Promise)
+        expect(await result).toBe('out')
+      })
+
+      it('turns a sync throw into a rejected promise', async () => {
+        const error = new Error('fail')
+        const result = runWithSpan('test', () => {
+          throw error
+        })
+        expect(result).toBeInstanceOf(Promise)
+        await expect(result).rejects.toBe(error)
+      })
+    })
+
     it('starts active span, runs function and ends span', async () => {
       const tracer = createMockTracer()
       const mockSpan = createMockSpan()
@@ -203,7 +199,7 @@ describe('tracing', () => {
       const fn = vi.fn().mockRejectedValue(error)
 
       await expect(runWithSpan('test', fn)).rejects.toThrow('fail')
-      expect(mockSpan.recordException).toHaveBeenCalledWith('error', expect.objectContaining({ message: 'fail' }))
+      expect(mockSpan.recordException).toHaveBeenCalledWith('error', error)
       expect(mockSpan.end).toHaveBeenCalledTimes(1)
     })
 

@@ -1,17 +1,18 @@
 import type { Promisable } from '@orpc/shared'
+import { listenAbort, takeLast, throwIfAborted } from '@orpc/shared'
 import type { QueryFunction, QueryFunctionContext, QueryKey } from '@tanstack/query-core'
 
 export interface SerializableStreamedQueryOptions {
   /**
-   * Determines how data is handled when the query is fetched again
+   * What a fetch does with existing data once its stream connects.
+   * Until then the data stays, so a query with data never returns to `pending`.
    *
-   * - `'reset'`: Clears existing data and returns the query to a pending state.
-   * - `'append'`: Adds new streamed chunks to the existing data.
-   * - `'replace'`: Buffers streamed data and replaces the cache after the stream completes.
+   * - `'reset'`: the data becomes `[]`, then each chunk is appended.
+   * - `'append'`: the data is kept (trimmed to `maxChunks`), and each chunk is appended.
    *
    * @default 'reset'
    */
-  refetchMode?: 'append' | 'reset' | 'replace'
+  refetchMode?: 'append' | 'reset' | undefined
 
   /**
    * Limits the number of data chunks stored in the query result.
@@ -19,7 +20,19 @@ export interface SerializableStreamedQueryOptions {
    *
    * @default Number.POSITIVE_INFINITY (unlimited)
    */
-  maxChunks?: number
+  maxChunks?: number | undefined
+}
+
+export interface SettleOnFirstDataOptions {
+  /**
+   * Settles the fetch at its first data (streamed: when the stream connects; live: on the first event)
+   * instead of following the stream to its end. The stream is closed and the data kept.
+   * Use it only where nothing watches the stream, such as server rendering:
+   * a refetch while a query is mounted would also settle, closing its stream.
+   *
+   * @default false
+   */
+  settleOnFirstData?: boolean | undefined
 }
 
 /**
@@ -31,79 +44,59 @@ export function serializableStreamedQuery<
   TQueryFnData = unknown,
   TQueryKey extends QueryKey = QueryKey,
 >(
-  queryFn: (
-    context: QueryFunctionContext<TQueryKey>,
-  ) => Promisable<AsyncIterable<TQueryFnData>>,
-  { refetchMode = 'reset', maxChunks = Number.POSITIVE_INFINITY }: SerializableStreamedQueryOptions = {},
+  queryFn: (context: QueryFunctionContext<TQueryKey>) => Promisable<AsyncIterable<TQueryFnData>>,
+  {
+    refetchMode = 'reset',
+    maxChunks = Number.POSITIVE_INFINITY,
+    settleOnFirstData = false,
+  }: SerializableStreamedQueryOptions & SettleOnFirstDataOptions = {},
 ): QueryFunction<TQueryFnData[], TQueryKey> {
-  /**
-   * below code is inspired from old `streamedQuery`: https://github.com/TanStack/query/blob/9973e0f1d82acd6ccf5a49d9a0b5e7e401fc5489/packages/query-core/src/streamedQuery.ts#L19
-   */
   return async (context) => {
-    const query = context.client
-      .getQueryCache()
-      .find({ queryKey: context.queryKey, exact: true })
-    const hasPreviousData = !!query && query.state.data !== undefined
+    const { client, queryKey, signal } = context
 
-    if (hasPreviousData) {
-      if (refetchMode === 'reset') {
-        query.setState({
-          status: 'pending',
-          data: undefined,
-          error: null,
-          fetchStatus: 'fetching',
-        })
-      }
-      else {
-        context.client.setQueryData<Array<TQueryFnData>>(
-          context.queryKey,
-          (prev = []) => limitArraySize(prev, maxChunks),
-        )
-      }
-    }
-
-    let result: Array<TQueryFnData> = []
-    const stream = await queryFn(context)
-    const shouldUpdateCacheDuringStream = !hasPreviousData || refetchMode !== 'replace'
-
-    // after resolve stream successfully we can treat result as empty array
-    context.client.setQueryData<Array<TQueryFnData>>(
-      context.queryKey,
-      (prev = []) => limitArraySize(prev, maxChunks),
+    // a stream cut short (cancelled, or its last observer left) reopens when observed again;
+    // marked at abort, so the writes of a fetch that replaces this one clear it
+    const unlisten = listenAbort(signal, () =>
+      client.getQueryCache().find({ queryKey, exact: true })?.invalidate(),
     )
 
-    for await (const chunk of stream) {
-      if (context.signal.aborted) {
-        throw context.signal.reason
+    try {
+      const stream = await queryFn(context)
+
+      // close without reading, so a generator the query no longer wants never starts
+      if (signal.aborted) {
+        await stream[Symbol.asyncIterator]().return?.()
+        throw signal.reason
       }
 
-      result.push(chunk)
-      result = limitArraySize(result, maxChunks)
+      let data = client.setQueryData<TQueryFnData[]>(queryKey, (current) =>
+        refetchMode === 'append' && current ? takeLast(current, maxChunks) : [],
+      )!
 
-      if (shouldUpdateCacheDuringStream) {
-        context.client.setQueryData<Array<TQueryFnData>>(
-          context.queryKey,
-          (prev = []) => limitArraySize([...prev, chunk], maxChunks),
-        )
+      if (settleOnFirstData) {
+        await stream[Symbol.asyncIterator]().return?.()
+        return data
       }
-    }
 
-    if (!shouldUpdateCacheDuringStream) {
-      context.client.setQueryData<Array<TQueryFnData>>(context.queryKey, result)
-    }
+      for await (const chunk of stream) {
+        throwIfAborted(signal)
 
-    const cachedData = context.client.getQueryData<Array<TQueryFnData>>(context.queryKey)
-    if (cachedData) {
-      return limitArraySize(cachedData, maxChunks)
-    }
+        // read the cache, so writes made during the stream are kept; a cleared entry (`null`) starts over
+        data = client.setQueryData<TQueryFnData[]>(queryKey, (current) =>
+          takeLast([...(current ?? []), chunk], maxChunks),
+        )!
+      }
 
-    return result
+      // the returned data is written again, so return the cache to keep later writes
+      const cached = client.getQueryData<TQueryFnData[]>(queryKey)
+      if (cached === undefined) {
+        return data
+      }
+
+      // only an array is trimmed; another value written after the stream (e.g. `null`) is kept as is
+      return Array.isArray(cached) ? takeLast(cached, maxChunks) : cached
+    } finally {
+      unlisten()
+    }
   }
-}
-
-function limitArraySize<T>(items: Array<T>, maxSize: number): Array<T> {
-  if (items.length <= maxSize) {
-    return items
-  }
-  return items.slice(items.length - maxSize)
 }

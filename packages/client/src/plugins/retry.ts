@@ -1,22 +1,32 @@
 import type { Promisable, Value } from '@orpc/shared'
-import type { StandardLinkInterceptor, StandardLinkInterceptorOptions, StandardLinkOptions, StandardLinkPlugin } from '../adapters/standard'
-import type { ClientContext } from '../types'
-import { AsyncIteratorClass, isAsyncIteratorObject, override, sleep, toArray, value } from '@orpc/shared'
+import { AsyncIteratorClass, isAsyncIteratorObject, sleep, toArray, value } from '@orpc/shared'
 import { getEventMeta } from '@standard-server/core'
 
-export interface RetryLinkPluginAttemptOptions<T extends RetryLinkPluginContext> extends StandardLinkInterceptorOptions<T> {
+import type {
+  StandardLinkInterceptor,
+  StandardLinkInterceptorOptions,
+  StandardLinkOptions,
+  StandardLinkPlugin,
+} from '../adapters/standard/index'
+import { COMMON_ERROR_STATUS_MAP, ORPCError, ResponseError } from '../error'
+import type { ClientContext } from '../types'
+
+export interface RetryLinkPluginAttemptOptions<
+  T extends RetryLinkPluginContext,
+> extends StandardLinkInterceptorOptions<T> {
   /**
    * Latest retry delay advertised by the server via event metadata.
    */
   lastEventRetry: number | undefined
 
   /**
-   * Current retry attempt number, starting at 1.
+   * Number of attempts made so far, the first call included.
+   * It is `1` when the first call has just failed, so it is also the number of the retry being decided.
    */
   attempt: number
 
   /**
-   * Error that triggered this retry attempt.
+   * Error from the latest attempt, the one this retry would follow.
    */
   error: unknown
 }
@@ -29,12 +39,18 @@ export interface RetryLinkPluginAttemptOptions<T extends RetryLinkPluginContext>
  */
 export interface RetryLinkPluginContext {
   /**
-   * Maximum retry attempts before throwing.
+   * Maximum number of retries after the first call, before throwing.
+   * The first call is not counted: `3` allows up to 4 attempts in total, and `0` disables retries.
    * Use `Number.POSITIVE_INFINITY` for infinite retries (e.g. for AsyncIteratorObject).
    *
    * @default 0
    */
-  retry?: Value<Promisable<number>, [Omit<StandardLinkInterceptorOptions<RetryLinkPluginContext>, 'next'>]>
+  retry?:
+    | Value<
+        Promisable<number>,
+        [Omit<StandardLinkInterceptorOptions<RetryLinkPluginContext>, 'next'>]
+      >
+    | undefined
 
   /**
    * Delay (in ms) before retrying.
@@ -44,19 +60,27 @@ export interface RetryLinkPluginContext {
    *
    * @default (o) => o.lastEventRetry ?? 2000
    */
-  retryDelay?: Value<Promisable<number>, [RetryLinkPluginAttemptOptions<RetryLinkPluginContext>]>
+  retryDelay?:
+    | Value<Promisable<number>, [RetryLinkPluginAttemptOptions<RetryLinkPluginContext>]>
+    | undefined
 
   /**
    * Determine whether to retry.
    *
-   * @default true
+   * @default (o) => isRetryableError(o.error)
    */
-  shouldRetry?: Value<Promisable<boolean>, [RetryLinkPluginAttemptOptions<RetryLinkPluginContext>]>
+  shouldRetry?:
+    | Value<Promisable<boolean>, [RetryLinkPluginAttemptOptions<RetryLinkPluginContext>]>
+    | undefined
 
   /**
    * Hook called before each retry. Can return a cleanup callback.
    */
-  onRetry?: (options: RetryLinkPluginAttemptOptions<RetryLinkPluginContext>) => void | ((isSuccess: boolean) => void)
+  onRetry?:
+    | ((
+        options: RetryLinkPluginAttemptOptions<RetryLinkPluginContext>,
+      ) => void | ((isSuccess: boolean) => void))
+    | undefined
 }
 
 export interface RetryLinkPluginOptions<_T extends RetryLinkPluginContext> {
@@ -64,6 +88,29 @@ export interface RetryLinkPluginOptions<_T extends RetryLinkPluginContext> {
    * Default retry options. Can be overridden by individual calls via the context.
    */
   default?: RetryLinkPluginContext | undefined
+}
+
+/**
+ * Default `shouldRetry` check of `RetryLinkPlugin`. Returns `false` only for errors
+ * from a 4xx response other than `408` and `429`.
+ *
+ * @see {@link https://orpc.dev/docs/plugins/retry#client-error-responses | Retry Plugin - Client Error Responses}
+ */
+export function isRetryableError(error: unknown): boolean {
+  const responseError = error instanceof ORPCError ? error.cause : error
+
+  if (!(responseError instanceof ResponseError)) {
+    return true
+  }
+
+  const { status } = responseError.response
+
+  return (
+    status < 400 ||
+    status >= 500 ||
+    status === COMMON_ERROR_STATUS_MAP.TIMEOUT ||
+    status === COMMON_ERROR_STATUS_MAP.TOO_MANY_REQUESTS
+  )
 }
 
 /**
@@ -75,34 +122,33 @@ export interface RetryLinkPluginOptions<_T extends RetryLinkPluginContext> {
  *
  * @see {@link https://orpc.dev/docs/plugins/retry | Retry Plugin}
  */
-export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> implements StandardLinkPlugin<T> {
+export class RetryLinkPlugin<
+  T extends RetryLinkPluginContext & ClientContext,
+> implements StandardLinkPlugin<T> {
   private readonly defaultRetry: Exclude<RetryLinkPluginContext['retry'], undefined>
   private readonly defaultRetryDelay: Exclude<RetryLinkPluginContext['retryDelay'], undefined>
   private readonly defaultShouldRetry: Exclude<RetryLinkPluginContext['shouldRetry'], undefined>
   private readonly defaultOnRetry: RetryLinkPluginContext['onRetry']
 
-  name = '~retry'
+  readonly name = '~retry'
 
   constructor(options: RetryLinkPluginOptions<T> = {}) {
     this.defaultRetry = options.default?.retry ?? 0
-    this.defaultRetryDelay = options.default?.retryDelay ?? (o => o.lastEventRetry ?? 2000)
-    this.defaultShouldRetry = options.default?.shouldRetry ?? true
+    this.defaultRetryDelay = options.default?.retryDelay ?? ((o) => o.lastEventRetry ?? 2000)
+    this.defaultShouldRetry = options.default?.shouldRetry ?? ((o) => isRetryableError(o.error))
     this.defaultOnRetry = options.default?.onRetry
   }
 
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
     const interceptor: StandardLinkInterceptor<T> = async (interceptorOptions) => {
       const { next, ...callOptions } = interceptorOptions
-      const maxAttempts = await value(
-        callOptions.context.retry ?? this.defaultRetry,
-        callOptions,
-      )
+      const maxRetries = await value(callOptions.context.retry ?? this.defaultRetry, callOptions)
 
       const retryDelay = callOptions.context.retryDelay ?? this.defaultRetryDelay
       const shouldRetry = callOptions.context.shouldRetry ?? this.defaultShouldRetry
       const onRetry = callOptions.context.onRetry ?? this.defaultOnRetry
 
-      if (maxAttempts <= 0) {
+      if (maxRetries <= 0) {
         return next(callOptions)
       }
 
@@ -110,6 +156,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
       let lastEventRetry: undefined | number
       let callback: void | ((isSuccess: boolean) => void)
       let attempt = 1
+      let isIteratorAborted = false
 
       const callNext = async (initialError?: { error: unknown }) => {
         let currentError = initialError
@@ -119,7 +166,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
           let retryDelayMs = 0
 
           if (currentError) {
-            if (attempt > maxAttempts) {
+            if (isIteratorAborted || attempt > maxRetries) {
               throw currentError.error
             }
 
@@ -130,10 +177,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
               lastEventRetry,
             }
 
-            const shouldRetryBool = await value(
-              shouldRetry,
-              attemptOptions,
-            )
+            const shouldRetryBool = await value(shouldRetry, attemptOptions)
 
             if (!shouldRetryBool) {
               throw currentError.error
@@ -147,20 +191,22 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
             if (currentError) {
               await sleep(retryDelayMs, { signal: updatedCallOptions.signal })
 
+              if (isIteratorAborted) {
+                throw currentError.error
+              }
+
               attempt++
             }
 
             currentError = undefined
             return await next(updatedCallOptions)
-          }
-          catch (error) {
+          } catch (error) {
             currentError = { error }
 
             if (updatedCallOptions.signal?.aborted) {
               throw error
             }
-          }
-          finally {
+          } finally {
             callback?.(!currentError)
             callback = undefined
           }
@@ -174,9 +220,8 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
       }
 
       let current = output
-      let isIteratorAborted = false
 
-      return override(() => current, new AsyncIteratorClass(
+      return new AsyncIteratorClass(
         async () => {
           while (true) {
             try {
@@ -187,8 +232,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
               lastEventRetry = meta?.retry ?? lastEventRetry
 
               return item
-            }
-            catch (error) {
+            } catch (error) {
               const meta = getEventMeta(error)
 
               lastEventId = meta?.id ?? lastEventId
@@ -198,6 +242,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
               if (!isAsyncIteratorObject(asyncIteratorObject)) {
                 throw new TypeError(
                   'RetryLinkPlugin: Expected an AsyncIteratorObject, got a different type.',
+                  { cause: error },
                 )
               }
 
@@ -217,7 +262,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
             await current.return?.()
           }
         },
-      ))
+      )
     }
 
     return { ...options, interceptors: [interceptor, ...toArray(options.interceptors)] }

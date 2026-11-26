@@ -1,17 +1,3 @@
 {
-  "extends": "../../tsconfig.lib.json",
-  "references": [
-    { "path": "../client" },
-    { "path": "../contract" },
-    { "path": "../shared" }
-  ],
-  "include": ["package.json", "src"],
-  "exclude": [
-    "**/*.test.*",
-    "**/*.bench.*",
-    "**/*.test-d.ts",
-    "**/__tests__/**",
-    "**/__mocks__/**",
-    "**/__snapshots__/**"
-  ]
+  "extends": "../../tsconfig.lib.json"
 }

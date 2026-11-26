@@ -1,5 +1,5 @@
 import type { RateLimiter, RateLimitOptions, RateLimitResult } from '../types'
-import { sleep } from '@orpc/shared'
+import { blockUntilReady, resolveWeight } from '../utils'
 
 export interface MemoryRateLimiterOptions {
   /**
@@ -13,109 +13,82 @@ export interface MemoryRateLimiterOptions {
   window: number
 
   /**
-   * Block until the request may pass or timeout is reached.
+   * How long to wait for capacity to become available, in milliseconds.
+   * Gives up right away when the window will not reset before the timeout elapses.
    *
-   * @default { enabled: false }
+   * @default 0
    */
-  blockingUntilReady?: {
-    /**
-     * Block until the request may pass or timeout is reached.
-     *
-     * @default false
-     */
-    enabled: boolean
-
-    /**
-     * milliseconds
-     */
-    timeout: number
-  }
+  timeout?: number | undefined
 }
 
 /**
  * Rate limiter adapter backed by in-memory storage. Enforces a fixed-window
  * limit, with optional blocking mode.
  *
+ * Windows are per key, and rejected requests do not consume quota.
+ *
  * @see {@link https://orpc.dev/docs/helpers/ratelimit#adapters | Rate Limit Helpers - Adapters}
  */
 export class MemoryRateLimiter implements RateLimiter {
   private readonly maxRequests: number
   private readonly window: number
-  private readonly blockingUntilReady: MemoryRateLimiterOptions['blockingUntilReady']
+  private readonly timeout: number
 
-  private current: Map<string, { used: number }> = new Map()
-  private currentEpochStart: number = Date.now()
+  private readonly entries: Map<string, { used: number; reset: number }> = new Map()
 
   constructor(options: MemoryRateLimiterOptions) {
     this.maxRequests = options.maxRequests
     this.window = options.window
-    this.blockingUntilReady = options.blockingUntilReady
+    this.timeout = options.timeout ?? 0
   }
 
   async limit(key: string, options?: RateLimitOptions): Promise<Required<RateLimitResult>> {
-    const weight = this.resolveWeight(options)
+    const weight = resolveWeight(options)
 
-    return this.blockingUntilReady?.enabled
-      ? this.blockUntilReady(key, this.blockingUntilReady.timeout, weight)
-      : this.checkLimit(key, weight)
+    return blockUntilReady(() => this.checkLimit(key, weight), this.timeout)
   }
 
-  private rotateIfNeeded(now: number): void {
-    if (now < this.currentEpochStart + this.window) {
-      return
-    }
+  /**
+   * Drops expired windows. Entries are in reset order, so it stops at the first live one.
+   */
+  private sweep(now: number): void {
+    for (const [key, entry] of this.entries) {
+      if (entry.reset > now) {
+        break
+      }
 
-    this.current = new Map()
-    this.currentEpochStart = now
+      this.entries.delete(key)
+    }
   }
 
   private checkLimit(key: string, weight: number): Required<RateLimitResult> {
     const now = Date.now()
-    this.rotateIfNeeded(now)
+    this.sweep(now)
 
-    let entry = this.current.get(key)
+    let entry = this.entries.get(key)
 
-    if (!entry) {
-      entry = { used: 0 }
-      this.current.set(key, entry)
+    // the sweep can miss it when the clock moved backward
+    if (entry && entry.reset <= now) {
+      this.entries.delete(key)
+      entry = undefined
     }
 
-    const reset = this.currentEpochStart + this.window
-    const success = entry.used + weight <= this.maxRequests
+    const success = (entry?.used ?? 0) + weight <= this.maxRequests
 
     if (success) {
+      if (!entry) {
+        entry = { used: 0, reset: now + this.window }
+        this.entries.set(key, entry)
+      }
+
       entry.used += weight
     }
 
     return {
       success,
       limit: this.maxRequests,
-      remaining: Math.max(0, this.maxRequests - entry.used),
-      reset,
+      remaining: this.maxRequests - (entry?.used ?? 0),
+      reset: entry?.reset ?? now + this.window,
     }
-  }
-
-  private async blockUntilReady(key: string, timeoutMs: number, weight: number): Promise<Required<RateLimitResult>> {
-    const deadlineAtMs = Date.now() + timeoutMs
-
-    while (true) {
-      const result = this.checkLimit(key, weight)
-
-      if (result.success || result.reset > deadlineAtMs) {
-        return result
-      }
-
-      await sleep(result.reset - Date.now())
-    }
-  }
-
-  private resolveWeight(options?: RateLimitOptions): number {
-    const weight = options?.weight ?? 1
-
-    if (!Number.isInteger(weight) || weight <= 0) {
-      throw new TypeError('Rate limit weight must be an integer greater than 0')
-    }
-
-    return weight
   }
 }

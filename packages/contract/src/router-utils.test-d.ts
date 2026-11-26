@@ -1,14 +1,15 @@
-import type { MergedErrorMap } from './error-utils'
-import type { ProcedureContract } from './procedure'
-import type { AugmentedContractRouter } from './router-utils'
-import type { Schema } from './schema'
 import { describe, expectTypeOf, it } from 'vitest'
 import { z } from 'zod'
+
 import { oc } from './builder'
+import type { MergedErrorMap } from './error-utils'
+import type { ProcedureContract } from './procedure'
+import type { AugmentedRouterContract } from './router-utils'
+import type { Schema } from './schema'
 
 // Schemas should have distinct TInput and TOutput types to ensure correct inference.
-const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
-const outputSchema = z.object({ output: z.string().transform(s => Number(s)) })
+const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })
+const outputSchema = z.object({ output: z.string().transform((s) => Number(s)) })
 
 const ping = oc.input(inputSchema).output(outputSchema)
 const pong = oc.errors({ PONG: { message: 'pong' } })
@@ -28,15 +29,15 @@ const errorMap = {
   },
 }
 
-describe('AugmentedContractRouter', () => {
+describe('AugmentedRouterContract', () => {
   it('merges error maps', () => {
-    type Augmented = AugmentedContractRouter<typeof router, typeof errorMap>
+    type Augmented = AugmentedRouterContract<typeof router, typeof errorMap>
 
     expectTypeOf<Augmented['ping']>().toEqualTypeOf<
       ProcedureContract<
         typeof inputSchema,
         typeof outputSchema,
-        MergedErrorMap<typeof errorMap, object>
+        MergedErrorMap<typeof errorMap, {}>
       >
     >()
 
@@ -50,13 +51,13 @@ describe('AugmentedContractRouter', () => {
   })
 
   it('preserves nested structure', () => {
-    type Augmented = AugmentedContractRouter<typeof router, typeof errorMap>
+    type Augmented = AugmentedRouterContract<typeof router, typeof errorMap>
 
     expectTypeOf<Augmented['nested']['ping']>().toEqualTypeOf<
       ProcedureContract<
         typeof inputSchema,
         typeof outputSchema,
-        MergedErrorMap<typeof errorMap, object>
+        MergedErrorMap<typeof errorMap, {}>
       >
     >()
 
@@ -67,5 +68,33 @@ describe('AugmentedContractRouter', () => {
         MergedErrorMap<typeof errorMap, { PONG: { message: string } }>
       >
     >()
+  })
+
+  it('maps optional keys', () => {
+    type Augmented = AugmentedRouterContract<
+      { ping?: typeof ping; nested?: { pong?: typeof pong } },
+      typeof errorMap
+    >
+
+    expectTypeOf<Augmented>().toEqualTypeOf<{
+      ping?:
+        | ProcedureContract<
+            typeof inputSchema,
+            typeof outputSchema,
+            MergedErrorMap<typeof errorMap, {}>
+          >
+        | undefined
+      nested?:
+        | {
+            pong?:
+              | ProcedureContract<
+                  Schema<void, unknown>,
+                  Schema<unknown, unknown>,
+                  MergedErrorMap<typeof errorMap, { PONG: { message: string } }>
+                >
+              | undefined
+          }
+        | undefined
+    }>()
   })
 })

@@ -1,11 +1,13 @@
 import { Suspense } from 'react'
+
+import { ChatRoom } from '../components/chat-room'
 import { CreatePlanetForm } from '../components/create-planet-form'
-import { ReferenceLinks } from '../components/reference-links'
-import { TopBar } from '../components/top-bar'
+import { PlanetTable } from '../components/planet-table'
+
 import './global.css'
 import { PlanetTableSkeleton } from '../components/planet-table-skeleton'
-import { PlanetTable } from '../components/planet-table'
-import { ChatRoom } from '../components/chat-room'
+import { ReferenceLinks } from '../components/reference-links'
+import { TopBar } from '../components/top-bar'
 
 export function App() {
   return (

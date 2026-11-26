@@ -1,5 +1,6 @@
-import type { PublisherSubscribeListenerOptions } from './publisher'
 import { promiseWithResolvers, sleep } from '@orpc/shared'
+
+import type { PublisherSubscribeListenerOptions } from './publisher'
 import { Publisher } from './publisher'
 
 // Concrete implementation for testing
@@ -10,7 +11,7 @@ class TestPublisher<T extends Record<string, object>> extends Publisher<T> {
   async publish<K extends keyof T>(event: K, payload: T[K]): Promise<void> {
     const eventListeners = this.listenersMap.get(event)
     if (eventListeners) {
-      eventListeners.forEach(listener => listener(payload))
+      eventListeners.forEach((listener) => listener(payload))
     }
   }
 
@@ -38,7 +39,7 @@ class TestPublisher<T extends Record<string, object>> extends Publisher<T> {
 type TestEvents = {
   message: { text: string }
   count: { value: number }
-  user: { id: string, name: string }
+  user: { id: string; name: string }
 }
 
 describe('publisher', () => {
@@ -66,11 +67,17 @@ describe('publisher', () => {
 
     const unsubscribe = await publisher.subscribe('message', listener, { lastEventId, onError })
     expect(subscribeListenerSpy).toHaveBeenCalledTimes(1)
-    expect(subscribeListenerSpy).toHaveBeenNthCalledWith(1, 'message', listener, { lastEventId, onError })
+    expect(subscribeListenerSpy).toHaveBeenNthCalledWith(1, 'message', listener, {
+      lastEventId,
+      onError,
+    })
 
     const iterator = publisher.subscribe('message', { lastEventId })
     expect(subscribeListenerSpy).toHaveBeenCalledTimes(2)
-    expect(subscribeListenerSpy).toHaveBeenNthCalledWith(2, 'message', expect.any(Function), { lastEventId, onError: expect.any(Function) })
+    expect(subscribeListenerSpy).toHaveBeenNthCalledWith(2, 'message', expect.any(Function), {
+      lastEventId,
+      onError: expect.any(Function),
+    })
 
     await unsubscribe()
     await iterator.return()
@@ -82,9 +89,9 @@ describe('publisher', () => {
       const iterator = publisher.subscribe('message')
 
       setTimeout(() => {
-        publisher.publish('message', { text: 'first' })
-        publisher.publish('message', { text: 'second' })
-        publisher.publish('message', { text: 'third' })
+        void publisher.publish('message', { text: 'first' })
+        void publisher.publish('message', { text: 'second' })
+        void publisher.publish('message', { text: 'third' })
         setTimeout(() => iterator.return(), 50)
       }, 10)
 
@@ -101,10 +108,7 @@ describe('publisher', () => {
 
       await publisher.publish('message', { text: 'concurrent' })
 
-      const [result1, result2] = await Promise.all([
-        iterator1.next(),
-        iterator2.next(),
-      ])
+      const [result1, result2] = await Promise.all([iterator1.next(), iterator2.next()])
 
       expect(result1.value?.text).toBe('concurrent')
       expect(result2.value?.text).toBe('concurrent')
@@ -200,7 +204,7 @@ describe('publisher', () => {
         await publisher.publish('message', { text: 'dropped' })
 
         const nextPromise = iterator.next()
-        await new Promise(resolve => setTimeout(resolve, 1))
+        await new Promise((resolve) => setTimeout(resolve, 1))
 
         await publisher.publish('message', { text: 'received' })
 
@@ -249,74 +253,6 @@ describe('publisher', () => {
         expect(result2.value?.text).toBe('second')
 
         await iterator.return()
-      })
-
-      describe('while missed events are replayed during setup', () => {
-        let setup: Promise<unknown>
-
-        beforeEach(() => {
-          subscribeListenerSpy.mockImplementationOnce((event: any, listener: any, options: any) => setup = (async () => {
-            const unsubscribe = await TestPublisher.prototype.subscribeListener.call(publisher, event, listener, options)
-            await sleep(0)
-            listener({ text: 'missed 1' })
-            listener({ text: 'missed 2' })
-            listener({ text: 'missed 3' })
-            return unsubscribe
-          })())
-        })
-
-        async function read(iterator: AsyncIterator<TestEvents['message']>, count: number) {
-          const texts: (string | undefined)[] = []
-
-          for (let i = 0; i < count; i++) {
-            texts.push((await iterator.next()).value?.text)
-          }
-
-          return texts
-        }
-
-        it('keeps every resumed event while the subscriber keeps up', async () => {
-          const iterator = publisher.subscribe('message', { lastEventId: '0', maxBufferedEvents: 1 })
-          await setup
-
-          expect(await read(iterator, 1)).toEqual(['missed 1'])
-          await publisher.publish('message', { text: 'live 1' })
-          expect(await read(iterator, 1)).toEqual(['missed 2'])
-          await publisher.publish('message', { text: 'live 2' })
-          expect(await read(iterator, 3)).toEqual(['missed 3', 'live 1', 'live 2'])
-
-          await iterator.return()
-        })
-
-        it('drops the oldest events once the subscriber falls further behind than the limit', async () => {
-          const iterator = publisher.subscribe('message', { lastEventId: '0', maxBufferedEvents: 2 })
-          await setup
-
-          await publisher.publish('message', { text: 'live 1' })
-          await publisher.publish('message', { text: 'live 2' })
-          await publisher.publish('message', { text: 'live 3' })
-          expect(await read(iterator, 1)).toEqual(['missed 2'])
-
-          await publisher.publish('message', { text: 'live 4' })
-          await publisher.publish('message', { text: 'live 5' })
-          expect(await read(iterator, 5)).toEqual(['live 1', 'live 2', 'live 3', 'live 4', 'live 5'])
-
-          await publisher.publish('message', { text: 'live 6' })
-          await publisher.publish('message', { text: 'live 7' })
-          await publisher.publish('message', { text: 'live 8' })
-          expect(await read(iterator, 2)).toEqual(['live 7', 'live 8'])
-
-          await iterator.return()
-        })
-
-        it('applies the limit to events delivered during setup when not resuming', async () => {
-          const iterator = publisher.subscribe('message', { maxBufferedEvents: 1 })
-          await setup
-
-          expect(await read(iterator, 1)).toEqual(['missed 3'])
-
-          await iterator.return()
-        })
       })
     })
 
@@ -410,9 +346,18 @@ describe('publisher', () => {
         publisher.optionsMap.get('message')?.[0]?.onError?.(new Error('Test error'))
         await publisher.publish('message', { text: 'third' })
 
-        await expect(iterator.next()).resolves.toMatchObject({ done: false, value: { text: 'first' } })
-        await expect(iterator.next()).resolves.toMatchObject({ done: false, value: { text: 'second' } })
-        await expect(iterator.next()).resolves.toMatchObject({ done: false, value: { text: 'third' } })
+        await expect(iterator.next()).resolves.toMatchObject({
+          done: false,
+          value: { text: 'first' },
+        })
+        await expect(iterator.next()).resolves.toMatchObject({
+          done: false,
+          value: { text: 'second' },
+        })
+        await expect(iterator.next()).resolves.toMatchObject({
+          done: false,
+          value: { text: 'third' },
+        })
         await expect(iterator.next()).rejects.toThrow('Test error')
       })
     })
@@ -454,9 +399,18 @@ describe('publisher', () => {
         listener?.({ text: 'third' })
         await sleep(0)
 
-        await expect(iterator.next()).resolves.toMatchObject({ done: false, value: { text: 'first' } })
-        await expect(iterator.next()).resolves.toMatchObject({ done: false, value: { text: 'second' } })
-        await expect(iterator.next()).resolves.toMatchObject({ done: false, value: { text: 'third' } })
+        await expect(iterator.next()).resolves.toMatchObject({
+          done: false,
+          value: { text: 'first' },
+        })
+        await expect(iterator.next()).resolves.toMatchObject({
+          done: false,
+          value: { text: 'second' },
+        })
+        await expect(iterator.next()).resolves.toMatchObject({
+          done: false,
+          value: { text: 'third' },
+        })
         await expect(iterator.next()).rejects.toThrow('__TEST__')
       })
     })

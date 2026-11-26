@@ -1,8 +1,8 @@
 ---
-title: "Server-Side Clients"
-description: "Call oRPC procedures locally in the same process with call, createRouterClient, or the callable extension, ideal for server-side code."
+title: 'Server-Side Clients'
+description: 'Call oRPC procedures locally in the same process with call, createRouterClient, or the callable extension, ideal for server-side code.'
 sidebar:
-  label: "Server-Side"
+  label: 'Server-Side'
 ---
 
 ## One-Off Calls
@@ -12,14 +12,12 @@ Use `call` when you need to invoke a single procedure without creating a client 
 ```ts twoslash
 import * as z from 'zod'
 
-const exampleProcedure = os
-  .input(z.string())
-  .handler(async ({ input }) => ({ id: input }))
+const exampleProcedure = os.input(z.string()).handler(async ({ input }) => ({ id: input }))
 // ---cut---
 import { call, os } from '@orpc/server'
 
 const result = await call(exampleProcedure, 'input', {
-  context: {} // <- provide initial context if needed
+  context: {}, // <- provide initial context if needed
 })
 ```
 
@@ -46,16 +44,14 @@ const client = createRouterClient(router, {
 
       try {
         return await next()
-      }
-      catch (err) {
+      } catch (err) {
         console.error(`${path.join('.')}:`, err)
         throw err
-      }
-      finally {
+      } finally {
         console.timeEnd(path.join('.'))
       }
-    }
-  ]
+    },
+  ],
 })
 
 const result = await client.ping()
@@ -79,13 +75,14 @@ interface ClientContext {
 }
 
 const client = createRouterClient(router, {
-  context: ({ cache }: ClientContext) => { // [!code highlight]
+  context: ({ cache }: ClientContext) => {
+    // [!code highlight]
     if (cache) {
       return {} // <- context when cache enabled
     }
 
     return {}
-  }
+  },
 })
 
 const result = await client.ping(undefined, { context: { cache: true } })
@@ -104,16 +101,14 @@ const client = createRouterClient(router, {
       try {
         const output = await next()
         return output
-      }
-      catch (err) {
+      } catch (err) {
         console.error(`${path.join('.')}:`, err)
         throw err
-      }
-      finally {
+      } finally {
         console.timeEnd(path.join('.'))
       }
-    }
-  ]
+    },
+  ],
 })
 ```
 
@@ -125,7 +120,7 @@ Import `@orpc/server/extensions/callable` from a module that always runs during 
 
 ```ts usage
 const ping = base
-  .input(z.object({ name: z.string(), }))
+  .input(z.object({ name: z.string() }))
   .handler(async ({ input }) => `Hello ${input.name}!`)
   .callable({
     context: async () => ({}), // <- provide initial context if needed, can be async function

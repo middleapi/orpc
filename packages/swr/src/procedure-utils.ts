@@ -1,6 +1,10 @@
 import type { Client, ClientContext } from '@orpc/client'
 import type { MaybeOptionalOptions } from '@orpc/shared'
+import { isAsyncIteratorObject, resolveMaybeOptionalOptions, takeLast } from '@orpc/shared'
+
 import type { OperationKey, OperationKeyOptions, OperationKeyPrefixOptions } from './key'
+import { generateOperationKey } from './key'
+import { SharedUtils } from './shared-utils'
 import type {
   Fetcher,
   FetcherOptions,
@@ -9,19 +13,20 @@ import type {
   KeyOptions,
   Mutator,
   MutatorOptions,
-  OperationContext,
+  SWROperationContext,
   Subscriber,
   SubscriberOptions,
 } from './types'
-import { isAsyncIteratorObject, resolveMaybeOptionalOptions } from '@orpc/shared'
-import { generateOperationKey } from './key'
-import { SharedUtils } from './shared-utils'
-import { OPERATION_CONTEXT_SYMBOL } from './types'
+import { SWR_OPERATION_CONTEXT_SYMBOL } from './types'
 
-export interface ProcedureUtilsOptions extends OperationKeyPrefixOptions {
-}
+export interface ProcedureUtilsOptions extends OperationKeyPrefixOptions {}
 
-export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutput, TError> extends SharedUtils<TInput> {
+export class ProcedureUtils<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError,
+> extends SharedUtils<TInput> {
   /**
    * Calling corresponding procedure client
    *
@@ -43,12 +48,13 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
    *
    * @see {@link https://orpc.dev/docs/integrations/swr#data-fetching | SWR Integration - Data Fetching}
    */
-  key(
-    ...rest: MaybeOptionalOptions<KeyOptions<TInput>>
-  ): OperationKey<TInput> {
+  key(...rest: MaybeOptionalOptions<KeyOptions<TInput>>): OperationKey<TInput> {
     const options = resolveMaybeOptionalOptions(rest)
 
-    return generateOperationKey(this.path, { ...options, prefix: this.options.prefix } as OperationKeyOptions<TInput>)
+    return generateOperationKey(this.path, {
+      ...options,
+      prefix: this.options.prefix,
+    } as OperationKeyOptions<TInput>)
   }
 
   /**
@@ -56,9 +62,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
    *
    * @see {@link https://orpc.dev/docs/integrations/swr#data-fetching | SWR Integration - Data Fetching}
    */
-  fetcher(
-    ...rest: MaybeOptionalOptions<FetcherOptions<TClientContext>>
-  ): Fetcher<TInput, TOutput> {
+  fetcher(...rest: MaybeOptionalOptions<FetcherOptions<TClientContext>>): Fetcher<TInput, TOutput> {
     const options = resolveMaybeOptionalOptions(rest)
 
     return async (key) => {
@@ -70,9 +74,9 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
       return this.call(input, {
         context: {
-          [OPERATION_CONTEXT_SYMBOL]: { key, type: 'fetcher' },
+          [SWR_OPERATION_CONTEXT_SYMBOL]: { key, type: 'fetcher' },
           ...options.context,
-        } satisfies OperationContext as any,
+        } satisfies SWROperationContext as any,
       })
     }
   }
@@ -100,9 +104,9 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
           const iterator = await this.call(input, {
             context: {
-              [OPERATION_CONTEXT_SYMBOL]: { key, type: 'subscriber' },
+              [SWR_OPERATION_CONTEXT_SYMBOL]: { key, type: 'subscriber' },
               ...options.context,
-            } satisfies OperationContext as any,
+            } satisfies SWROperationContext as any,
             signal: controller.signal,
           })
 
@@ -115,55 +119,24 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
             return
           }
 
-          let hasPreviousData = false
-
           if (refetchMode === 'reset') {
-            next(undefined, undefined)
+            next(undefined, [] as unknown as InferSubscriberOutput<TOutput>)
           }
-          else if (refetchMode === 'replace') {
-            /**
-             * The updater is invoked synchronously with the current data,
-             * so we can use it to detect whether previous data exists.
-             */
-            next(undefined, (old) => {
-              hasPreviousData = old !== undefined
-              return old as InferSubscriberOutput<TOutput>
-            })
-          }
-
-          const shouldUpdateDataDuringStream = refetchMode !== 'replace' || !hasPreviousData
-          let buffer: unknown[] = []
 
           for await (const event of iterator) {
             if (controller.signal.aborted) {
               break
             }
 
-            if (shouldUpdateDataDuringStream) {
-              next(undefined, (old) => {
-                const newData = Array.isArray(old) ? [...old, event] : [event]
+            next(undefined, (old) => {
+              const newData = Array.isArray(old) ? [...old, event] : [event]
 
-                if (typeof maxChunks === 'number' && newData.length > maxChunks) {
-                  return newData.slice(newData.length - maxChunks) as InferSubscriberOutput<TOutput>
-                }
-
-                return newData as InferSubscriberOutput<TOutput>
-              })
-            }
-            else {
-              buffer = [...buffer, event]
-
-              if (typeof maxChunks === 'number' && buffer.length > maxChunks) {
-                buffer = buffer.slice(buffer.length - maxChunks)
-              }
-            }
+              return (
+                typeof maxChunks === 'number' ? takeLast(newData, maxChunks) : newData
+              ) as InferSubscriberOutput<TOutput>
+            })
           }
-
-          if (!shouldUpdateDataDuringStream && !controller.signal.aborted) {
-            next(undefined, buffer as InferSubscriberOutput<TOutput>)
-          }
-        }
-        catch (error) {
+        } catch (error) {
           /**
            * Only report the error if the controller is not aborted.
            */
@@ -202,14 +175,19 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
           const iterator = await this.call(input, {
             context: {
-              [OPERATION_CONTEXT_SYMBOL]: { key, type: 'liveSubscriber' },
+              [SWR_OPERATION_CONTEXT_SYMBOL]: { key, type: 'liveSubscriber' },
               ...options.context,
-            } satisfies OperationContext as any,
+            } satisfies SWROperationContext as any,
             signal: controller.signal,
           })
 
           if (!isAsyncIteratorObject(iterator)) {
             throw new TypeError('.liveSubscriber requires an AsyncIteratorObject output')
+          }
+
+          if (controller.signal.aborted) {
+            await iterator.return?.()
+            return
           }
 
           for await (const event of iterator) {
@@ -219,8 +197,7 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
 
             next(undefined, event as InferLiveSubscriberOutput<TOutput>)
           }
-        }
-        catch (error) {
+        } catch (error) {
           /**
            * Only report the error if the controller is not aborted.
            */
@@ -241,16 +218,15 @@ export class ProcedureUtils<TClientContext extends ClientContext, TInput, TOutpu
    *
    * @see {@link https://orpc.dev/docs/integrations/swr#mutations | SWR Integration - Mutations}
    */
-  mutator(
-    ...rest: MaybeOptionalOptions<MutatorOptions<TClientContext>>
-  ): Mutator<TInput, TOutput> {
+  mutator(...rest: MaybeOptionalOptions<MutatorOptions<TClientContext>>): Mutator<TInput, TOutput> {
     const options = resolveMaybeOptionalOptions(rest)
 
-    return (key, { arg }) => this.call(arg, {
-      context: {
-        [OPERATION_CONTEXT_SYMBOL]: { key, type: 'mutator' },
-        ...options.context,
-      } satisfies OperationContext as any,
-    })
+    return (key, { arg }) =>
+      this.call(arg, {
+        context: {
+          [SWR_OPERATION_CONTEXT_SYMBOL]: { key, type: 'mutator' },
+          ...options.context,
+        } satisfies SWROperationContext as any,
+      })
   }
 }

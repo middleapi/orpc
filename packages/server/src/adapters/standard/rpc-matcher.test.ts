@@ -1,12 +1,15 @@
 import { oc } from '@orpc/contract'
+import { promiseWithResolvers } from '@orpc/shared'
 import { z } from 'zod'
+
 import { os } from '../../builder'
+import { implement } from '../../implementer'
 import { Lazy } from '../../lazy'
 import * as ProcedureUtils from '../../procedure-utils'
 import { withHiddenRouterContract } from '../../router-hidden'
 import { RPCMatcher } from './rpc-matcher'
 
-const createContractProcedureSpy = vi.spyOn(ProcedureUtils, 'createContractProcedure')
+const createContractedProcedureSpy = vi.spyOn(ProcedureUtils, 'createContractedProcedure')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -21,13 +24,15 @@ describe('rpcMatcher', () => {
   const procedure3 = os.errors({ BAD_GATEWAY: {} }).handler(() => {})
 
   const lazyLazyLoader = vi.fn(async () => ({ default: { deep: procedure1 } }))
-  const lazyLoader = vi.fn(async () => ({ default: {
-    info: procedure3,
-    lazy: new Lazy({
-      loader: lazyLazyLoader,
-      meta: {},
-    }),
-  } }))
+  const lazyLoader = vi.fn(async () => ({
+    default: {
+      info: procedure3,
+      lazy: new Lazy({
+        loader: lazyLazyLoader,
+        meta: {},
+      }),
+    },
+  }))
 
   const router = {
     ping: procedure1,
@@ -165,38 +170,38 @@ describe('rpcMatcher', () => {
     expect(loader).toHaveBeenCalledTimes(3)
   })
 
-  it('resolves a deep lazy chain for concurrent matches without losing or reloading routers', async () => {
+  it('resolves a deep lazy chain for concurrent matches without losing or re-indexing routers', async () => {
     const leaf = os.handler(() => 'ok')
-    const loads: Record<string, number> = {}
 
     /** `l1` -> `l2` -> `l3`, each lazy, each also exposing a `leaf` procedure beside the next level */
     function lazyLevel(depth: number): Lazy<any> {
       return new Lazy({
         meta: {},
         loader: async () => {
-          loads[`l${depth}`] = (loads[`l${depth}`] ?? 0) + 1
-
           // settle after a different number of microtask turns per level, so they interleave
           for (let i = 0; i < 5 - depth; i++) {
             await Promise.resolve()
           }
 
-          return { default: depth === 3 ? { leaf } : { leaf, [`l${depth + 1}`]: lazyLevel(depth + 1) } }
+          return {
+            default: depth === 3 ? { leaf } : { leaf, [`l${depth + 1}`]: lazyLevel(depth + 1) },
+          }
         },
       })
     }
 
     const matcher = new RPCMatcher({ l1: lazyLevel(1) })
+    const indexSpy = vi.spyOn(matcher as any, 'index')
 
     const paths = ['/l1/leaf', '/l1/l2/leaf', '/l1/l2/l3/leaf'] as const
     const results = await Promise.all(
-      paths.flatMap(path => [
+      paths.flatMap((path) => [
         matcher.match('POST', path, undefined),
         matcher.match('POST', path, undefined),
       ]),
     )
 
-    expect(results.map(result => result?.path.join('/'))).toEqual([
+    expect(results.map((result) => result?.path.join('/'))).toEqual([
       'l1/leaf',
       'l1/leaf',
       'l1/l2/leaf',
@@ -205,12 +210,66 @@ describe('rpcMatcher', () => {
       'l1/l2/l3/leaf',
     ])
 
-    // every level is loaded exactly once even though six matches raced for it
-    expect(loads).toEqual({ l1: 1, l2: 1, l3: 1 })
+    const indexed = () => indexSpy.mock.calls.map(([, path]) => (path as string[]).join('/'))
+    expect(indexed()).toEqual(['l1', 'l1/l2', 'l1/l2/l3'])
 
-    // and the deepest route stays matchable afterwards
     await expect(matcher.match('POST', '/l1/l2/l3/leaf', undefined)).resolves.toBeDefined()
-    expect(loads).toEqual({ l1: 1, l2: 1, l3: 1 })
+    expect(indexed()).toEqual(['l1', 'l1/l2', 'l1/l2/l3'])
+  })
+
+  it('matches while another match is still loading, and drops the slower load', async () => {
+    const first = os.handler(() => 'first')
+    const second = os.handler(() => 'second')
+    const firstLoad = promiseWithResolvers<{ default: any }>()
+    const loader = vi
+      .fn()
+      .mockReturnValueOnce(firstLoad.promise)
+      .mockResolvedValueOnce({ default: { ping: second } })
+    const matcher = new RPCMatcher({ runs: new Lazy({ loader, meta: {} }) })
+
+    const slow = matcher.match('POST', '/runs/ping', undefined)
+    await expect(matcher.match('POST', '/runs/ping', undefined)).resolves.toMatchObject({
+      procedure: second,
+    })
+
+    firstLoad.resolve({ default: { ping: first } })
+
+    await expect(slow).resolves.toMatchObject({ procedure: second })
+    await expect(matcher.match('POST', '/runs/ping', undefined)).resolves.toMatchObject({
+      procedure: second,
+    })
+  })
+
+  it('looks up lazy prefixes no deeper than the deepest pending lazy router', async () => {
+    const loader = vi.fn(async () => ({ default: { find: os.handler(() => 'ok') } }))
+    const matcher = new RPCMatcher({ planet: os.lazy(loader) })
+    const pending = (matcher as any).pendingLazyRouters as Map<string, unknown>
+    const hasSpy = vi.spyOn(pending, 'has')
+    const getSpy = vi.spyOn(pending, 'get')
+
+    await expect(
+      matcher.match('POST', `/${'/'.repeat(16_000)}%25`, undefined),
+    ).resolves.toBeUndefined()
+
+    // max pending depth is 1, and there are two passes (raw + normalized)
+    expect(hasSpy.mock.calls.length + getSpy.mock.calls.length).toBeLessThanOrEqual(2)
+    expect(loader).not.toHaveBeenCalled()
+  })
+
+  it('resolves lazy routers nested deeper than any pending one in a single match', async () => {
+    const deep = os.handler(() => 'deep')
+    const inner = vi.fn(async () => ({ default: { deep } }))
+    const outer = vi.fn(async () => ({ default: { lazy: new Lazy({ loader: inner, meta: {} }) } }))
+    const matcher = new RPCMatcher({ nested: { lazy: new Lazy({ loader: outer, meta: {} }) } })
+
+    // the inner lazy router (depth 3) only becomes pending once the outer one (depth 2) loads
+    const result = await matcher.match('POST', '/nested/lazy/lazy/deep', undefined)
+
+    expect(result).toBeDefined()
+    expect(result!.path).toEqual(['nested', 'lazy', 'lazy', 'deep'])
+    expect(result!.procedure).toBe(deep)
+    expect(outer).toHaveBeenCalledTimes(1)
+    expect(inner).toHaveBeenCalledTimes(1)
   })
 
   it('support filter option', async () => {
@@ -222,28 +281,23 @@ describe('rpcMatcher', () => {
   })
 
   describe('allowMethods', () => {
-    it.each([
-      'POST',
-      'PUT',
-      'PATCH',
-      'DELETE',
-    ] as const)('matches %s requests by default', async (method) => {
-      const matcher = new RPCMatcher(router)
+    it.each(['POST', 'PUT', 'PATCH', 'DELETE'] as const)(
+      'matches %s requests by default',
+      async (method) => {
+        const matcher = new RPCMatcher(router)
 
-      await expect(matcher.match(method, '/ping', undefined)).resolves.toBeDefined()
-    })
+        await expect(matcher.match(method, '/ping', undefined)).resolves.toBeDefined()
+      },
+    )
 
-    it.each([
-      'GET',
-      'HEAD',
-      'OPTIONS',
-      'QUERY',
-      'TRACE',
-    ] as const)('treats %s requests as unmatched by default', async (method) => {
-      const matcher = new RPCMatcher(router)
+    it.each(['GET', 'HEAD', 'OPTIONS', 'QUERY', 'TRACE'] as const)(
+      'treats %s requests as unmatched by default',
+      async (method) => {
+        const matcher = new RPCMatcher(router)
 
-      await expect(matcher.match(method, '/ping', undefined)).resolves.toBeUndefined()
-    })
+        await expect(matcher.match(method, '/ping', undefined)).resolves.toBeUndefined()
+      },
+    )
 
     it('replaces the default allowlist entirely when a list is provided', async () => {
       const matcher = new RPCMatcher(router, { allowMethods: ['GET', 'QUERY'] })
@@ -254,7 +308,10 @@ describe('rpcMatcher', () => {
     })
 
     it('decides per request with the method, matched procedure, and path', async () => {
-      const allowMethods = vi.fn((method: string, _procedure: unknown, path: string[]) => method === 'GET' && path[0] === 'ping')
+      const allowMethods = vi.fn(
+        (method: string, _procedure: unknown, path: string[]) =>
+          method === 'GET' && path[0] === 'ping',
+      )
       const matcher = new RPCMatcher(router, { allowMethods })
 
       const matched = await matcher.match('GET', '/ping', undefined)
@@ -357,8 +414,14 @@ describe('rpcMatcher', () => {
     it('strips trailing slash after prefix stripping', async () => {
       const matcher = new RPCMatcher(router)
 
-      await expect(matcher.match('POST', '/api/ping/', '/api/')).resolves.toEqual({ path: ['ping'], procedure: procedure1 })
-      await expect(matcher.match('POST', '/api/ping/', '/api')).resolves.toEqual({ path: ['ping'], procedure: procedure1 })
+      await expect(matcher.match('POST', '/api/ping/', '/api/')).resolves.toEqual({
+        path: ['ping'],
+        procedure: procedure1,
+      })
+      await expect(matcher.match('POST', '/api/ping/', '/api')).resolves.toEqual({
+        path: ['ping'],
+        procedure: procedure1,
+      })
     })
   })
 
@@ -376,18 +439,22 @@ describe('rpcMatcher', () => {
       const r1 = await matcher.match('POST', '/ping', undefined)
       expect(r1).toBeDefined()
       expect(r1!.path).toEqual(['ping'])
-      expect(createContractProcedureSpy).toHaveBeenCalledTimes(1)
-      expect(createContractProcedureSpy).toHaveBeenNthCalledWith(1, router.ping, contract.ping)
+      expect(createContractedProcedureSpy).toHaveBeenCalledTimes(1)
+      expect(createContractedProcedureSpy).toHaveBeenNthCalledWith(1, router.ping, contract.ping)
       expect(r1!.procedure).not.toBe(procedure1)
-      expect(r1!.procedure).toBe(createContractProcedureSpy.mock.results[0]!.value)
+      expect(r1!.procedure).toBe(createContractedProcedureSpy.mock.results[0]!.value)
 
       const r2 = await matcher.match('POST', '/nested/echo', undefined)
       expect(r2).toBeDefined()
       expect(r2!.path).toEqual(['nested', 'echo'])
-      expect(createContractProcedureSpy).toHaveBeenCalledTimes(2)
-      expect(createContractProcedureSpy).toHaveBeenNthCalledWith(2, router.nested.echo, contract.nested.echo)
+      expect(createContractedProcedureSpy).toHaveBeenCalledTimes(2)
+      expect(createContractedProcedureSpy).toHaveBeenNthCalledWith(
+        2,
+        router.nested.echo,
+        contract.nested.echo,
+      )
       expect(r2!.procedure).not.toBe(procedure2)
-      expect(r2!.procedure).toBe(createContractProcedureSpy.mock.results[1]!.value)
+      expect(r2!.procedure).toBe(createContractedProcedureSpy.mock.results[1]!.value)
 
       const r3 = await matcher.match('POST', '/lazy/info', undefined)
       expect(r3).toBeUndefined() // lazy is not in contract, so no match
@@ -395,10 +462,10 @@ describe('rpcMatcher', () => {
       const r4 = await matcher.match('POST', '/api/ping', '/api')
       expect(r4).toBeDefined()
       expect(r4!.path).toEqual(['ping'])
-      // no need to call createContractProcedure again for the same procedure
-      expect(createContractProcedureSpy).toHaveBeenCalledTimes(2)
+      // no need to call createContractedProcedure again for the same procedure
+      expect(createContractedProcedureSpy).toHaveBeenCalledTimes(2)
       expect(r4!.procedure).not.toBe(router.ping)
-      expect(r4!.procedure).toBe(createContractProcedureSpy.mock.results[0]!.value)
+      expect(r4!.procedure).toBe(createContractedProcedureSpy.mock.results[0]!.value)
 
       expect(lazyLazyLoader).toHaveBeenCalledTimes(0)
       expect(lazyLoader).toHaveBeenCalledTimes(0)
@@ -410,7 +477,27 @@ describe('rpcMatcher', () => {
       }
 
       const matcher = new RPCMatcher(withHiddenRouterContract(router, contract))
-      await expect(matcher.match('POST', '/missing', undefined)).rejects.toThrowError('[Contract-First] Missing or invalid implementation for procedure at path: "missing"')
+      await expect(matcher.match('POST', '/missing', undefined)).rejects.toThrowError(
+        '[Contract-First] Missing or invalid implementation for procedure at path: "missing"',
+      )
+    })
+
+    it('uses the implemented handler and config when implementing a server router', async () => {
+      const original = {
+        ping: os
+          .$config({ disableInputValidation: true })
+          .input(z.string())
+          .handler(() => 'original'),
+      }
+      const implementer = implement(original, { disableInputValidation: false })
+      const matcher = new RPCMatcher(
+        implementer.router({ ping: implementer.ping.handler(() => 'implemented') }),
+      )
+
+      const { procedure } = (await matcher.match('POST', '/ping', undefined))!
+
+      await expect(ProcedureUtils.call(procedure, 'input')).resolves.toBe('implemented')
+      await expect(ProcedureUtils.call(procedure, 123)).rejects.toThrow('Input validation failed')
     })
   })
 
@@ -440,6 +527,38 @@ describe('rpcMatcher', () => {
       expect(result).toBeDefined()
       expect(result!.path).toEqual(['nested', 'echo'])
       expect(result!.procedure).toBe(procedure2)
+    })
+
+    it('handles raw characters in pathnames that are stored percent-encoded', async () => {
+      const matcher = new RPCMatcher({ 'v1^beta': { 'items:batchGet': procedure1 } })
+
+      // WHATWG URL and Node's req.url keep "^" raw, while procedure paths are stored as "%5E"
+      for (const pathname of [
+        '/v1^beta/items:batchGet',
+        '/v1%5Ebeta/items%3AbatchGet',
+        '/v1%5ebeta/items:batchGet',
+      ] as const) {
+        const result = await matcher.match('POST', pathname, undefined)
+
+        expect(result).toBeDefined()
+        expect(result!.path).toEqual(['v1^beta', 'items:batchGet'])
+        expect(result!.procedure).toBe(procedure1)
+      }
+
+      await expect(
+        matcher.match('POST', '/v1beta/items:batchGet', undefined),
+      ).resolves.toBeUndefined()
+    })
+
+    it('resolves lazy routers found only after normalizing a raw character in the pathname', async () => {
+      const loader = vi.fn(async () => ({ default: { info: procedure3 } }))
+      const matcher = new RPCMatcher({ 'lazy^beta': new Lazy({ loader, meta: {} }) })
+      const result = await matcher.match('POST', '/lazy^beta/info', undefined)
+
+      expect(result).toBeDefined()
+      expect(result!.path).toEqual(['lazy^beta', 'info'])
+      expect(result!.procedure).toBe(procedure3)
+      expect(loader).toHaveBeenCalledTimes(1)
     })
 
     it('resolves lazy routers found only after normalizing a percent-encoded pathname', async () => {

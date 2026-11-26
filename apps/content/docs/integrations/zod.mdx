@@ -1,8 +1,8 @@
 ---
-title: "Zod Integration"
-description: "Use Zod schemas directly in oRPC via Standard Schema, with a dedicated JSON Schema converter and registries for customizing generated schemas."
+title: 'Zod Integration'
+description: 'Use Zod schemas directly in oRPC via Standard Schema, with a dedicated JSON Schema converter and registries for customizing generated schemas.'
 sidebar:
-  label: "Zod"
+  label: 'Zod'
 ---
 
 :::warning
@@ -48,10 +48,12 @@ A common pattern is defining reusable schemas with `id` metadata. The converter 
 ```ts
 import * as z from 'zod'
 
-const PlanetSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-}).meta({ id: 'Planet' })
+const PlanetSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+  })
+  .meta({ id: 'Planet' })
 ```
 
 ### Customizing Generated JSON Schemas
@@ -68,7 +70,7 @@ import * as z from 'zod'
 
 const user = z.object({
   name: z.string(),
-  age: z.string().transform(v => Number(v)),
+  age: z.string().transform((v) => Number(v)),
 })
 
 JSON_SCHEMA_REGISTRY.add(user, {

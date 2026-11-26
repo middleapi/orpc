@@ -1,21 +1,23 @@
 import { experimental_DurableLockObject as DurableLockObject } from '../../src/lock-object'
 import { DurablePublisherObject } from '../../src/publisher-object'
+import { handleFetch } from './fetch-handler'
 
-export class PublisherDO extends DurablePublisherObject {
-}
+export class PublisherDO extends DurablePublisherObject {}
 
 export class PublisherResume3sDO extends DurablePublisherObject {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env, {
       resume: {
-        enabled: true,
-        seconds: 3,
-        cleanupIntervalSeconds: 30,
+        ttl: 3_000,
+        cleanupInterval: 30_000,
         schemaPrefix: 'prefix:',
       },
     })
   }
 }
 
-export class LockDO extends DurableLockObject {
-}
+export class LockDO extends DurableLockObject {}
+
+export default {
+  fetch: handleFetch,
+} satisfies ExportedHandler<Env>

@@ -41,7 +41,16 @@ export type {
    */
   RouterContractClient as ContractRouterClient,
 } from './router-client'
-export * from './router-utils'
+export {
+  getProcedureContractOrThrow,
+  getRouterContract,
+  minifyRouterContract,
+} from './router-utils'
+export type {
+  AugmentRouterContractOptions,
+  AugmentedRouterContract,
+  AugmentedRouterContractInternal,
+} from './router-utils'
 export {
   /**
    * @deprecated Use `getRouterContract` instead.
@@ -53,7 +62,8 @@ export {
   minifyRouterContract as minifyContractRouter,
 } from './router-utils'
 export * from './schema'
-export * from './schema-built-in'
+export { asyncIteratorObject, getAsyncIteratorObjectSchemasDetails } from './schema-built-in'
+export type { AsyncIteratorObjectSchemasDetails } from './schema-built-in'
 export {
   /**
    * @deprecated Use `asyncIteratorObject` instead.
@@ -70,8 +80,4 @@ export type {
   FriendlyClientOptions,
 } from '@orpc/client'
 
-export type {
-  PromiseWithError,
-  Registry,
-  ThrowableError,
-} from '@orpc/shared'
+export type { AsyncIteratorClass, PromiseWithError, Registry, ThrowableError } from '@orpc/shared'

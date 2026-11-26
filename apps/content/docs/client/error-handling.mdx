@@ -1,8 +1,8 @@
 ---
-title: "Client Error Handling"
-description: "Handle client-side errors in oRPC with try/catch, or use safe and createSafeClient for fully type-inferred typesafe errors."
+title: 'Client Error Handling'
+description: 'Handle client-side errors in oRPC with try/catch, or use safe and createSafeClient for fully type-inferred typesafe errors.'
 sidebar:
-  label: "Error Handling"
+  label: 'Error Handling'
 ---
 
 ## Using `try/catch`
@@ -12,8 +12,7 @@ For most calls, use regular `try/catch`.
 ```ts
 try {
   const data = await client.doSomething({ id: '123' })
-}
-catch (error) {
+} catch (error) {
   // handle error
 }
 ```
@@ -32,28 +31,25 @@ const exampleProcedure = os
   .input(z.object({ id: z.string() }))
   .errors({
     RATE_LIMIT_EXCEEDED: {
-      data: z.object({ retryAfter: z.number() })
-    }
+      data: z.object({ retryAfter: z.number() }),
+    },
   })
   .handler(async ({ input, errors }) => {
     throw errors.RATE_LIMIT_EXCEEDED({ data: { retryAfter: 1000 } })
   })
 
 // or { error, data, definedError }
-const [error, data, definedError] = await safe(
-  call(exampleProcedure, { id: '123' })
-)
+const [error, data, definedError] = await safe(call(exampleProcedure, { id: '123' }))
 
-if (isDefinedError(error)) { // or definedError
+if (isDefinedError(error)) {
+  // or definedError
   // handle defined error
 
   // or definedError.data.retryAfter
   console.log(error.data.retryAfter)
-}
-else if (error) {
+} else if (error) {
   // handle unknown error
-}
-else {
+} else {
   // handle success
   console.log(data)
 }

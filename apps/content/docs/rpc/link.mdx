@@ -1,6 +1,6 @@
 ---
-title: "RPC Link"
-description: "Use RPCLink to call RPC Handler servers or any server implementing the RPC protocol, with headers, interceptors, plugins, and custom serializers."
+title: 'RPC Link'
+description: 'Use RPCLink to call RPC Handler servers or any server implementing the RPC protocol, with headers, interceptors, plugins, and custom serializers.'
 ---
 
 ## Overview
@@ -20,20 +20,17 @@ const link = new RPCLink({
 
       try {
         return await next()
-      }
-      catch (err) {
+      } catch (err) {
         console.error(`${path.join('.')}:`, err)
         throw err
-      }
-      finally {
+      } finally {
         console.timeEnd(path.join('.'))
       }
     },
   ],
-  plugins: [
-    new RetryAfterLinkPlugin(),
-  ],
-  fetch: (url, init) => { // <- only available in fetch adapter
+  plugins: [new RetryAfterLinkPlugin()],
+  fetch: (url, init) => {
+    // <- only available in fetch adapter
     return globalThis.fetch(url, {
       ...init,
       credentials: 'include', // Include cookies on cross-origin requests
@@ -46,11 +43,10 @@ export const client = createORPCClient(link)
 
 :::warning
 To better support `Blob`, `File`, and `ReadableStream<Uint8Array>` at the root level in cross-origin scenarios,
-extend your [CORS allowlist](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_response_header) to allow clients to send and receive the `Content-Disposition` and `Standard-Server` headers. Learn more in the [Standard Server documentation](https://github.com/middleapi/standard-server#how-body-parsing-works). If you use the [CORS Plugin](/docs/plugins/cors), include them in `allowHeaders` and `exposeHeaders`:
+extend your [CORS allowlist](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_response_header) to allow clients to read the `Content-Disposition` and `Standard-Server` response headers. Learn more in the [Standard Server documentation](https://github.com/middleapi/standard-server#how-body-parsing-works). If you use the [CORS Plugin](/docs/plugins/cors), include them in `exposeHeaders`:
 
 ```ts
 const cors = new CORSHandlerPlugin({
-  allowHeaders: ['Content-Disposition', 'Standard-Server'],
   exposeHeaders: ['Content-Disposition', 'Standard-Server'],
 })
 ```
@@ -137,7 +133,7 @@ Each option can also be a function to dynamically customize values per request. 
 
 ```ts
 const link = new RPCLink<ClientContext>({
-  origin: ({ path, context }) => {
+  origin: (options, path) => {
     if (path[0] === 'internal') {
       return 'https://internal.example.com'
     }
@@ -169,12 +165,10 @@ const link = new RPCLink({
       try {
         const output = await next()
         return output
-      }
-      catch (err) {
+      } catch (err) {
         console.error(`${path.join('.')}:`, err)
         throw err
-      }
-      finally {
+      } finally {
         console.timeEnd(path.join('.'))
       }
     },
@@ -213,9 +207,7 @@ Plugins package reusable interceptors. For example, [Retry After Plugin](/docs/p
 
 ```ts
 const link = new RPCLink({
-  plugins: [
-    new RetryAfterLinkPlugin(),
-  ],
+  plugins: [new RetryAfterLinkPlugin()],
 })
 ```
 
@@ -268,18 +260,40 @@ const link = new RPCLink<ClientContext>({
 })
 ```
 
-## Malformed Responses
+## Error Responses
 
-When `RPCLink` cannot decode a response, for example when a proxy or gateway answers instead of your handler, it produces an `ORPCError` with code `MALFORMED_ORPC_RESPONSE` and a message inferred from the body or status. Its `cause` is a `MalformedResponseError` carrying the resolved response:
+When the server answers with an error, `RPCLink` throws an `ORPCError` whose `cause` is a `ResponseError` carrying the resolved response, so details that are not part of the error itself, such as its status or headers, stay available:
 
 ```ts
-import { MalformedResponseError, ORPCError, onError } from '@orpc/client'
+import { onError, ORPCError, ResponseError } from '@orpc/client'
 
 const link = new RPCLink({
   interceptors: [
     onError((error) => {
-      if (error instanceof ORPCError && error.cause instanceof MalformedResponseError) {
-        console.error('Malformed response:', error.cause.response.status, error.cause.response.body)
+      if (error instanceof ORPCError && error.cause instanceof ResponseError) {
+        console.error(
+          'Request failed:',
+          error.cause.response.status,
+          error.cause.response.headers['x-request-id'],
+        )
+      }
+    }),
+  ],
+})
+```
+
+## Malformed Responses
+
+When `RPCLink` cannot decode a response, for example when a proxy or gateway answers instead of your handler, it throws a `MalformedResponseError` instead of an `ORPCError`. It extends `ResponseError`, so it carries the resolved response, and its message is inferred from the body or status:
+
+```ts
+import { MalformedResponseError, onError } from '@orpc/client'
+
+const link = new RPCLink({
+  interceptors: [
+    onError((error) => {
+      if (error instanceof MalformedResponseError) {
+        console.error('Malformed response:', error.response.status, error.response.body)
       }
     }),
   ],
@@ -294,14 +308,15 @@ Configure how an [AsyncIteratorObject](/docs/async-iterator-object) is streamed 
 const link = new RPCLink({
   toFetchRequest: {
     eventStream: {
+      /**
+       * Initial comment sent immediately upon stream start to flush headers. This allows the
+       * receiving side to establish the connection without waiting for the first event.
+       *
+       * `false` disables it, an object customizes it.
+       *
+       * @default true
+       */
       initialComment: {
-        /**
-         * If true, an initial comment is sent immediately upon stream start to flush headers.
-         * This allows the receiving side to establish the connection without waiting for the first event.
-         *
-         * @default true
-         */
-        enabled: true,
         /**
          * The content of the initial comment sent upon stream start. Must not include newline characters.
          *
@@ -309,13 +324,14 @@ const link = new RPCLink({
          */
         comment: '',
       },
+      /**
+       * Ping comment sent periodically to keep the connection alive.
+       *
+       * `false` disables it, an object customizes it.
+       *
+       * @default true
+       */
       keepAlive: {
-        /**
-         * If true, a ping comment is sent periodically to keep the connection alive.
-         *
-         * @default true
-         */
-        enabled: true,
         /**
          * Interval (in milliseconds) between ping comments sent after the last event.
          *

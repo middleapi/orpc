@@ -43,7 +43,7 @@ const OPEN_CLASS = 'twoslash-open'
 const BRIDGE_CLASS = 'twoslash-bridge'
 const DISMISSED_CLASS = 'twoslash-dismissed'
 
-function popupFor(target: EventTarget | null): { hover: Element, popup: HTMLElement } | null {
+function popupFor(target: EventTarget | null): { hover: Element; popup: HTMLElement } | null {
   const element = target instanceof Element ? target : null
   const hover = element?.closest('.twoslash-hover')
   const popup = hover?.querySelector<HTMLElement>('.twoslash-popup-container')
@@ -62,7 +62,7 @@ function bridgeFor(hover: Element): HTMLElement {
   return bridge
 }
 
-let placed: { hover: Element, popup: HTMLElement } | null = null
+let placed: { hover: Element; popup: HTMLElement } | null = null
 
 function place(hover: Element, popup: HTMLElement): void {
   // Un-dismiss first: the dismissal rule display:nones the popup, which
@@ -137,8 +137,7 @@ document.addEventListener('click', (event) => {
   const found = popupFor(event.target)
   if (!found) {
     setOpen(null)
-  }
-  else if (lastPointerType !== 'mouse') {
+  } else if (lastPointerType !== 'mouse') {
     setOpen(found.hover)
     reveal(event.target)
   }
@@ -150,18 +149,22 @@ document.addEventListener('click', (event) => {
 // bridge even where a sticky tap-:hover would keep the CSS reveal alive;
 // the next place() lifts it. Scrolling inside the popup itself is the one
 // scroller reading depends on, so it never dismisses.
-document.addEventListener('scroll', (event) => {
-  if (!placed) {
-    return
-  }
-  if (event.target instanceof Node && placed.popup.contains(event.target)) {
-    return
-  }
-  if (lastPointerType === 'mouse') {
-    place(placed.hover, placed.popup)
-    return
-  }
-  setOpen(null)
-  placed.hover.classList.add(DISMISSED_CLASS)
-  placed = null
-}, { capture: true, passive: true })
+document.addEventListener(
+  'scroll',
+  (event) => {
+    if (!placed) {
+      return
+    }
+    if (event.target instanceof Node && placed.popup.contains(event.target)) {
+      return
+    }
+    if (lastPointerType === 'mouse') {
+      place(placed.hover, placed.popup)
+      return
+    }
+    setOpen(null)
+    placed.hover.classList.add(DISMISSED_CLASS)
+    placed = null
+  },
+  { capture: true, passive: true },
+)

@@ -1,11 +1,13 @@
-import type { AddressInfo } from 'node:net'
-import type { CreateBatchClientServerTest } from './client-server'
 import * as http from 'node:http'
+import type { AddressInfo } from 'node:net'
+
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { BatchLinkPlugin } from '@orpc/client/plugins'
 import { RPCHandler } from '@orpc/server/node'
 import { BatchHandlerPlugin } from '@orpc/server/plugins'
+
+import type { CreateBatchClientServerTest } from './client-server'
 import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server'
 
 export const createNodeHttpBatchClientServerTest: CreateBatchClientServerTest = (
@@ -13,8 +15,8 @@ export const createNodeHttpBatchClientServerTest: CreateBatchClientServerTest = 
   {
     context = defaultBatchClientServerOptions.context,
     method = 'POST',
-    mode = defaultBatchClientServerOptions.mode,
     serializer = defaultBatchClientServerOptions.serializer,
+    mode,
   } = {},
 ) => {
   const handler = new RPCHandler(router, {
@@ -45,7 +47,7 @@ export const createNodeHttpBatchClientServerTest: CreateBatchClientServerTest = 
     method,
     serializer,
     fetch: fetchSpy,
-    plugins: [new BatchLinkPlugin({ groups: [defaultBatchGroup], mode })],
+    plugins: [new BatchLinkPlugin({ mode, groups: [defaultBatchGroup] })],
   })
 
   return {

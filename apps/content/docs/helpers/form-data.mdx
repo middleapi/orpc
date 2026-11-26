@@ -1,8 +1,8 @@
 ---
-title: "Form Data Helpers"
-description: "Parse HTML form data and extract validation error messages with bracket notation support for complex nested structures."
+title: 'Form Data Helpers'
+description: 'Parse HTML form data and extract validation error messages with bracket notation support for complex nested structures.'
 sidebar:
-  label: "Form Data"
+  label: 'Form Data'
 ---
 
 ## `parseFormData`
@@ -41,10 +41,10 @@ const error = {
     issues: [
       {
         path: ['user', 'email'],
-        message: 'Invalid email format'
-      }
-    ]
-  }
+        message: 'Invalid email format',
+      },
+    ],
+  },
 }
 
 const emailError = getIssueMessage(error, 'user[email]')
@@ -73,8 +73,7 @@ export function ContactForm() {
     try {
       const data = parseFormData(form)
       // Process structured data
-    }
-    catch (error) {
+    } catch (error) {
       setError(error)
     }
   }

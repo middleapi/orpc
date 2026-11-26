@@ -7,19 +7,19 @@ export interface LockOptions {
    *
    * @default the adapter default
    */
-  ttl?: number
+  ttl?: number | undefined
 
   /**
    * How long to wait for the lock to become available, in milliseconds.
    *
    * @default the adapter default
    */
-  timeout?: number
+  timeout?: number | undefined
 
   /**
    * Aborts waiting for the lock. Has no effect once the lock is acquired.
    */
-  signal?: AbortSignal
+  signal?: AbortSignal | undefined
 }
 
 export interface LockCallbackOptions {
@@ -44,5 +44,9 @@ export interface Locker {
    *
    * @throws {LockTimeoutError} when the lock cannot be acquired before the timeout elapses
    */
-  lock<T>(key: string, fn: (options: LockCallbackOptions) => Promisable<T>, options?: LockOptions): Promise<T>
+  lock<T>(
+    key: string,
+    fn: (options: LockCallbackOptions) => Promisable<T>,
+    options?: LockOptions,
+  ): Promise<T>
 }

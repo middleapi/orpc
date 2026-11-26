@@ -1,8 +1,8 @@
 ---
-title: "Generate Contract from OpenAPI"
+title: 'Generate Contract from OpenAPI'
 description: "Generate an oRPC contract from an existing OpenAPI specification with Hey API's orpc plugin instead of writing it by hand."
 sidebar:
-  label: "Generate from OpenAPI"
+  label: 'Generate from OpenAPI'
 ---
 
 ## Overview
@@ -55,12 +55,14 @@ import * as z from 'zod'
 import { zAddPetBody, zAddPetResponse } from './zod.gen'
 
 export const addPet = oc
-  .meta(openapi({
-    inputStructure: 'detailed',
-    method: 'POST',
-    path: '/pet',
-    tags: ['pet'],
-  }))
+  .meta(
+    openapi({
+      inputStructure: 'detailed',
+      method: 'POST',
+      path: '/pet',
+      tags: ['pet'],
+    }),
+  )
   .input(z.object({ body: zAddPetBody }))
   .output(zAddPetResponse)
 

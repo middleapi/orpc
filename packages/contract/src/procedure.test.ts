@@ -15,14 +15,18 @@ describe('procedureContract', () => {
 
       expect({}).not.toBeInstanceOf(ProcedureContract)
       expect({ '~orpc': {} }).not.toBeInstanceOf(ProcedureContract)
-      expect({ '~orpc': {
-        ...procedure['~orpc'],
-        errorMap: 'invalid',
-      } }).not.toBeInstanceOf(ProcedureContract)
-      expect({ '~orpc': {
-        ...procedure['~orpc'],
-        meta: 'invalid',
-      } }).not.toBeInstanceOf(ProcedureContract)
+      expect({
+        '~orpc': {
+          ...procedure['~orpc'],
+          errorMap: 'invalid',
+        },
+      }).not.toBeInstanceOf(ProcedureContract)
+      expect({
+        '~orpc': {
+          ...procedure['~orpc'],
+          meta: 'invalid',
+        },
+      }).not.toBeInstanceOf(ProcedureContract)
     })
 
     it('not support structural for extended class', () => {
@@ -39,8 +43,18 @@ describe('procedureContract', () => {
       expect(new ExtendedProcedureContract()).toBeInstanceOf(ProcedureContract)
       expect(new ExtendedProcedureContract()).toBeInstanceOf(ExtendedProcedureContract)
 
-      expect({ '~orpc': new ExtendedProcedureContract()['~orpc'] }).toBeInstanceOf(ProcedureContract)
-      expect({ '~orpc': new ExtendedProcedureContract()['~orpc'] }).not.toBeInstanceOf(ExtendedProcedureContract)
+      expect({ '~orpc': new ExtendedProcedureContract()['~orpc'] }).toBeInstanceOf(
+        ProcedureContract,
+      )
+      expect({ '~orpc': new ExtendedProcedureContract()['~orpc'] }).not.toBeInstanceOf(
+        ExtendedProcedureContract,
+      )
+    })
+
+    it('match by prototype chain before the constructor body runs (Babel class transform)', () => {
+      class ExtendedProcedureContract extends ProcedureContract<any, any, any> {}
+
+      expect(Object.create(ExtendedProcedureContract.prototype)).toBeInstanceOf(ProcedureContract)
     })
   })
 })

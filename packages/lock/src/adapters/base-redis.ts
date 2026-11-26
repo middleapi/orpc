@@ -1,7 +1,8 @@
 import type { Promisable } from '@orpc/shared'
-import type { LockCallbackOptions, Locker, LockOptions } from '../types'
 import { sleep, throwIfAborted } from '@orpc/shared'
+
 import { LockTimeoutError } from '../error'
+import type { LockCallbackOptions, Locker, LockOptions } from '../types'
 
 const RELEASE_LOCK_SCRIPT = `
 if redis.call('GET', KEYS[1]) == ARGV[1] then
@@ -22,7 +23,7 @@ export interface BaseRedisLockerOptions {
    *
    * @default ''
    */
-  prefix?: string
+  prefix?: string | undefined
 
   /**
    * How long a lock is held before it expires automatically, in milliseconds.
@@ -37,7 +38,7 @@ export interface BaseRedisLockerOptions {
    *
    * @default 10000
    */
-  timeout?: number
+  timeout?: number | undefined
 
   /**
    * How long to wait between acquisition attempts while the lock
@@ -45,7 +46,7 @@ export interface BaseRedisLockerOptions {
    *
    * @default 100
    */
-  retryInterval?: number
+  retryInterval?: number | undefined
 }
 
 /**
@@ -58,13 +59,13 @@ export interface BaseRedisLockerOptions {
  * @see {@link https://orpc.dev/docs/helpers/lock#adapters | Lock Helpers - Adapters}
  */
 export abstract class BaseRedisLocker implements Locker {
-  protected readonly prefix: string
+  protected readonly keyPrefix: string
   protected readonly ttl: number
   protected readonly timeout: number
   protected readonly retryInterval: number
 
   constructor(options: BaseRedisLockerOptions) {
-    this.prefix = options.prefix ?? ''
+    this.keyPrefix = options.prefix ?? ''
     this.ttl = options.ttl
     this.timeout = options.timeout ?? 10_000
     this.retryInterval = options.retryInterval ?? 100
@@ -82,8 +83,12 @@ export abstract class BaseRedisLocker implements Locker {
    */
   protected abstract evalScript(script: string, keys: string[], args: string[]): Promise<unknown>
 
-  async lock<T>(key: string, fn: (options: LockCallbackOptions) => Promisable<T>, options: LockOptions = {}): Promise<T> {
-    const prefixedKey = `${this.prefix}${key}`
+  async lock<T>(
+    key: string,
+    fn: (options: LockCallbackOptions) => Promisable<T>,
+    options: LockOptions = {},
+  ): Promise<T> {
+    const prefixedKey = `${this.keyPrefix}${key}`
     const ttl = options.ttl ?? this.ttl
     const deadline = Date.now() + (options.timeout ?? this.timeout)
     const token = crypto.randomUUID()
@@ -104,9 +109,12 @@ export abstract class BaseRedisLocker implements Locker {
 
     try {
       return await fn({ waited })
-    }
-    finally {
-      await this.evalScript(RELEASE_LOCK_SCRIPT, [prefixedKey], [token])
+    } finally {
+      try {
+        await this.evalScript(RELEASE_LOCK_SCRIPT, [prefixedKey], [token])
+      } catch {
+        // the lock still expires through its TTL
+      }
     }
   }
 }

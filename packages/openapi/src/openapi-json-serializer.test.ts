@@ -19,53 +19,61 @@ describe('openAPIJsonSerializer', () => {
 
   describe('serialize', () => {
     it('passes through primitives unchanged', () => {
-      expect(serializer.serialize(1).json).toBe(1)
-      expect(serializer.serialize('hello').json).toBe('hello')
-      expect(serializer.serialize(true).json).toBe(true)
-      expect(serializer.serialize(false).json).toBe(false)
-      expect(serializer.serialize(null).json).toBe(null)
+      expect(serializer.serializeJson(1).json).toBe(1)
+      expect(serializer.serializeJson('hello').json).toBe('hello')
+      expect(serializer.serializeJson(true).json).toBe(true)
+      expect(serializer.serializeJson(false).json).toBe(false)
+      expect(serializer.serializeJson(null).json).toBe(null)
     })
 
     it('serializes root and nested undefined values to null', () => {
-      expect(serializer.serialize(undefined).json).toBeNull()
-      expect(serializer.serialize([undefined]).json).toEqual([null])
+      expect(serializer.serializeJson(undefined).json).toBeNull()
+      expect(serializer.serializeJson([undefined]).json).toEqual([null])
     })
 
     it('serializes NaN to null', () => {
-      expect(serializer.serialize(Number.NaN).json).toBeNull()
+      expect(serializer.serializeJson(Number.NaN).json).toBeNull()
     })
 
     it('serializes Infinity and -Infinity to null', () => {
-      expect(serializer.serialize(Number.POSITIVE_INFINITY).json).toBeNull()
-      expect(serializer.serialize(Number.NEGATIVE_INFINITY).json).toBeNull()
+      expect(serializer.serializeJson(Number.POSITIVE_INFINITY).json).toBeNull()
+      expect(serializer.serializeJson(Number.NEGATIVE_INFINITY).json).toBeNull()
     })
 
     it('serializes Date to ISO string', () => {
-      expect(serializer.serialize(new Date('2023-01-01')).json).toBe('2023-01-01T00:00:00.000Z')
+      expect(serializer.serializeJson(new Date('2023-01-01')).json).toBe('2023-01-01T00:00:00.000Z')
     })
 
     it('serializes invalid Date to null', () => {
-      expect(serializer.serialize(new Date('invalid')).json).toBeNull()
+      expect(serializer.serializeJson(new Date('invalid')).json).toBeNull()
     })
 
     it('serializes bigint to string', () => {
-      expect(serializer.serialize(42n).json).toBe('42')
-      expect(serializer.serialize(99999999999999999999999999999n).json).toBe('99999999999999999999999999999')
+      expect(serializer.serializeJson(42n).json).toBe('42')
+      expect(serializer.serializeJson(99999999999999999999999999999n).json).toBe(
+        '99999999999999999999999999999',
+      )
     })
 
     it('serializes URL to string', () => {
-      expect(serializer.serialize(new URL('https://dinwwwh.com')).json).toBe('https://dinwwwh.com/')
+      expect(serializer.serializeJson(new URL('https://dinwwwh.com')).json).toBe(
+        'https://dinwwwh.com/',
+      )
     })
 
     it('serializes Set to array and Map to entries, converting nested values', () => {
-      expect(serializer.serialize(new Set([1, 2, 3])).json).toEqual([1, 2, 3])
-      expect(serializer.serialize(new Map([['a', 1]])).json).toEqual([['a', 1]])
-      expect(serializer.serialize(new Set([new Date('2023-01-01')])).json).toEqual(['2023-01-01T00:00:00.000Z'])
-      expect(serializer.serialize(new Map([[new Date('2023-01-01'), 1n]])).json).toEqual([['2023-01-01T00:00:00.000Z', '1']])
+      expect(serializer.serializeJson(new Set([1, 2, 3])).json).toEqual([1, 2, 3])
+      expect(serializer.serializeJson(new Map([['a', 1]])).json).toEqual([['a', 1]])
+      expect(serializer.serializeJson(new Set([new Date('2023-01-01')])).json).toEqual([
+        '2023-01-01T00:00:00.000Z',
+      ])
+      expect(serializer.serializeJson(new Map([[new Date('2023-01-01'), 1n]])).json).toEqual([
+        ['2023-01-01T00:00:00.000Z', '1'],
+      ])
     })
 
     it('serializes a realistic API response in one pass', () => {
-      const { json } = serializer.serialize({
+      const { json } = serializer.serializeJson({
         user: {
           id: 9007199254740993n,
           name: 'dinwwwh',
@@ -91,21 +99,25 @@ describe('openAPIJsonSerializer', () => {
       })
     })
 
-    it('omits undefined object properties by default', () => {
-      expect(serializer.serialize({ a: 1, b: undefined }).json).not.toHaveProperty('b')
+    it('omits undefined object properties', () => {
+      expect(serializer.serializeJson({ a: 1, b: undefined }).json).not.toHaveProperty('b')
     })
 
     it('skips toJSON methods', () => {
-      expect(serializer.serialize({ value: { toJSON: () => 'hello' } }).json).toEqual({ value: {} })
+      expect(serializer.serializeJson({ value: { toJSON: () => 'hello' } }).json).toEqual({
+        value: {},
+      })
     })
 
     it('keeps non-function toJSON properties', () => {
-      expect(serializer.serialize({ value: { toJSON: 'hello' } }).json).toEqual({ value: { toJSON: 'hello' } })
+      expect(serializer.serializeJson({ value: { toJSON: 'hello' } }).json).toEqual({
+        value: { toJSON: 'hello' },
+      })
     })
 
     it('collects blobs and maps', () => {
       const blob = new Blob(['hello'])
-      const { maps, blobs } = serializer.serialize({ file: blob })
+      const { maps, blobs } = serializer.serializeJson({ file: blob })
       expect(blobs).toEqual([blob])
       expect(maps).toEqual([['file']])
     })
@@ -113,22 +125,29 @@ describe('openAPIJsonSerializer', () => {
     it('collects multiple blobs with their exact paths', () => {
       const a = new Blob(['a'])
       const b = new Blob(['b'])
-      const { maps, blobs } = serializer.serialize({ nested: { a }, list: [1, b] })
+      const { maps, blobs } = serializer.serializeJson({ nested: { a }, list: [1, b] })
 
-      expect(maps).toEqual([['nested', 'a'], ['list', 1]])
+      expect(maps).toEqual([
+        ['nested', 'a'],
+        ['list', 1],
+      ])
       expect(blobs).toEqual([a, b])
     })
 
     it('passes through values no handler understands', () => {
       const symbol = Symbol('sym')
-      expect(serializer.serialize(symbol).json).toBe(symbol)
+      expect(serializer.serializeJson(symbol).json).toBe(symbol)
     })
   })
 
   describe('deserialize', () => {
     it('restores blobs at mapped paths', () => {
       const blob = new Blob(['hello'])
-      const result = serializer.deserialize({ json: { file: null }, maps: [['file']], blobs: [blob] })
+      const result = serializer.deserializeJson({
+        json: { file: null },
+        maps: [['file']],
+        blobs: [blob],
+      })
       expect((result as any).file).toBe(blob)
     })
 
@@ -136,14 +155,14 @@ describe('openAPIJsonSerializer', () => {
       const blob = new Blob(['hello'])
       const payload = { json: { files: [null] }, maps: [['files', 0]], blobs: [blob] }
 
-      expect(serializer.deserialize(payload)).toEqual({ files: [blob] })
-      expect(serializer.deserialize(payload)).toEqual({ files: [blob] })
+      expect(serializer.deserializeJson(payload)).toEqual({ files: [blob] })
+      expect(serializer.deserializeJson(payload)).toEqual({ files: [blob] })
       expect(payload.json).toEqual({ files: [null] })
     })
 
     it('returns json as-is when no blobs', () => {
       const json = { a: 1, b: '2023-01-01T00:00:00.000Z' }
-      expect(serializer.deserialize({ json })).toEqual(json)
+      expect(serializer.deserializeJson({ json })).toEqual(json)
     })
   })
 
@@ -152,33 +171,38 @@ describe('openAPIJsonSerializer', () => {
       const custom = new OpenAPIJsonSerializer({
         handlers: {
           date: {
-            condition: data => data instanceof Date,
+            condition: (data) => data instanceof Date,
             serialize: (value: Date) => `___TEST___${value.getTime()}`,
           },
         },
       })
 
       const date = new Date('2023-01-01')
-      expect(custom.serialize({ value: date }).json).toEqual({ value: `___TEST___${date.getTime()}` })
+      expect(custom.serializeJson({ value: date }).json).toEqual({
+        value: `___TEST___${date.getTime()}`,
+      })
     })
 
     it('supports disabling default handlers', () => {
       const custom = new OpenAPIJsonSerializer({ handlers: { date: undefined } })
       const date = new Date('2023-01-01')
-      expect(custom.serialize({ value: date, list: [undefined] }).json).toEqual({ value: date, list: [null] })
+      expect(custom.serializeJson({ value: date, list: [undefined] }).json).toEqual({
+        value: date,
+        list: [null],
+      })
     })
 
     it('supports custom handlers, and keeps serializing non-terminal results', () => {
       const custom = new OpenAPIJsonSerializer({
         handlers: {
           person: {
-            condition: data => data instanceof Person,
+            condition: (data) => data instanceof Person,
             serialize: (data: Person) => data.toJSON(),
           },
         },
       })
 
-      expect(custom.serialize(new Person('dinwwwh', new Date('2023-01-01'))).json).toEqual({
+      expect(custom.serializeJson(new Person('dinwwwh', new Date('2023-01-01'))).json).toEqual({
         name: 'dinwwwh',
         date: '2023-01-01T00:00:00.000Z',
       })
@@ -189,7 +213,7 @@ describe('openAPIJsonSerializer', () => {
       const custom = new OpenAPIJsonSerializer({
         handlers: {
           person: {
-            condition: data => data instanceof Person,
+            condition: (data) => data instanceof Person,
             serialize: (data: Person) => data.toJSON(),
             isTerminal: true,
           },
@@ -197,7 +221,7 @@ describe('openAPIJsonSerializer', () => {
       })
 
       // the nested Date stays untouched because the terminal result is not walked
-      expect((custom.serialize(new Person('dinwwwh', date)).json as any).date).toBe(date)
+      expect((custom.serializeJson(new Person('dinwwwh', date)).json as any).date).toBe(date)
     })
 
     it('keeps every built-in type working when any built-in handler is customized', () => {
@@ -205,26 +229,28 @@ describe('openAPIJsonSerializer', () => {
       const custom = new OpenAPIJsonSerializer({
         handlers: {
           undefined: {
-            condition: data => data === undefined,
+            condition: (data) => data === undefined,
             serialize: () => null,
             isTerminal: true,
           },
         },
       })
 
-      expect(custom.serialize({
-        date: new Date('2023-01-01'),
-        invalidDate: new Date('Invalid'),
-        nan: Number.NaN,
-        infinity: Number.POSITIVE_INFINITY,
-        negativeInfinity: Number.NEGATIVE_INFINITY,
-        url: new URL('https://orpc.dev'),
-        set: new Set([1, 2]),
-        map: new Map([['a', 1]]),
-        bigint: 123n,
-        list: [undefined],
-        plain: 'text',
-      }).json).toEqual({
+      expect(
+        custom.serializeJson({
+          date: new Date('2023-01-01'),
+          invalidDate: new Date('Invalid'),
+          nan: Number.NaN,
+          infinity: Number.POSITIVE_INFINITY,
+          negativeInfinity: Number.NEGATIVE_INFINITY,
+          url: new URL('https://orpc.dev'),
+          set: new Set([1, 2]),
+          map: new Map([['a', 1]]),
+          bigint: 123n,
+          list: [undefined],
+          plain: 'text',
+        }).json,
+      ).toEqual({
         date: '2023-01-01T00:00:00.000Z',
         invalidDate: null,
         nan: null,
@@ -247,23 +273,84 @@ describe('openAPIJsonSerializer', () => {
       const custom = new OpenAPIJsonSerializer({
         handlers: {
           blobContainer: {
-            condition: data => data instanceof BlobContainer,
+            condition: (data) => data instanceof BlobContainer,
             serialize: (data: BlobContainer) => data.blob,
             isTerminal: true,
           },
         },
       })
 
-      const serialized = custom.serialize({ file: new BlobContainer(new Blob(['hello'], { type: 'text/plain' })) })
+      const serialized = custom.serializeJson({
+        file: new BlobContainer(new Blob(['hello'], { type: 'text/plain' })),
+      })
 
       expect(serialized.json).toEqual({ file: expect.any(Blob) })
       expect(serialized.maps).toEqual([['file']])
       expect(serialized.blobs).toEqual([expect.any(Blob)])
     })
 
-    it('can disable omitting undefined properties', () => {
-      const custom = new OpenAPIJsonSerializer({ omitUndefinedProperties: false })
-      expect(custom.serialize({ a: 1, b: undefined }).json).toEqual({ a: 1, b: null })
+    describe.each([
+      ['built-in handlers kept', {}],
+      ['a built-in handler overridden', { url: undefined }],
+    ] as const)('custom primitive handlers with %s', (_, extraHandlers) => {
+      const custom = new OpenAPIJsonSerializer({
+        handlers: {
+          ...extraHandlers,
+          negZero: {
+            condition: (data) => Object.is(data, -0),
+            serialize: () => '-0',
+            isTerminal: true,
+          },
+          secret: {
+            condition: (data) => typeof data === 'string' && data.startsWith('secret:'),
+            serialize: () => '***',
+            isTerminal: true,
+          },
+          flag: {
+            condition: (data) => typeof data === 'boolean',
+            serialize: (data: boolean) => (data ? 'yes' : 'no'),
+            isTerminal: true,
+          },
+          nil: {
+            condition: (data) => data === null,
+            serialize: () => 'null',
+            isTerminal: true,
+          },
+        },
+      })
+
+      it('runs custom handlers for strings, booleans, finite numbers and null', () => {
+        expect(
+          custom.serializeJson({ zero: -0, text: 'secret:abc', flag: true, nil: null }).json,
+        ).toEqual({ zero: '-0', text: '***', flag: 'yes', nil: 'null' })
+      })
+
+      it('leaves primitives no custom handler matches untouched', () => {
+        expect(custom.serializeJson({ zero: 0, num: 1.5, text: 'plain' }).json).toEqual({
+          zero: 0,
+          num: 1.5,
+          text: 'plain',
+        })
+      })
+
+      it('still gives built-in handlers precedence over custom handlers', () => {
+        const numbers = new OpenAPIJsonSerializer({
+          handlers: {
+            ...extraHandlers,
+            number: {
+              condition: (data) => typeof data === 'number',
+              serialize: (data: number) => `n${data}`,
+              isTerminal: true,
+            },
+          },
+        })
+
+        expect(numbers.serializeJson([1, Number.NaN, Number.POSITIVE_INFINITY]).json).toEqual([
+          'n1',
+          null,
+          null,
+        ])
+      })
     })
   })
 
@@ -273,34 +360,48 @@ describe('openAPIJsonSerializer', () => {
       expect((Object.prototype as any).polluted).toBeUndefined()
     })
 
-    it.each(['doesNotExist', '__proto__', 'constructor', 'prototype'])('throws on invalid blob map segment "%s" to prevent prototype pollution', (segment) => {
-      expect(
-        () => serializer.deserialize({ json: { o: {} }, blobs: [new Blob()], maps: [[segment]] }),
-      ).toThrowError(`Invalid OpenAPI serialized data: segment "${segment}" does not exist.`)
+    it.each(['doesNotExist', '__proto__', 'constructor', 'prototype'])(
+      'throws on invalid blob map segment "%s" to prevent prototype pollution',
+      (segment) => {
+        expect(() =>
+          serializer.deserializeJson({ json: { o: {} }, blobs: [new Blob()], maps: [[segment]] }),
+        ).toThrowError(`Invalid OpenAPI serialized data: segment "${segment}" does not exist.`)
 
-      expect(
-        () => serializer.deserialize({ json: { o: {} }, blobs: [new Blob()], maps: [['o', segment]] }),
-      ).toThrowError(`Invalid OpenAPI serialized data: segment "${segment}" does not exist.`)
+        expect(() =>
+          serializer.deserializeJson({
+            json: { o: {} },
+            blobs: [new Blob()],
+            maps: [['o', segment]],
+          }),
+        ).toThrowError(`Invalid OpenAPI serialized data: segment "${segment}" does not exist.`)
 
-      expect(
-        () => serializer.deserialize({ json: { o: {} }, blobs: [new Blob()], maps: [[segment, 'o']] }),
-      ).toThrowError(`Invalid OpenAPI serialized data: segment "${segment}" does not exist.`)
-    })
+        expect(() =>
+          serializer.deserializeJson({
+            json: { o: {} },
+            blobs: [new Blob()],
+            maps: [[segment, 'o']],
+          }),
+        ).toThrowError(`Invalid OpenAPI serialized data: segment "${segment}" does not exist.`)
+      },
+    )
 
     it('throws when a blobs entry is not a Blob', () => {
       for (const value of [4294967295, 'text', null, {}, []]) {
-        expect(() => serializer.deserialize({ json: [null], blobs: [value as any], maps: [[0]] }))
-          .toThrowError('Invalid OpenAPI serialized data: blob 0 is not a Blob.')
+        expect(() =>
+          serializer.deserializeJson({ json: [null], blobs: [value as any], maps: [[0]] }),
+        ).toThrowError('Invalid OpenAPI serialized data: blob 0 is not a Blob.')
       }
 
-      expect(() => serializer.deserialize({ json: [null, null], blobs: [new Blob()], maps: [[0], [1]] }))
-        .toThrowError('Invalid OpenAPI serialized data: blob 1 is not a Blob.')
+      expect(() =>
+        serializer.deserializeJson({ json: [null, null], blobs: [new Blob()], maps: [[0], [1]] }),
+      ).toThrowError('Invalid OpenAPI serialized data: blob 1 is not a Blob.')
     })
 
-    /* eslint-disable no-proto, no-restricted-properties */
     it('serializes own __proto__ keys as plain data', () => {
       // JSON.parse creates own __proto__ properties, exactly like a real request body
-      const { json } = serializer.serialize(JSON.parse('{"__proto__": {"polluted": true}}')) as any
+      const { json } = serializer.serializeJson(
+        JSON.parse('{"__proto__": {"polluted": true}}'),
+      ) as any
 
       expect(Object.hasOwn(json, '__proto__')).toBe(true)
       expect(json.__proto__).toEqual({ polluted: true })
@@ -309,7 +410,7 @@ describe('openAPIJsonSerializer', () => {
 
     it('restores blobs behind own __proto__ keys without touching prototypes', () => {
       const blob = new Blob(['x'])
-      const result = serializer.deserialize({
+      const result = serializer.deserializeJson({
         json: JSON.parse('{"__proto__": {"file": null}}'),
         maps: [['__proto__', 'file']],
         blobs: [blob],
@@ -321,7 +422,7 @@ describe('openAPIJsonSerializer', () => {
 
     it('restores a blob stored directly under an own __proto__ key', () => {
       const blob = new Blob(['x'])
-      const result = serializer.deserialize({
+      const result = serializer.deserializeJson({
         json: JSON.parse('{"__proto__": null}'),
         maps: [['__proto__']],
         blobs: [blob],
@@ -334,7 +435,7 @@ describe('openAPIJsonSerializer', () => {
 
     it('walks an own constructor/prototype chain without reaching the real Object.prototype', () => {
       const blob = new Blob(['x'])
-      const result = serializer.deserialize({
+      const result = serializer.deserializeJson({
         json: JSON.parse('{"constructor": {"prototype": {"polluted": null}}}'),
         maps: [['constructor', 'prototype', 'polluted']],
         blobs: [blob],
@@ -342,6 +443,5 @@ describe('openAPIJsonSerializer', () => {
 
       expect(result.constructor.prototype.polluted).toBe(blob)
     })
-    /* eslint-enable no-proto, no-restricted-properties */
   })
 })

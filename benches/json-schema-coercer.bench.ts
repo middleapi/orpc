@@ -4,8 +4,16 @@ import { bench } from 'vitest'
 
 const coercer = new JsonSchemaCoercer()
 
-const DATE_SCHEMA = { 'type': 'string', 'format': 'date-time', 'x-native-type': 'date' } as JsonSchema
-const BIGINT_SCHEMA = { 'type': 'string', 'pattern': '^-?[0-9]+$', 'x-native-type': 'bigint' } as JsonSchema
+const DATE_SCHEMA = {
+  'type': 'string',
+  'format': 'date-time',
+  'x-native-type': 'date',
+} as JsonSchema
+const BIGINT_SCHEMA = {
+  'type': 'string',
+  'pattern': '^-?[0-9]+$',
+  'x-native-type': 'bigint',
+} as JsonSchema
 const URL_SCHEMA = { 'type': 'string', 'format': 'uri', 'x-native-type': 'url' } as JsonSchema
 
 /** What a GET request's query params look like: every leaf arrives as a string. */
@@ -46,7 +54,12 @@ const UNIT_SCHEMA: JsonSchema = {
     active: { type: 'boolean' },
     createdAt: DATE_SCHEMA,
     largeInt: BIGINT_SCHEMA,
-    tags: { 'type': 'array', 'uniqueItems': true, 'items': { type: 'string' }, 'x-native-type': 'set' } as JsonSchema,
+    tags: {
+      'type': 'array',
+      'uniqueItems': true,
+      'items': { type: 'string' },
+      'x-native-type': 'set',
+    } as JsonSchema,
     metadata: {
       'type': 'array',
       'items': {
@@ -121,9 +134,8 @@ const TREE_SCHEMA: JsonSchema = {
 function createTree(depth: number, breadth: number): unknown {
   return {
     value: `${depth}`,
-    children: depth === 0
-      ? []
-      : Array.from({ length: breadth }, () => createTree(depth - 1, breadth)),
+    children:
+      depth === 0 ? [] : Array.from({ length: breadth }, () => createTree(depth - 1, breadth)),
   }
 }
 

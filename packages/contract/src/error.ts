@@ -1,16 +1,17 @@
 import type { ORPCError, ORPCErrorCode } from '@orpc/client'
+
 import type { AnySchema, InferSchemaOutput, SchemaIssue } from './schema'
 
 export interface ErrorMapItem {
   /**
    * Default message, can be overridden when constructing an error.
    */
-  message?: undefined | string
+  message?: string | undefined
 
   /**
    * Schema used to type and validate the error data.
    */
-  data?: undefined | AnySchema
+  data?: AnySchema | undefined
 }
 
 /**
@@ -24,11 +25,11 @@ export type ErrorMap = {
 }
 
 export type ORPCErrorFromErrorMap<TErrorMap extends ErrorMap> = {
-  [K in keyof TErrorMap]: TErrorMap[K] extends ErrorMapItem
+  [K in keyof TErrorMap]-?: Exclude<TErrorMap[K], undefined> extends infer I extends ErrorMapItem
     ? ORPCError<
-       K & ORPCErrorCode,
-       TErrorMap[K]['data'] extends AnySchema ? InferSchemaOutput<TErrorMap[K]['data']> : unknown
-    >
+        K & ORPCErrorCode,
+        I['data'] extends AnySchema ? InferSchemaOutput<I['data']> : unknown
+      >
     : never
 }[keyof TErrorMap]
 

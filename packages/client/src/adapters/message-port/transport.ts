@@ -1,14 +1,28 @@
 import type { Promisable, Value } from '@orpc/shared'
+import { value } from '@orpc/shared'
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
-import type { DecodePeerMessageOptions, EncodePeerMessageOptions, ServerPeerSendMessage } from '@standard-server/peer'
+import type {
+  DecodePeerMessageOptions,
+  EncodePeerMessageOptions,
+  ServerPeerSendMessage,
+} from '@standard-server/peer'
+import {
+  ClientPeer,
+  decodePeerMessage,
+  encodePeerMessage,
+  isPeerMessage,
+  isServerPeerSendMessage,
+} from '@standard-server/peer'
+
+import { ConnectionClosedError } from '../../error'
 import type { ClientContext, ClientOptions } from '../../types'
-import type { StandardLinkTransport } from '../standard'
+import type { StandardLinkTransport } from '../standard/index'
 import type { SupportedMessagePort } from './message-port'
-import { AbortError, value } from '@orpc/shared'
-import { ClientPeer, decodePeerMessage, encodePeerMessage, isPeerMessage, isServerPeerSendMessage } from '@standard-server/peer'
 import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from './message-port'
 
-type DecodedRequestMessage = ConstructorParameters<typeof ClientPeer>[0] extends (message: infer TMessage) => unknown
+type DecodedRequestMessage = ConstructorParameters<typeof ClientPeer>[0] extends (
+  message: infer TMessage,
+) => unknown
   ? TMessage
   : never
 
@@ -24,7 +38,12 @@ export interface MessagePortLinkTransportOptions<_T extends ClientContext> {
    * **Note**: Returning `null` or `undefined` disables this feature.
    * **Warning**: Make sure your message port supports `transfer` before using this feature.
    */
-  experimental_transfer?: Value<Promisable<object[] | null | undefined>, [message: DecodedRequestMessage, port: SupportedMessagePort]>
+  experimental_transfer?:
+    | Value<
+        Promisable<object[] | null | undefined>,
+        [message: DecodedRequestMessage, port: SupportedMessagePort]
+      >
+    | undefined
 
   /**
    * Options for encoding peer messages. such as `prefix` for distinguishing messages on the same channel..
@@ -40,8 +59,13 @@ export interface MessagePortLinkTransportOptions<_T extends ClientContext> {
 export class MessagePortLinkTransport<T extends ClientContext> implements StandardLinkTransport<T> {
   private readonly peer: ClientPeer
 
-  constructor({ port, experimental_transfer, encodePeerMessage: encodePeerMessageOptions, decodePeerMessage: decodePeerMessageOptions }: MessagePortLinkTransportOptions<T>) {
-    let closeReason: undefined | AbortError
+  constructor({
+    port,
+    experimental_transfer,
+    encodePeerMessage: encodePeerMessageOptions,
+    decodePeerMessage: decodePeerMessageOptions,
+  }: MessagePortLinkTransportOptions<T>) {
+    let closeReason: undefined | ConnectionClosedError
 
     this.peer = new ClientPeer(async (message) => {
       // `postMessage` silently discards data once the port is closed, so requests would never settle
@@ -53,8 +77,7 @@ export class MessagePortLinkTransport<T extends ClientContext> implements Standa
 
       if (transfer) {
         postMessagePortMessage(port, message, transfer)
-      }
-      else {
+      } else {
         postMessagePortMessage(port, await encodePeerMessage(message, encodePeerMessageOptions))
       }
     })
@@ -64,13 +87,14 @@ export class MessagePortLinkTransport<T extends ClientContext> implements Standa
 
       if (typeof data === 'string' || data instanceof Uint8Array) {
         // MessagePort receives the exact payload sent, and `encodePeerMessage` only returns string or Uint8Array.
-        const result = decodePeerMessage(data as string | Uint8Array<ArrayBuffer>, decodePeerMessageOptions)
+        const result = decodePeerMessage(
+          data as string | Uint8Array<ArrayBuffer>,
+          decodePeerMessageOptions,
+        )
         if (result.matched && isServerPeerSendMessage(result.message)) {
           peerMessage = result.message
         }
-      }
-
-      else if (isPeerMessage(data) && isServerPeerSendMessage(data)) {
+      } else if (isPeerMessage(data) && isServerPeerSendMessage(data)) {
         peerMessage = data
       }
 
@@ -87,12 +111,16 @@ export class MessagePortLinkTransport<T extends ClientContext> implements Standa
     })
 
     onMessagePortClose(port, async () => {
-      closeReason = new AbortError('MessagePort closed')
+      closeReason = new ConnectionClosedError('MessagePort closed')
       await this.peer.close(closeReason)
     })
   }
 
-  async send(standardRequest: StandardRequest, _path: string[], _options: ClientOptions<T>): Promise<StandardLazyResponse> {
+  async send(
+    standardRequest: StandardRequest,
+    _path: string[],
+    _options: ClientOptions<T>,
+  ): Promise<StandardLazyResponse> {
     const standardResponse = await this.peer.request(standardRequest)
     return standardResponse
   }

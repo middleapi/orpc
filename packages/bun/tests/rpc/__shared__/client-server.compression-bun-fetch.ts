@@ -1,10 +1,15 @@
-import type { CreateClientServerTest } from './client-server'
+import { afterAll } from 'bun:test'
+
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { RequestCompressionLinkPlugin } from '@orpc/client/plugins'
 import { RPCHandler } from '@orpc/server/fetch'
-import { RequestCompressionHandlerPlugin, ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
-import { afterAll } from 'bun:test'
+import {
+  RequestCompressionHandlerPlugin,
+  ResponseCompressionHandlerPlugin,
+} from '@orpc/server/plugins'
+
+import type { CreateClientServerTest } from './client-server'
 import { defaultSerializer } from './client-server'
 
 export const createCompressionBunFetchClientServerTest: CreateClientServerTest = (
@@ -35,7 +40,7 @@ export const createCompressionBunFetchClientServerTest: CreateClientServerTest =
   })
 
   afterAll(() => {
-    server.stop()
+    void server.stop()
   })
 
   const link = new RPCLink({

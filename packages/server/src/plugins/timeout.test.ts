@@ -1,8 +1,9 @@
-import type { TimeoutHandlerPluginOptions } from './timeout'
 import { COMMON_ERROR_STATUS_MAP, ORPCError } from '@orpc/client'
-import { AbortError } from '@orpc/shared'
-import { RPCHandler } from '../adapters/fetch'
+import { TimeoutError } from '@orpc/shared'
+
+import { RPCHandler } from '../adapters/fetch/index'
 import { os } from '../builder'
+import type { TimeoutHandlerPluginOptions } from './timeout'
 import { TimeoutHandlerPlugin } from './timeout'
 
 beforeEach(() => {
@@ -30,10 +31,14 @@ describe('timeoutHandlerPlugin', () => {
   function sleepWithSignal(ms: number, signal?: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(resolve, ms)
-      signal?.addEventListener('abort', () => {
-        clearTimeout(timer)
-        reject(signal.reason)
-      }, { once: true })
+      signal?.addEventListener(
+        'abort',
+        () => {
+          clearTimeout(timer)
+          reject(signal.reason)
+        },
+        { once: true },
+      )
     })
   }
 
@@ -49,7 +54,7 @@ describe('timeoutHandlerPlugin', () => {
     expect(signal.aborted).toBe(false)
   })
 
-  it('should abort the signal with an AbortError and respond once the procedure honors it', async () => {
+  it('should abort the signal with a TimeoutError and respond once the procedure honors it', async () => {
     procedure_handler.mockImplementationOnce(({ signal }) => sleepWithSignal(100_000, signal))
     const handler = makeHandler({ timeout: 1000 })
 
@@ -61,7 +66,7 @@ describe('timeoutHandlerPlugin', () => {
 
     const { signal } = procedure_handler.mock.calls[0]![0]
     expect(signal.aborted).toBe(true)
-    expect(signal.reason).toBeInstanceOf(AbortError)
+    expect(signal.reason).toBeInstanceOf(TimeoutError)
     expect(signal.reason.message).toBe('Request timed out after 1000ms')
   })
 
@@ -109,59 +114,72 @@ describe('timeoutHandlerPlugin', () => {
     expect(response?.status).toBe(COMMON_ERROR_STATUS_MAP.INTERNAL_SERVER_ERROR)
 
     expect(timeout).toHaveBeenCalledTimes(1)
-    expect(timeout).toHaveBeenCalledWith(expect.objectContaining({
-      path: [],
-      procedure,
-      context: { timeout: 1000 },
-    }))
+    expect(timeout).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: [],
+        procedure,
+        context: { timeout: 1000 },
+      }),
+    )
   })
 
-  it.each([null, undefined])('should dynamically disable timeout when value is %s', async (timeout) => {
-    procedure_handler.mockImplementationOnce(() => sleepWithSignal(100_000).then(() => 'success'))
-    const handler = makeHandler({ timeout: () => timeout })
+  it.each([null, undefined])(
+    'should dynamically disable timeout when value is %s',
+    async (timeout) => {
+      procedure_handler.mockImplementationOnce(() => sleepWithSignal(100_000).then(() => 'success'))
+      const handler = makeHandler({ timeout: () => timeout })
 
-    const promise = handler.handle(new Request('http://localhost'))
-    await vi.advanceTimersByTimeAsync(100_000)
+      const promise = handler.handle(new Request('http://localhost'))
+      await vi.advanceTimersByTimeAsync(100_000)
 
-    const { response } = await promise
-    expect(response?.status).toBe(200)
-  })
+      const { response } = await promise
+      expect(response?.status).toBe(200)
+    },
+  )
 
   it.each([
     ['not provided', {}],
     ['null', { streamingTimeout: () => null }],
     ['undefined', { streamingTimeout: () => undefined }],
-  ])('should let streaming responses outlive the timeout when streamingTimeout is %s', async (_, options) => {
-    const handler = makeHandler({ timeout: 1000, ...options }, os.handler(async function* () {
-      yield 'first'
-      await sleepWithSignal(100_000)
-      yield 'second'
-    }))
+  ])(
+    'should let streaming responses outlive the timeout when streamingTimeout is %s',
+    async (_, options) => {
+      const handler = makeHandler(
+        { timeout: 1000, ...options },
+        os.handler(async function* () {
+          yield 'first'
+          await sleepWithSignal(100_000)
+          yield 'second'
+        }),
+      )
 
-    const { response } = await handler.handle(new Request('http://localhost'))
-    expect(response?.status).toBe(200)
+      const { response } = await handler.handle(new Request('http://localhost'))
+      expect(response?.status).toBe(200)
 
-    const textPromise = response!.text()
-    await vi.advanceTimersByTimeAsync(100_000)
+      const textPromise = response!.text()
+      await vi.advanceTimersByTimeAsync(100_000)
 
-    const text = await textPromise
-    expect(text).toContain('first')
-    expect(text).toContain('second')
-    expect(text).not.toContain('event: error')
-  })
+      const text = await textPromise
+      expect(text).toContain('first')
+      expect(text).toContain('second')
+      expect(text).not.toContain('event: error')
+    },
+  )
 
   it('should end event iterator bodies with an error event when streamingTimeout is exceeded', async () => {
     let cleaned = false
-    const handler = makeHandler({ timeout: 1000, streamingTimeout: 2000 }, os.handler(async function* ({ signal }) {
-      try {
-        yield 'first'
-        await sleepWithSignal(100_000, signal)
-        yield 'second'
-      }
-      finally {
-        cleaned = true
-      }
-    }))
+    const handler = makeHandler(
+      { timeout: 1000, streamingTimeout: 2000 },
+      os.handler(async function* ({ signal }) {
+        try {
+          yield 'first'
+          await sleepWithSignal(100_000, signal)
+          yield 'second'
+        } finally {
+          cleaned = true
+        }
+      }),
+    )
 
     const { response } = await handler.handle(new Request('http://localhost'))
     expect(response?.status).toBe(200)
@@ -179,18 +197,24 @@ describe('timeoutHandlerPlugin', () => {
   it('should end readable stream bodies once the producer honors the signal when streamingTimeout is exceeded', async () => {
     const handler = new RPCHandler(procedure, {
       allowMethods: ['GET'],
-      interceptors: [async ({ request }) => ({
-        status: 200,
-        headers: {},
-        body: new ReadableStream<Uint8Array>({
-          start(controller) {
-            controller.enqueue(new TextEncoder().encode('first'))
-            request.signal!.addEventListener('abort', () => {
-              controller.error(request.signal!.reason)
-            }, { once: true })
-          },
+      interceptors: [
+        async ({ request }) => ({
+          status: 200,
+          headers: {},
+          body: new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode('first'))
+              request.signal!.addEventListener(
+                'abort',
+                () => {
+                  controller.error(request.signal!.reason)
+                },
+                { once: true },
+              )
+            },
+          }),
         }),
-      })],
+      ],
       plugins: [new TimeoutHandlerPlugin({ timeout: 1000, streamingTimeout: 2000 })],
     })
 
@@ -198,23 +222,30 @@ describe('timeoutHandlerPlugin', () => {
     expect(response?.status).toBe(200)
 
     const reader = response!.body!.getReader()
-    await expect(reader.read()).resolves.toEqual({ done: false, value: new TextEncoder().encode('first') })
+    await expect(reader.read()).resolves.toEqual({
+      done: false,
+      value: new TextEncoder().encode('first'),
+    })
 
     const nextRead = reader.read()
     nextRead.catch(() => {})
     await vi.advanceTimersByTimeAsync(2000)
 
-    await expect(nextRead).rejects.toSatisfy(error =>
-      error instanceof AbortError && error.message === 'Request timed out after 2000ms',
+    await expect(nextRead).rejects.toSatisfy(
+      (error) =>
+        error instanceof TimeoutError && error.message === 'Request timed out after 2000ms',
     )
   })
 
   it('should let streaming responses finish in time and clear the streaming timeout', async () => {
-    const handler = makeHandler({ timeout: 1000, streamingTimeout: 5000 }, os.handler(async function* () {
-      yield 'first'
-      await sleepWithSignal(1000)
-      yield 'second'
-    }))
+    const handler = makeHandler(
+      { timeout: 1000, streamingTimeout: 5000 },
+      os.handler(async function* () {
+        yield 'first'
+        await sleepWithSignal(1000)
+        yield 'second'
+      }),
+    )
 
     const { response } = await handler.handle(new Request('http://localhost'))
     const textPromise = response!.text()
@@ -226,13 +257,26 @@ describe('timeoutHandlerPlugin', () => {
     expect(text).not.toContain('event: error')
   })
 
+  it('should not start the streaming timeout for non-streaming responses', async () => {
+    procedure_handler.mockResolvedValueOnce('success')
+    const handler = makeHandler({ timeout: 1000, streamingTimeout: 5000 })
+
+    const { response } = await handler.handle(new Request('http://localhost'))
+
+    expect(response?.status).toBe(200)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
   it('should support dynamic streamingTimeout based on interceptor options', async () => {
     const streamingTimeout = vi.fn(({ context }: any) => context.streamingTimeout)
-    const handler = makeHandler({ timeout: 1000, streamingTimeout }, os.handler(async function* ({ signal }) {
-      yield 'first'
-      await sleepWithSignal(100_000, signal)
-      yield 'second'
-    }))
+    const handler = makeHandler(
+      { timeout: 1000, streamingTimeout },
+      os.handler(async function* ({ signal }) {
+        yield 'first'
+        await sleepWithSignal(100_000, signal)
+        yield 'second'
+      }),
+    )
 
     const { response } = await handler.handle(new Request('http://localhost'), {
       context: { streamingTimeout: 2000 },
@@ -247,9 +291,11 @@ describe('timeoutHandlerPlugin', () => {
     expect(text).toContain('event: error')
 
     expect(streamingTimeout).toHaveBeenCalledTimes(1)
-    expect(streamingTimeout).toHaveBeenCalledWith(expect.objectContaining({
-      context: { streamingTimeout: 2000 },
-    }))
+    expect(streamingTimeout).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: { streamingTimeout: 2000 },
+      }),
+    )
   })
 
   it('should forward abort from the request signal while the timeout is still active', async () => {

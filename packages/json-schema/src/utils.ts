@@ -3,15 +3,33 @@
  * and exclusively use absolute JSON pointers for `$ref` values.
  */
 
+import {
+  JSON_SCHEMA_LOGIC_KEYWORDS,
+  JSON_SCHEMA_PRIMITIVE_TYPES,
+  JSON_SCHEMA_RECORD_KEYWORDS,
+} from './constants'
+import { resolveJsonSchemaLocalPointer } from './ref-utils'
 import type { JsonSchema } from './types'
-import { JSON_SCHEMA_LOGIC_KEYWORDS, JSON_SCHEMA_PRIMITIVE_TYPES } from './constants'
 
+/**
+ * Returns true when the schema only describes primitive values, by a primitive `type`
+ * (or a non-empty list of them, such as `['string', 'null']`), a `const`, or an `enum`.
+ * Composition keywords are not inspected, so flatten unions with {@link flattenJsonUnionSchema} first.
+ */
 export function isJsonPrimitiveSchema(schema: JsonSchema): schema is JsonSchema & object {
   if (typeof schema === 'boolean') {
     return false
   }
 
   if (typeof schema.type === 'string' && JSON_SCHEMA_PRIMITIVE_TYPES.has(schema.type)) {
+    return true
+  }
+
+  if (
+    Array.isArray(schema.type) &&
+    schema.type.length > 0 &&
+    schema.type.every((type) => JSON_SCHEMA_PRIMITIVE_TYPES.has(type))
+  ) {
     return true
   }
 
@@ -26,13 +44,64 @@ export function isJsonPrimitiveSchema(schema: JsonSchema): schema is JsonSchema 
   return false
 }
 
-export type JsonFileSchema = JsonSchema & object & { type: 'string', contentMediaType?: string }
+export type JsonFileSchema = JsonSchema & object & { type: 'string'; contentMediaType?: string }
 
 /**
  * Returns true when the schema is a file-like string schema.
  */
 export function isJsonFileSchema(schema: JsonSchema): schema is JsonFileSchema {
-  return typeof schema !== 'boolean' && schema.type === 'string' && (typeof schema.contentMediaType === 'string' || schema.format === 'binary' || schema.contentEncoding === 'binary')
+  return (
+    typeof schema !== 'boolean' &&
+    schema.type === 'string' &&
+    (typeof schema.contentMediaType === 'string' ||
+      schema.format === 'binary' ||
+      schema.contentEncoding === 'binary')
+  )
+}
+
+/**
+ * Returns true when a file schema is reachable from the schema, such as through a property, a composition, or a local `$ref`.
+ */
+export function containsJsonFileSchema(schema: JsonSchema): boolean {
+  const seen = new Set<object>()
+
+  const visit = (value: unknown, schemaLevel: boolean): boolean => {
+    if (!value || typeof value !== 'object' || seen.has(value)) {
+      return false
+    }
+
+    seen.add(value)
+
+    if (Array.isArray(value)) {
+      return value.some((item) => visit(item, schemaLevel))
+    }
+
+    const record = value as Record<string, unknown>
+
+    if (schemaLevel && isJsonFileSchema(record as JsonSchema)) {
+      return true
+    }
+
+    return Object.keys(record).some((key) => {
+      const val = record[key]
+
+      if (key === '$ref' && typeof val === 'string') {
+        return visit(resolveJsonSchemaLocalPointer(schema, val), true)
+      }
+
+      if (!schemaLevel) {
+        return visit(val, true)
+      }
+
+      return (
+        key !== '$defs' &&
+        (JSON_SCHEMA_LOGIC_KEYWORDS.has(key) || JSON_SCHEMA_RECORD_KEYWORDS.has(key)) &&
+        visit(val, !JSON_SCHEMA_RECORD_KEYWORDS.has(key))
+      )
+    })
+  }
+
+  return visit(schema, true)
 }
 
 export type JsonObjectSchema = JsonSchema & object & { type: 'object' }
@@ -61,7 +130,7 @@ export function isUnconstrainedSchema(schema: JsonSchema): boolean {
     return schema
   }
 
-  if (Object.keys(schema).every(k => !JSON_SCHEMA_LOGIC_KEYWORDS.has(k))) {
+  if (Object.keys(schema).every((k) => !JSON_SCHEMA_LOGIC_KEYWORDS.has(k))) {
     return true
   }
 

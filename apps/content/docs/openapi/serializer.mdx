@@ -1,6 +1,6 @@
 ---
-title: "OpenAPI Serializer"
-description: "Learn how OpenAPI Serializer performs one-way serialization of complex types like Date, BigInt, and files into JSON-friendly formats, and how to customize it."
+title: 'OpenAPI Serializer'
+description: 'Learn how OpenAPI Serializer performs one-way serialization of complex types like Date, BigInt, and files into JSON-friendly formats, and how to customize it.'
 ---
 
 ## Supported Data Types
@@ -30,11 +30,10 @@ description: "Learn how OpenAPI Serializer performs one-way serialization of com
 
 :::warning
 To better support `Blob`, `File`, and `ReadableStream<Uint8Array>` at the root level in cross-origin scenarios,
-extend your [CORS allowlist](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_response_header) to allow clients to send and receive the `Content-Disposition` and `Standard-Server` headers. Learn more in the [Standard Server documentation](https://github.com/middleapi/standard-server#how-body-parsing-works). If you use the [CORS Plugin](/docs/plugins/cors), include them in `allowHeaders` and `exposeHeaders`:
+extend your [CORS allowlist](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_response_header) to allow clients to read the `Content-Disposition` and `Standard-Server` response headers. Learn more in the [Standard Server documentation](https://github.com/middleapi/standard-server#how-body-parsing-works). If you use the [CORS Plugin](/docs/plugins/cors), include them in `exposeHeaders`:
 
 ```ts
 const cors = new CORSHandlerPlugin({
-  allowHeaders: ['Content-Disposition', 'Standard-Server'],
   exposeHeaders: ['Content-Disposition', 'Standard-Server'],
 })
 ```
@@ -67,12 +66,14 @@ import { OpenAPISerializer } from '@orpc/openapi'
 
 const serializer = new OpenAPISerializer({
   handlers: {
-    person: { // <- add support for Person
-      condition: v => v instanceof Person,
+    person: {
+      // <- add support for Person
+      condition: (v) => v instanceof Person,
       serialize: (v: Person) => ({ name: v.name, age: v.age }),
     },
-    date: { // <- replace the default Date handler
-      condition: v => v instanceof Date,
+    date: {
+      // <- replace the default Date handler
+      condition: (v) => v instanceof Date,
       serialize: (v: Date) => v.getTime(),
     },
   },
@@ -91,6 +92,33 @@ const link = new OpenAPILink(contract, {
 })
 ```
 
+:::
+
+## OpenAPI JSON Serializer
+
+`OpenAPIJsonSerializer` is the JSON layer behind `OpenAPISerializer`. Use it directly wherever only JSON is accepted.
+
+```ts twoslash
+import { OpenAPIJsonSerializer } from '@orpc/openapi'
+
+const serializer = new OpenAPIJsonSerializer({
+  handlers: {
+    // same handlers as OpenAPISerializer
+  },
+})
+
+const { json } = serializer.serializeJson({
+  name: 'John',
+  createdAt: new Date('2024-01-01'),
+})
+// json: { name: 'John', createdAt: '2024-01-01T00:00:00.000Z' }
+
+const data = serializer.deserializeJson({ json })
+// data: { name: 'John', createdAt: '2024-01-01T00:00:00.000Z' }
+```
+
+:::info[Reuse an OpenAPI Serializer]
+`OpenAPISerializer` extends `OpenAPIJsonSerializer`, so an `OpenAPISerializer` instance also works wherever an `OpenAPIJsonSerializer` is accepted, such as [MCP outputs](/docs/integrations/mcp#output), [TanStack Query keys](/docs/integrations/tanstack-query#key-serializer), or [Pinia Colada keys](/docs/integrations/pinia-colada#key-serializer). Configure your handlers once and share the same instance.
 :::
 
 ## Serialization Format

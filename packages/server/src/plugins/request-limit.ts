@@ -1,15 +1,30 @@
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '../adapters/standard'
-import type { Context } from '../context'
+import type { AnyORPCError } from '@orpc/client'
 import { ORPCError } from '@orpc/client'
-import { toArray } from '@orpc/shared'
+import type { Value } from '@orpc/shared'
+import { toArray, value } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
 import { toFetchHeaders, toStandardBody } from '@standard-server/fetch'
 
-export interface RequestLimitHandlerPluginOptions {
+import type {
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+  StandardHandlerRoutingInterceptor,
+  StandardHandlerRoutingInterceptorOptions,
+} from '../adapters/standard/index'
+import type { Context } from '../context'
+
+export interface RequestLimitHandlerPluginOptions<T extends Context = Context> {
   /**
    * The maximum allowed request body size in bytes.
    */
   maxBodySize: number
+
+  /**
+   * The error to throw when the body exceeds `maxBodySize`.
+   *
+   * @default ORPCError('PAYLOAD_TOO_LARGE')
+   */
+  error?: Value<AnyORPCError, [options: StandardHandlerRoutingInterceptorOptions<T>]> | undefined
 }
 
 /**
@@ -21,28 +36,34 @@ export interface RequestLimitHandlerPluginOptions {
  * @see {@link https://orpc.dev/docs/plugins/request-limit | Request Limit Plugin}
  */
 export class RequestLimitHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  name = '~request-limit'
+  readonly name = '~request-limit'
 
   /**
-   * Should limit the original batch request body instead of sub-requests.
+   * Wraps batch: limits the original request body, not sub-requests.
    */
-  after = ['~batch']
+  readonly after: readonly string[] = ['~batch']
 
   /**
-   * Should limit the final body size instead of the compressed one.
+   * Runs inside request compression: limits the decompressed size.
    */
-  before = ['~request-compression']
+  readonly before: readonly string[] = ['~request-compression']
 
   private readonly maxBodySize: number
+  private readonly error: Exclude<RequestLimitHandlerPluginOptions<T>['error'], undefined>
 
-  constructor(options: RequestLimitHandlerPluginOptions) {
+  constructor(options: NoInfer<RequestLimitHandlerPluginOptions<T>>) {
     this.maxBodySize = options.maxBodySize
+    this.error = options.error ?? (() => new ORPCError('PAYLOAD_TOO_LARGE'))
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     const maxBodySize = this.maxBodySize
+    const error = this.error
 
-    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({ next, ...interceptorOptions }) => {
+    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({
+      next,
+      ...interceptorOptions
+    }) => {
       return next({
         ...interceptorOptions,
         request: {
@@ -53,7 +74,7 @@ export class RequestLimitHandlerPlugin<T extends Context> implements StandardHan
             )
 
             if (Number.isFinite(contentLength) && contentLength > maxBodySize) {
-              throw new ORPCError('PAYLOAD_TOO_LARGE')
+              throw value(error, interceptorOptions)
             }
 
             const stream = await interceptorOptions.request.resolveBody('octet-stream')
@@ -70,7 +91,7 @@ export class RequestLimitHandlerPlugin<T extends Context> implements StandardHan
                   currentBodySize += chunk.byteLength
 
                   if (currentBodySize > maxBodySize) {
-                    controller.error(new ORPCError('PAYLOAD_TOO_LARGE'))
+                    controller.error(value(error, interceptorOptions))
                     return
                   }
 
@@ -91,10 +112,7 @@ export class RequestLimitHandlerPlugin<T extends Context> implements StandardHan
 
     return {
       ...options,
-      routingInterceptors: [
-        routingInterceptor,
-        ...toArray(options.routingInterceptors),
-      ],
+      routingInterceptors: [routingInterceptor, ...toArray(options.routingInterceptors)],
     }
   }
 }

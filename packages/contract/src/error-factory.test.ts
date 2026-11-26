@@ -1,8 +1,9 @@
-import type { Schema } from './schema'
 import { ORPCError } from '@orpc/client'
-import z from 'zod'
+import * as z from 'zod'
+
 import { ValidationError } from './error'
 import { createORPCErrorConstructorMap, error } from './error-factory'
+import type { Schema } from './schema'
 
 describe('error factory', () => {
   const dataSchema = z.object({ value: z.number() })
@@ -71,7 +72,7 @@ describe('error factory', () => {
         '~standard': {
           version: 1,
           vendor: 'test',
-          validate: async value => ({ value }),
+          validate: async (value) => ({ value }),
         },
       } satisfies Schema<unknown>,
     })
@@ -91,7 +92,7 @@ describe('error factory', () => {
   })
 
   it('defaults static data to a passthrough schema', async () => {
-    const result = await SimpleError.data['~standard'].validate('anything') as any
+    const result = (await SimpleError.data['~standard'].validate('anything')) as any
 
     expect(result.value).toBe('anything')
     expect(result.issues).toBeUndefined()
@@ -101,6 +102,10 @@ describe('error factory', () => {
     it('matches instances created by the class', () => {
       expect(new TestError({ data: { value: 1 } })).toBeInstanceOf(TestError)
       expect(new SimpleError()).toBeInstanceOf(SimpleError)
+    })
+
+    it('matches by prototype chain before the constructor sets code and data (Babel class transform)', () => {
+      expect(Object.create(TestError.prototype)).toBeInstanceOf(TestError)
     })
 
     it('matches plain ORPCError instances with the same code and valid data', () => {
@@ -140,7 +145,7 @@ describe('error factory', () => {
           '~standard': {
             version: 1,
             vendor: 'test',
-            validate: async value => ({ value }),
+            validate: async (value) => ({ value }),
           },
         } satisfies Schema<unknown>,
       })
@@ -223,17 +228,19 @@ describe('createORPCErrorConstructorMap', () => {
     expect('ANY_THING' in constructors).toBe(false)
   })
 
-  it('not proxy on symbol and then keys', async () => {
+  it('not proxy on symbol and RECURSIVE_CLIENT_UNWRAP_KEYS', async () => {
     const map = constructors as any
     expect(map[Symbol('something')]).toBeUndefined()
     expect(map.then).toBeUndefined()
     expect(await map).toBe(map)
+    expect(map.toJSON).toBeUndefined()
+    expect(String(map)).toBe('[object Object]')
   })
 
   it('does not resolve error codes through Object.prototype', () => {
-    const e = (constructors as any).toString()
+    const e = (constructors as any).constructor()
 
-    expect(e.code).toEqual('toString')
+    expect(e.code).toEqual('constructor')
     expect(e.defined).toEqual(false)
   })
 })

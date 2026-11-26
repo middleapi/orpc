@@ -1,15 +1,46 @@
 export * from './cache-revalidation-plugin'
 export * from './contract-utils'
-export * from './key'
+export type {
+  OperationKey,
+  OperationKeyBaseOptions,
+  OperationKeyOptions,
+  OperationKeyPrefixOptions,
+} from './key'
 export * from './meta'
-export * from './plugin'
-export * from './procedure-utils'
+export type { RouterUtilsPlugin } from './plugin'
+export { mergeProcedureUtilsOptions, ProcedureUtils } from './procedure-utils'
+export type {
+  ProcedureUtilsInfiniteInterceptor,
+  ProcedureUtilsInfiniteInterceptorOptions,
+  ProcedureUtilsLiveInterceptor,
+  ProcedureUtilsLiveInterceptorOptions,
+  ProcedureUtilsModifier,
+  ProcedureUtilsMutationInterceptor,
+  ProcedureUtilsMutationInterceptorOptions,
+  ProcedureUtilsOptions,
+  ProcedureUtilsQueryInterceptor,
+  ProcedureUtilsQueryInterceptorOptions,
+  ProcedureUtilsStreamedInterceptor,
+  ProcedureUtilsStreamedInterceptorOptions,
+} from './procedure-utils'
 export * from './router-utils'
 export { createRouterUtils as createTanstackQueryUtils } from './router-utils'
-export * from './shared-utils'
-export * from './stream-query'
+export { SharedUtils } from './shared-utils'
+export * from './ssr'
+export type { SerializableStreamedQueryOptions, SettleOnFirstDataOptions } from './stream-query'
+export * from './structural-sharing'
 export * from './types'
 export {
-  OPERATION_CONTEXT_SYMBOL as TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL,
-  type OperationContext as TanstackQueryOperationContext,
+  /**
+   * @deprecated Use `TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL` instead.
+   */
+  TANSTACK_QUERY_OPERATION_CONTEXT_SYMBOL as OPERATION_CONTEXT_SYMBOL,
+  /**
+   * @deprecated Use `TanstackQueryOperationContext` instead.
+   */
+  type TanstackQueryOperationContext as OperationContext,
 } from './types'
+
+export type { AnyNestedClient } from '@orpc/client'
+
+export type { Public } from '@orpc/shared'

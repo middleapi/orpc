@@ -1,8 +1,25 @@
-import type { StandardHandlerInterceptor, StandardHandlerInterceptorOptions, StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard'
-import type { Context } from '../context'
+import type { AnyORPCError } from '@orpc/client'
 import { ORPCError } from '@orpc/client'
-import { toArray } from '@orpc/shared'
+import type { Value } from '@orpc/shared'
+import { toArray, value } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
+
+import type {
+  StandardHandlerInterceptor,
+  StandardHandlerInterceptorOptions,
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+} from '../adapters/standard/index'
+import type { Context } from '../context'
+
+export interface GetMethodCsrfProtectionHandlerPluginOptions<T extends Context> {
+  /**
+   * The error to throw when a request is blocked.
+   *
+   * @default ORPCError('FORBIDDEN')
+   */
+  error?: Value<AnyORPCError, [options: StandardHandlerInterceptorOptions<T>]> | undefined
+}
 
 /**
  * Adds Cross-Site Request Forgery (CSRF) protection that makes the safe `GET` method as
@@ -20,8 +37,21 @@ import { flattenStandardHeader } from '@standard-server/core'
  *
  * @see {@link https://orpc.dev/docs/plugins/get-method-csrf-protection | GET Method CSRF Protection Plugin}
  */
-export class GetMethodCsrfProtectionHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  name = '~get-method-csrf-protection'
+export class GetMethodCsrfProtectionHandlerPlugin<
+  T extends Context,
+> implements StandardHandlerPlugin<T> {
+  readonly name = '~get-method-csrf-protection'
+
+  private readonly error: Exclude<
+    GetMethodCsrfProtectionHandlerPluginOptions<T>['error'],
+    undefined
+  >
+
+  constructor(options: NoInfer<GetMethodCsrfProtectionHandlerPluginOptions<T>> = {}) {
+    this.error =
+      options.error ??
+      (() => new ORPCError('FORBIDDEN', { message: 'Request blocked by CSRF protection.' }))
+  }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     /**
@@ -34,7 +64,7 @@ export class GetMethodCsrfProtectionHandlerPlugin<T extends Context> implements 
         return interceptorOptions.next()
       }
 
-      throw new ORPCError('FORBIDDEN', { message: 'Request blocked by CSRF protection.' })
+      throw value(this.error, interceptorOptions)
     }
 
     return {

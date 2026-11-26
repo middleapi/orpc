@@ -1,6 +1,6 @@
 ---
-title: "OpenAPI Handler"
-description: "Use OpenAPIHandler to expose oRPC procedures as HTTP endpoints for OpenAPI Link and other OpenAPI-compliant clients."
+title: 'OpenAPI Handler'
+description: 'Use OpenAPIHandler to expose oRPC procedures as HTTP endpoints for OpenAPI Link and other OpenAPI-compliant clients.'
 ---
 
 ## Overview
@@ -13,30 +13,26 @@ const handler = new OpenAPIHandler(router, {
 
       try {
         return await next()
-      }
-      catch (err) {
+      } catch (err) {
         console.error(`${path.join('.')}:`, err)
         throw err
-      }
-      finally {
+      } finally {
         console.timeEnd(path.join('.'))
       }
-    }
+    },
   ],
-  plugins: [
-    new CORSHandlerPlugin()
-  ],
+  plugins: [new CORSHandlerPlugin()],
 })
 ```
 
 :::info
-The actual usage of `OpenAPIHandler` depends on the adapter you use. For example, when using the fetch adapter, the handler is used like this:
+The actual usage of `OpenAPIHandler` depends on the [adapter](/docs/openapi/adapters) you use. For example, when using the fetch adapter, the handler is used like this:
 
 ```ts
 export async function fetch(request: Request) {
   const { matched, response } = await handler.handle(request, {
     prefix: '/api',
-    context: {} // <- provide initial context if needed
+    context: {}, // <- provide initial context if needed
   })
 
   if (matched) {
@@ -63,11 +59,10 @@ const { matched, response } = await handler.handle(request, {
 
 :::warning
 To better support `Blob`, `File`, and `ReadableStream<Uint8Array>` at the root level in cross-origin scenarios,
-extend your [CORS allowlist](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_response_header) to allow clients to send and receive the `Content-Disposition` and `Standard-Server` headers. Learn more in the [Standard Server documentation](https://github.com/middleapi/standard-server#how-body-parsing-works). If you use the [CORS Plugin](/docs/plugins/cors), include them in `allowHeaders` and `exposeHeaders`:
+extend your [CORS allowlist](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_response_header) to allow clients to read the `Content-Disposition` and `Standard-Server` response headers. Learn more in the [Standard Server documentation](https://github.com/middleapi/standard-server#how-body-parsing-works). If you use the [CORS Plugin](/docs/plugins/cors), include them in `exposeHeaders`:
 
 ```ts
 const cors = new CORSHandlerPlugin({
-  allowHeaders: ['Content-Disposition', 'Standard-Server'],
   exposeHeaders: ['Content-Disposition', 'Standard-Server'],
 })
 ```
@@ -99,7 +94,7 @@ const handler = new OpenAPIHandler(router, {
 
 ### Interceptors
 
-These interceptors run only for matched requests, after routing and before error handling (but can't use `ORPCError` for [typesafe errors](/docs/error-handling#orpcerror-compatibility)). Use them when you need access to the matched procedure.
+These interceptors run only for matched requests, after routing and before error handling, and can use `ORPCError` for [typesafe errors](/docs/error-handling#orpcerror-compatibility). Use them when you need access to the matched procedure.
 
 :::tip
 In most cases, `interceptors` are the best choice. They provide more context, are easier to work with, and run before error handling.
@@ -112,8 +107,7 @@ const handler = new OpenAPIHandler(router, {
       try {
         const response = await next()
         return response
-      }
-      catch (err) {
+      } catch (err) {
         if (err instanceof CustomError) {
           throw new ORPCError('CUSTOM_ERROR', { message: err.message, cause: err })
         }
@@ -127,12 +121,10 @@ const handler = new OpenAPIHandler(router, {
       try {
         const response = await next()
         return response
-      }
-      catch (err) {
+      } catch (err) {
         console.error(`${path.join('.')}:`, err)
         throw err
-      }
-      finally {
+      } finally {
         console.timeEnd(path.join('.'))
       }
     },
@@ -161,9 +153,7 @@ Plugins package reusable interceptors. For example, [CORS Plugin](/docs/plugins/
 
 ```ts
 const handler = new OpenAPIHandler(router, {
-  plugins: [
-    new CORSHandlerPlugin()
-  ],
+  plugins: [new CORSHandlerPlugin()],
 })
 ```
 
@@ -193,7 +183,7 @@ const handler = new OpenAPIHandler(router, {
 
 ## Custom Error Response
 
-By default, `OpenAPIHandler` determines response status codes using `COMMON_ERROR_STATUS_MAP` and encodes error bodies in the ORPC error format. Use `errorStatusMap` and `customErrorResponseBodyEncoder` to customize this behavior:
+By default, `OpenAPIHandler` determines response status codes using `COMMON_ERROR_STATUS_MAP`, falling back to `400` for codes missing from the map, and encodes error bodies in the ORPC error format. Use `errorStatusMap` and `errorResponseBodyEncoder` to customize this behavior:
 
 ```ts
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/openapi'
@@ -206,7 +196,7 @@ const handler = new OpenAPIHandler(router, {
     ...COMMON_ERROR_STATUS_MAP,
     CUSTOM_ERROR: 599,
   },
-  customErrorResponseBodyEncoder: (error) => {
+  errorResponseBodyEncoder: (error) => {
     if (error.code === 'CUSTOM_ERROR') {
       return {
         customMessage: error.message,
@@ -214,8 +204,7 @@ const handler = new OpenAPIHandler(router, {
       }
     }
 
-    // fallback to default by returning null or undefined
-    return null
+    return error.toJSON()
   },
 })
 ```
@@ -250,6 +239,14 @@ const handler = new OpenAPIHandler(router, {
 
 </Expandable>
 
+Error responses are sent as `application/json` by default. Use `errorResponseContentType` to change the media type, such as `application/problem+json` for [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457):
+
+```ts
+const handler = new OpenAPIHandler(router, {
+  errorResponseContentType: 'application/problem+json',
+})
+```
+
 :::info
 If you use `OpenAPILink` with a custom server-side error format, make sure to configure [Custom Error Decoding](/docs/openapi/link#custom-error-decoding).
 :::
@@ -262,14 +259,15 @@ Configure how an [AsyncIteratorObject](/docs/async-iterator-object) is streamed 
 const handler = new OpenAPIHandler(router, {
   toFetchResponse: {
     eventStream: {
+      /**
+       * Initial comment sent immediately upon stream start to flush headers. This allows the
+       * receiving side to establish the connection without waiting for the first event.
+       *
+       * `false` disables it, an object customizes it.
+       *
+       * @default true
+       */
       initialComment: {
-        /**
-         * If true, an initial comment is sent immediately upon stream start to flush headers.
-         * This allows the receiving side to establish the connection without waiting for the first event.
-         *
-         * @default true
-         */
-        enabled: true,
         /**
          * The content of the initial comment sent upon stream start. Must not include newline characters.
          *
@@ -277,13 +275,14 @@ const handler = new OpenAPIHandler(router, {
          */
         comment: '',
       },
+      /**
+       * Ping comment sent periodically to keep the connection alive.
+       *
+       * `false` disables it, an object customizes it.
+       *
+       * @default true
+       */
       keepAlive: {
-        /**
-         * If true, a ping comment is sent periodically to keep the connection alive.
-         *
-         * @default true
-         */
-        enabled: true,
         /**
          * Interval (in milliseconds) between ping comments sent after the last event.
          *

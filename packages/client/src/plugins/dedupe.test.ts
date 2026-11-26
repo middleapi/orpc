@@ -1,10 +1,19 @@
-import type { StandardBody, StandardLazyResponse, StandardRequest } from '@standard-server/core'
-import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { getEventListeners } from 'node:events'
+
 import * as SharedExperimentalV2Module from '@orpc/shared'
-import { AsyncIteratorClass, asyncIteratorToStream, promiseWithResolvers, sleep } from '@orpc/shared'
-import { StandardLink } from '../adapters/standard'
+import {
+  AsyncIteratorClass,
+  asyncIteratorToStream,
+  getTracer,
+  promiseWithResolvers,
+  setTracer,
+  sleep,
+} from '@orpc/shared'
+import type { StandardBody, StandardLazyResponse, StandardRequest } from '@standard-server/core'
+
+import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard/index'
+import { StandardLink } from '../adapters/standard/index'
 import { DedupeLinkPlugin } from './dedupe'
 
 interface TestContext {
@@ -14,16 +23,19 @@ interface TestContext {
 
 function makeCodec(): StandardLinkCodec<TestContext> {
   return {
-    encodeInput: vi.fn(async (input, path, { signal }) => ({
-      method: path[0] as StandardRequest['method'],
-      url: `/${path.slice(1).join('/')}` as `/${string}`,
-      headers: {
-        authorization: 'bearer 123',
-        path: path.join('/'),
-      },
-      body: input,
-      signal,
-    } satisfies StandardRequest)),
+    encodeInput: vi.fn(
+      async (input, path, { signal }) =>
+        ({
+          method: path[0] as StandardRequest['method'],
+          url: `/${path.slice(1).join('/')}` as `/${string}`,
+          headers: {
+            authorization: 'bearer 123',
+            path: path.join('/'),
+          },
+          body: input,
+          signal,
+        }) satisfies StandardRequest,
+    ),
     decodeResponse: vi.fn(async (response) => {
       const body = await response.resolveBody()
       return { kind: 'output' as const, output: body }
@@ -35,13 +47,16 @@ function makeTransport(
   resolveBody: StandardLazyResponse['resolveBody'] = vi.fn(async () => ({ value: '__body__' })),
 ): StandardLinkTransport<TestContext> {
   return {
-    send: vi.fn(async () => ({
-      status: 200,
-      headers: {
-        'x-custom': '1',
-      },
-      resolveBody,
-    } satisfies StandardLazyResponse)),
+    send: vi.fn(
+      async () =>
+        ({
+          status: 200,
+          headers: {
+            'x-custom': '1',
+          },
+          resolveBody,
+        }) satisfies StandardLazyResponse,
+    ),
   }
 }
 
@@ -51,7 +66,10 @@ beforeEach(() => {
 })
 
 describe('dedupeLinkPlugin', () => {
-  const allAbortSignalSpy = vi.spyOn(SharedExperimentalV2Module, 'allAbortSignal')
+  const disposableAllAbortSignalSpy = vi.spyOn(
+    SharedExperimentalV2Module,
+    'disposableAllAbortSignal',
+  )
 
   it('dedupes identical requests and reuses the resolved body', async () => {
     const signal1 = AbortSignal.timeout(1000)
@@ -62,12 +80,16 @@ describe('dedupeLinkPlugin', () => {
     const groupCondition = vi.fn(() => true)
 
     const link = new StandardLink(codec, transport, {
-      plugins: [new DedupeLinkPlugin({
-        groups: [{
-          condition: groupCondition,
-          context: { group: true },
-        }],
-      })],
+      plugins: [
+        new DedupeLinkPlugin({
+          groups: [
+            {
+              condition: groupCondition,
+              context: { group: true },
+            },
+          ],
+        }),
+      ],
     })
 
     const [output1, output2] = await Promise.all([
@@ -86,30 +108,36 @@ describe('dedupeLinkPlugin', () => {
     const [request, path, callOptions] = vi.mocked(transport.send).mock.calls[0]!
 
     expect(request).toEqual({
-      ...await vi.mocked(codec.encodeInput).mock.results[0]!.value,
-      signal: allAbortSignalSpy.mock.results[0]!.value,
+      ...(await vi.mocked(codec.encodeInput).mock.results[0]!.value),
+      signal: disposableAllAbortSignalSpy.mock.results[0]!.value.signal,
     })
     expect(path).toEqual(['GET', 'planet'])
     expect(callOptions).toMatchObject({
       context: { group: true },
-      signal: allAbortSignalSpy.mock.results[0]!.value,
+      signal: disposableAllAbortSignalSpy.mock.results[0]!.value.signal,
     })
     expect((callOptions as any).next).toEqual(expect.any(Function))
 
-    expect(allAbortSignalSpy).toHaveBeenCalledTimes(1)
-    expect(allAbortSignalSpy).toHaveBeenCalledWith([signal1, signal2])
+    expect(disposableAllAbortSignalSpy).toHaveBeenCalledTimes(1)
+    expect(disposableAllAbortSignalSpy).toHaveBeenCalledWith([signal1, signal2])
 
     expect(groupCondition).toHaveBeenCalledTimes(2)
-    expect(groupCondition).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      path: ['GET', 'planet'],
-      request: await vi.mocked(codec.encodeInput).mock.results[0]!.value,
-      context: { tag: 'first' },
-    }))
-    expect(groupCondition).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      path: ['GET', 'planet'],
-      request: await vi.mocked(codec.encodeInput).mock.results[1]!.value,
-      context: { tag: 'second' },
-    }))
+    expect(groupCondition).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        path: ['GET', 'planet'],
+        request: await vi.mocked(codec.encodeInput).mock.results[0]!.value,
+        context: { tag: 'first' },
+      }),
+    )
+    expect(groupCondition).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        path: ['GET', 'planet'],
+        request: await vi.mocked(codec.encodeInput).mock.results[1]!.value,
+        context: { tag: 'second' },
+      }),
+    )
   })
 
   it('dedupes identical QUERY requests by default', async () => {
@@ -117,9 +145,11 @@ describe('dedupeLinkPlugin', () => {
     const transport = makeTransport()
 
     const link = new StandardLink(codec, transport, {
-      plugins: [new DedupeLinkPlugin({
-        groups: [{ condition: () => true, context: { group: true } }],
-      })],
+      plugins: [
+        new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: { group: true } }],
+        }),
+      ],
     })
 
     const [output1, output2] = await Promise.all([
@@ -131,14 +161,118 @@ describe('dedupeLinkPlugin', () => {
     expect(transport.send).toHaveBeenCalledTimes(1)
   })
 
+  describe('with a tracer injecting per-call headers', () => {
+    function useTracer(extraHeader?: string) {
+      const original = getTracer()
+      onTestFinished(() => setTracer(original))
+
+      let spanId = 0
+      const makeSpan = () => ({
+        id: ++spanId,
+        setAttribute() {},
+        updateName() {},
+        addEvent() {},
+        recordException() {},
+        end() {},
+      })
+
+      setTracer({
+        startSpan: makeSpan,
+        startActiveSpan: (_name, _parent, fn) => fn(makeSpan()),
+        getActiveSpan: () => undefined,
+        withActiveSpan: (_span, fn) => fn(),
+        inject(span, headers) {
+          headers.traceparent = `00-trace-${(span as ReturnType<typeof makeSpan>).id}-01`
+          headers.tracestate = `vendor=${(span as ReturnType<typeof makeSpan>).id}`
+
+          if (extraHeader) {
+            headers[extraHeader] = `${(span as ReturnType<typeof makeSpan>).id}`
+          }
+        },
+      })
+    }
+
+    it('dedupes identical requests and sends the first one', async () => {
+      useTracer()
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [
+          new DedupeLinkPlugin({
+            groups: [{ condition: () => true, context: { group: true } }],
+          }),
+        ],
+      })
+
+      const [output1, output2] = await Promise.all([
+        link.call(['GET', 'planet'], undefined, { context: {} }),
+        link.call(['GET', 'planet'], undefined, { context: {} }),
+      ])
+
+      expect(output1).toBe(output2)
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(transport.send).mock.calls[0]![0].headers).toMatchObject({
+        traceparent: '00-trace-1-01',
+        tracestate: 'vendor=1',
+      })
+    })
+
+    it('dedupes requests differing only in custom `ignoredHeaders`', async () => {
+      useTracer('b3')
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [
+          new DedupeLinkPlugin({
+            ignoredHeaders: ['traceparent', 'tracestate', 'b3'],
+            groups: [{ condition: () => true, context: { group: true } }],
+          }),
+        ],
+      })
+
+      await Promise.all([
+        link.call(['GET', 'planet'], undefined, { context: {} }),
+        link.call(['GET', 'planet'], undefined, { context: {} }),
+      ])
+
+      expect(transport.send).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not dedupe requests differing in headers left out of `ignoredHeaders`', async () => {
+      useTracer()
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [
+          new DedupeLinkPlugin({
+            ignoredHeaders: ['traceparent'],
+            groups: [{ condition: () => true, context: { group: true } }],
+          }),
+        ],
+      })
+
+      await Promise.all([
+        link.call(['GET', 'planet'], undefined, { context: {} }),
+        link.call(['GET', 'planet'], undefined, { context: {} }),
+      ])
+
+      expect(transport.send).toHaveBeenCalledTimes(2)
+    })
+  })
+
   it('does not dedupe QUERY requests with different bodies', async () => {
     const codec = makeCodec()
     const transport = makeTransport()
 
     const link = new StandardLink(codec, transport, {
-      plugins: [new DedupeLinkPlugin({
-        groups: [{ condition: () => true, context: { group: true } }],
-      })],
+      plugins: [
+        new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: { group: true } }],
+        }),
+      ],
     })
 
     const [output1, output2] = await Promise.all([
@@ -155,9 +289,11 @@ describe('dedupeLinkPlugin', () => {
     const transport = makeTransport()
 
     const link = new StandardLink(codec, transport, {
-      plugins: [new DedupeLinkPlugin({
-        groups: [{ condition: () => true, context: { group: true } }],
-      })],
+      plugins: [
+        new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: { group: true } }],
+        }),
+      ],
     })
 
     const [output1, output2] = await Promise.all([
@@ -172,21 +308,22 @@ describe('dedupeLinkPlugin', () => {
   it('computes group context from all deduped matching options', async () => {
     const codec = makeCodec()
     const transport = makeTransport()
-    const context = vi.fn((items: [
-      { context: TestContext },
-      ...{ context: TestContext }[],
-    ]) => ({
+    const context = vi.fn((items: [{ context: TestContext }, ...{ context: TestContext }[]]) => ({
       group: true,
-      tag: items.map(item => item.context.tag).join(','),
+      tag: items.map((item) => item.context.tag).join(','),
     }))
 
     const link = new StandardLink(codec, transport, {
-      plugins: [new DedupeLinkPlugin({
-        groups: [{
-          condition: () => true,
-          context,
-        }],
-      })],
+      plugins: [
+        new DedupeLinkPlugin({
+          groups: [
+            {
+              condition: () => true,
+              context,
+            },
+          ],
+        }),
+      ],
     })
 
     await Promise.all([
@@ -217,12 +354,16 @@ describe('dedupeLinkPlugin', () => {
     }))
 
     const link = new StandardLink(codec, transport, {
-      plugins: [new DedupeLinkPlugin({
-        groups: [{
-          condition: () => true,
-          context,
-        }],
-      })],
+      plugins: [
+        new DedupeLinkPlugin({
+          groups: [
+            {
+              condition: () => true,
+              context,
+            },
+          ],
+        }),
+      ],
     })
 
     await link.call(['GET', 'planet'], { value: 1 }, { context: { tag: 'single' }, signal })
@@ -251,9 +392,11 @@ describe('dedupeLinkPlugin', () => {
     const transport = makeTransport(resolveBody)
 
     const link = new StandardLink(codec, transport, {
-      plugins: [new DedupeLinkPlugin({
-        groups: [{ condition: () => true, context: { group: true } }],
-      })],
+      plugins: [
+        new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: { group: true } }],
+        }),
+      ],
     })
 
     const [output1, output2] = await Promise.all([
@@ -261,26 +404,37 @@ describe('dedupeLinkPlugin', () => {
       link.call(['GET', 'planet'], { value: 1 }, { context: {} }),
     ])
 
-    await expect(readAllAsync(output1 as AsyncIterable<string>)).resolves.toEqual(['first', 'second'])
-    await expect(readAllAsync(output2 as AsyncIterable<string>)).resolves.toEqual(['first', 'second'])
+    await expect(readAllAsync(output1 as AsyncIterable<string>)).resolves.toEqual([
+      'first',
+      'second',
+    ])
+    await expect(readAllAsync(output2 as AsyncIterable<string>)).resolves.toEqual([
+      'first',
+      'second',
+    ])
     expect(resolveBody).toHaveBeenCalledTimes(1)
   })
 
   it('replicates readable stream response bodies for deduped requests', async () => {
     const codec = makeCodec()
-    const resolveBody = vi.fn(async () => new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(new Uint8Array([1, 2]))
-        controller.enqueue(new Uint8Array([3, 4]))
-        controller.close()
-      },
-    }))
+    const resolveBody = vi.fn(
+      async () =>
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new Uint8Array([1, 2]))
+            controller.enqueue(new Uint8Array([3, 4]))
+            controller.close()
+          },
+        }),
+    )
     const transport = makeTransport(resolveBody)
 
     const link = new StandardLink(codec, transport, {
-      plugins: [new DedupeLinkPlugin({
-        groups: [{ condition: () => true, context: { group: true } }],
-      })],
+      plugins: [
+        new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: { group: true } }],
+        }),
+      ],
     })
 
     const [output1, output2] = await Promise.all([
@@ -302,13 +456,14 @@ describe('dedupeLinkPlugin', () => {
   it.each([
     [
       'readable-stream',
-      () => new ReadableStream<Uint8Array>({
-        start(controller) {
-          controller.enqueue(new Uint8Array([1, 2]))
-          controller.enqueue(new Uint8Array([3, 4]))
-          controller.close()
-        },
-      }),
+      () =>
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new Uint8Array([1, 2]))
+            controller.enqueue(new Uint8Array([3, 4]))
+            controller.close()
+          },
+        }),
       (output: unknown) => readAllStream(output as ReadableStream<Uint8Array>),
       [new Uint8Array([1, 2]), new Uint8Array([3, 4])],
     ],
@@ -321,53 +476,60 @@ describe('dedupeLinkPlugin', () => {
       (output: unknown) => readAllAsync(output as AsyncIterable<string>),
       ['first', 'second'],
     ],
-  ])('reuses the resolved %s body for repeated and concurrent reads of the same replicated response', async (_name, createBody, readAll, expected) => {
-    const codec: StandardLinkCodec<TestContext> = {
-      ...makeCodec(),
-      decodeResponse: vi.fn(async (response) => {
-        const [firstBody, concurrentBody] = await Promise.all([
-          response.resolveBody(),
-          response.resolveBody(),
-        ])
-        const laterBody = await response.resolveBody()
+  ])(
+    'reuses the resolved %s body for repeated and concurrent reads of the same replicated response',
+    async (_name, createBody, readAll, expected) => {
+      const codec: StandardLinkCodec<TestContext> = {
+        ...makeCodec(),
+        decodeResponse: vi.fn(async (response) => {
+          const [firstBody, concurrentBody] = await Promise.all([
+            response.resolveBody(),
+            response.resolveBody(),
+          ])
+          const laterBody = await response.resolveBody()
 
-        expect(concurrentBody).toBe(firstBody)
-        expect(laterBody).toBe(firstBody)
+          expect(concurrentBody).toBe(firstBody)
+          expect(laterBody).toBe(firstBody)
 
-        return {
-          kind: 'output' as const,
-          output: firstBody,
-        }
-      }),
-    }
-    const resolveBody = vi.fn(async () => createBody())
-    const transport = makeTransport(resolveBody)
+          return {
+            kind: 'output' as const,
+            output: firstBody,
+          }
+        }),
+      }
+      const resolveBody = vi.fn(async () => createBody())
+      const transport = makeTransport(resolveBody)
 
-    const link = new StandardLink(codec, transport, {
-      plugins: [new DedupeLinkPlugin({
-        groups: [{ condition: () => true, context: { group: true } }],
-      })],
-    })
+      const link = new StandardLink(codec, transport, {
+        plugins: [
+          new DedupeLinkPlugin({
+            groups: [{ condition: () => true, context: { group: true } }],
+          }),
+        ],
+      })
 
-    const [output1, output2] = await Promise.all([
-      link.call(['GET', 'planet'], { value: 1 }, { context: {} }),
-      link.call(['GET', 'planet'], { value: 1 }, { context: {} }),
-    ])
+      const [output1, output2] = await Promise.all([
+        link.call(['GET', 'planet'], { value: 1 }, { context: {} }),
+        link.call(['GET', 'planet'], { value: 1 }, { context: {} }),
+      ])
 
-    await expect(readAll(output1)).resolves.toEqual(expected)
-    await expect(readAll(output2)).resolves.toEqual(expected)
-    expect(resolveBody).toHaveBeenCalledTimes(1)
-  })
+      await expect(readAll(output1)).resolves.toEqual(expected)
+      await expect(readAll(output2)).resolves.toEqual(expected)
+      expect(resolveBody).toHaveBeenCalledTimes(1)
+    },
+  )
 
   it('dedupes non-GET requests when filter allows them', async () => {
     const codec = makeCodec()
     const transport = makeTransport()
 
     const link = new StandardLink(codec, transport, {
-      plugins: [new DedupeLinkPlugin({
-        groups: [{ condition: () => true, context: { group: true } }],
-        filter: () => true,
-      })],
+      plugins: [
+        new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: { group: true } }],
+          filter: () => true,
+        }),
+      ],
     })
 
     const [output1, output2] = await Promise.all([
@@ -383,22 +545,32 @@ describe('dedupeLinkPlugin', () => {
     ['blob', new Blob(['test'])],
     ['form-data', new FormData()],
     ['url-search-params', new URLSearchParams('a=1')],
-    ['readable-stream', new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(new Uint8Array([1]))
-        controller.close()
-      },
-    })],
-    ['async-iterator', (async function* () { yield 'chunk' }())],
+    [
+      'readable-stream',
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new Uint8Array([1]))
+          controller.close()
+        },
+      }),
+    ],
+    [
+      'async-iterator',
+      (async function* () {
+        yield 'chunk'
+      })(),
+    ],
   ])('passes through unsupported %s bodies', async (_name, body) => {
     const codec = makeCodec()
     const transport = makeTransport()
 
     const link = new StandardLink(codec, transport, {
-      plugins: [new DedupeLinkPlugin({
-        groups: [{ condition: () => true, context: { group: true } }],
-        filter: () => true,
-      })],
+      plugins: [
+        new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: { group: true } }],
+          filter: () => true,
+        }),
+      ],
     })
 
     await Promise.all([
@@ -417,9 +589,11 @@ describe('dedupeLinkPlugin', () => {
     const transport = makeTransport()
 
     const link = new StandardLink(codec, transport, {
-      plugins: [new DedupeLinkPlugin({
-        groups: [{ condition: () => true, context: { group: true } }],
-      })],
+      plugins: [
+        new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: { group: true } }],
+        }),
+      ],
     })
 
     await Promise.all([
@@ -437,9 +611,11 @@ describe('dedupeLinkPlugin', () => {
     vi.mocked(transport.send).mockRejectedValue(new Error('FAIL'))
 
     const link = new StandardLink(codec, transport, {
-      plugins: [new DedupeLinkPlugin({
-        groups: [{ condition: () => true, context: { group: true } }],
-      })],
+      plugins: [
+        new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: { group: true } }],
+        }),
+      ],
     })
 
     const promise1 = link.call(['GET', 'planet'], { value: 1 }, { context: {} })
@@ -448,6 +624,90 @@ describe('dedupeLinkPlugin', () => {
     await expect(promise1).rejects.toThrow('FAIL')
     await expect(promise2).rejects.toThrow('FAIL')
     expect(transport.send).toHaveBeenCalledTimes(1)
+  })
+
+  describe('listeners on long-lived caller signals', () => {
+    function makeLink(transport: StandardLinkTransport<TestContext>) {
+      return new StandardLink(makeCodec(), transport, {
+        plugins: [
+          new DedupeLinkPlugin({
+            groups: [{ condition: () => true, context: { group: true } }],
+          }),
+        ],
+      })
+    }
+
+    function callTwice(link: ReturnType<typeof makeLink>, signal: AbortSignal) {
+      return Promise.all(
+        [0, 1].map(() => link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal })),
+      )
+    }
+
+    it('are removed once each deduped request resolves its body', async () => {
+      const shared = new AbortController()
+      const other = new AbortController()
+      const link = makeLink(makeTransport())
+
+      await Promise.all([
+        link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: shared.signal }),
+        link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: other.signal }),
+      ])
+
+      expect(getEventListeners(shared.signal, 'abort')).toHaveLength(0)
+      expect(getEventListeners(other.signal, 'abort')).toHaveLength(0)
+    })
+
+    it('are removed once a deduped request fails', async () => {
+      const shared = new AbortController()
+      const transport = makeTransport()
+      vi.mocked(transport.send).mockRejectedValue(new Error('FAIL'))
+      const link = makeLink(transport)
+
+      await expect(callTwice(link, shared.signal)).rejects.toThrow('FAIL')
+
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      expect(getEventListeners(shared.signal, 'abort')).toHaveLength(0)
+    })
+
+    it('are removed once a deduped body fails to resolve', async () => {
+      const shared = new AbortController()
+      const link = makeLink(
+        makeTransport(async () => {
+          throw new Error('BODY_FAIL')
+        }),
+      )
+
+      await expect(callTwice(link, shared.signal)).rejects.toThrow('BODY_FAIL')
+
+      expect(getEventListeners(shared.signal, 'abort')).toHaveLength(0)
+    })
+
+    it('still abort the shared request when every caller aborts before the body resolves', async () => {
+      const controller1 = new AbortController()
+      const controller2 = new AbortController()
+      const body = promiseWithResolvers<StandardBody>()
+      const transport = makeTransport(() => body.promise)
+      const link = makeLink(transport)
+
+      const promise1 = link
+        .call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller1.signal })
+        .catch((e) => e)
+      const promise2 = link
+        .call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller2.signal })
+        .catch((e) => e)
+
+      await vi.waitFor(() => expect(transport.send).toHaveBeenCalledTimes(1))
+      const sharedSignal = vi.mocked(transport.send).mock.calls[0]![0].signal!
+
+      controller1.abort()
+      expect(sharedSignal.aborted).toBe(false)
+      controller2.abort()
+      expect(sharedSignal.aborted).toBe(true)
+
+      body.resolve({ value: '__body__' })
+      await expect(promise1).resolves.toBe(controller1.signal.reason)
+      await expect(promise2).resolves.toBe(controller2.signal.reason)
+    })
   })
 
   it('rejects only the aborted caller while the shared request continues for the rest', async () => {
@@ -463,12 +723,18 @@ describe('dedupeLinkPlugin', () => {
     })
 
     const link = new StandardLink(codec, transport, {
-      plugins: [new DedupeLinkPlugin({
-        groups: [{ condition: () => true, context: { group: true } }],
-      })],
+      plugins: [
+        new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: { group: true } }],
+        }),
+      ],
     })
 
-    const promise1 = link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller.signal })
+    const promise1 = link.call(
+      ['GET', 'planet'],
+      { value: 1 },
+      { context: {}, signal: controller.signal },
+    )
     const promise2 = link.call(['GET', 'planet'], { value: 1 }, { context: {} })
 
     await vi.waitFor(() => expect(transport.send).toHaveBeenCalledTimes(1))
@@ -477,7 +743,7 @@ describe('dedupeLinkPlugin', () => {
     await expect(promise1).rejects.toBe(controller.signal.reason)
 
     release.resolve()
-    const iterator = await promise2 as AsyncIteratorObject<string>
+    const iterator = (await promise2) as AsyncIteratorObject<string>
     const next = iterator.next()
     tick()
     await expect(next).resolves.toEqual({ done: false, value: 'tick' })
@@ -497,15 +763,29 @@ describe('dedupeLinkPlugin', () => {
     const context = vi.fn(() => ({ group: true }))
 
     const link = new StandardLink(codec, transport, {
-      plugins: [new DedupeLinkPlugin({
-        wait: 100,
-        groups: [{ condition: () => true, context }],
-      })],
+      plugins: [
+        new DedupeLinkPlugin({
+          wait: 100,
+          groups: [{ condition: () => true, context }],
+        }),
+      ],
     })
 
-    const promise1 = link.call(['GET', 'planet'], { value: 1 }, { context: { tag: 'first' }, signal: controller1.signal })
-    const promise2 = link.call(['GET', 'planet'], { value: 1 }, { context: { tag: 'second' }, signal: signal2 })
-    const promise3 = link.call(['GET', 'planet'], { value: 2 }, { context: {}, signal: controller3.signal })
+    const promise1 = link.call(
+      ['GET', 'planet'],
+      { value: 1 },
+      { context: { tag: 'first' }, signal: controller1.signal },
+    )
+    const promise2 = link.call(
+      ['GET', 'planet'],
+      { value: 1 },
+      { context: { tag: 'second' }, signal: signal2 },
+    )
+    const promise3 = link.call(
+      ['GET', 'planet'],
+      { value: 2 },
+      { context: {}, signal: controller3.signal },
+    )
 
     await vi.advanceTimersByTimeAsync(10)
     controller1.abort()
@@ -534,12 +814,18 @@ describe('dedupeLinkPlugin', () => {
     const transport = makeTransport(() => body.promise)
 
     const link = new StandardLink(codec, transport, {
-      plugins: [new DedupeLinkPlugin({
-        groups: [{ condition: () => true, context: { group: true } }],
-      })],
+      plugins: [
+        new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: { group: true } }],
+        }),
+      ],
     })
 
-    const promise1 = link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller.signal })
+    const promise1 = link.call(
+      ['GET', 'planet'],
+      { value: 1 },
+      { context: {}, signal: controller.signal },
+    )
     const promise2 = link.call(['GET', 'planet'], { value: 1 }, { context: {} })
 
     await vi.waitFor(() => expect(codec.decodeResponse).toHaveBeenCalledTimes(2))
@@ -562,13 +848,17 @@ describe('dedupeLinkPlugin', () => {
       const transport = makeTransport(async () => body)
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new DedupeLinkPlugin({
-          groups: [{ condition: () => true, context: { group: true } }],
-        })],
+        plugins: [
+          new DedupeLinkPlugin({
+            groups: [{ condition: () => true, context: { group: true } }],
+          }),
+        ],
       })
 
       const [reader1, reader2] = await Promise.all([
-        link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller.signal }).then(openReader),
+        link
+          .call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller.signal })
+          .then(openReader),
         link.call(['GET', 'planet'], { value: 1 }, { context: {} }).then(openReader),
       ])
 
@@ -598,14 +888,18 @@ describe('dedupeLinkPlugin', () => {
       const transport = makeTransport(async () => body)
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new DedupeLinkPlugin({
-          groups: [{ condition: () => true, context: { group: true } }],
-        })],
+        plugins: [
+          new DedupeLinkPlugin({
+            groups: [{ condition: () => true, context: { group: true } }],
+          }),
+        ],
       })
 
       // The first caller never reads, so its replica keeps what it receives
       const [, reader2] = await Promise.all([
-        link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller.signal }).then(openReader),
+        link
+          .call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller.signal })
+          .then(openReader),
         link.call(['GET', 'planet'], { value: 1 }, { context: {} }).then(openReader),
       ])
 
@@ -626,12 +920,18 @@ describe('dedupeLinkPlugin', () => {
       const transport = makeTransport(() => resolvedBody.promise)
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new DedupeLinkPlugin({
-          groups: [{ condition: () => true, context: { group: true } }],
-        })],
+        plugins: [
+          new DedupeLinkPlugin({
+            groups: [{ condition: () => true, context: { group: true } }],
+          }),
+        ],
       })
 
-      const promise1 = link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller.signal })
+      const promise1 = link.call(
+        ['GET', 'planet'],
+        { value: 1 },
+        { context: {}, signal: controller.signal },
+      )
       const promise2 = link.call(['GET', 'planet'], { value: 1 }, { context: {} })
 
       await vi.waitFor(() => expect(codec.decodeResponse).toHaveBeenCalledTimes(2))
@@ -648,41 +948,50 @@ describe('dedupeLinkPlugin', () => {
     it.each([
       ['ends', true],
       ['fails', new Error('FAIL')],
-    ] as const)('removes the abort listener once the replica is cancelled or the body %s', async (_name, end) => {
-      const controller1 = new AbortController()
-      const controller2 = new AbortController()
-      const codec = makeCodec()
-      const { body, tick } = createTickingBody()
-      const transport = makeTransport(async () => body)
+    ] as const)(
+      'removes the abort listener once the replica is cancelled or the body %s',
+      async (_name, end) => {
+        const controller1 = new AbortController()
+        const controller2 = new AbortController()
+        const codec = makeCodec()
+        const { body, tick } = createTickingBody()
+        const transport = makeTransport(async () => body)
 
-      const link = new StandardLink(codec, transport, {
-        plugins: [new DedupeLinkPlugin({
-          groups: [{ condition: () => true, context: { group: true } }],
-        })],
-      })
+        const link = new StandardLink(codec, transport, {
+          plugins: [
+            new DedupeLinkPlugin({
+              groups: [{ condition: () => true, context: { group: true } }],
+            }),
+          ],
+        })
 
-      const [reader1, reader2] = await Promise.all([
-        link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller1.signal }).then(openReader),
-        link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller2.signal }).then(openReader),
-      ])
+        const [reader1, reader2] = await Promise.all([
+          link
+            .call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller1.signal })
+            .then(openReader),
+          link
+            .call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller2.signal })
+            .then(openReader),
+        ])
 
-      const listenerCount1 = getEventListeners(controller1.signal, 'abort').length
-      const listenerCount2 = getEventListeners(controller2.signal, 'abort').length
+        const listenerCount1 = getEventListeners(controller1.signal, 'abort').length
+        const listenerCount2 = getEventListeners(controller2.signal, 'abort').length
 
-      // A cancelled stream branch settles only once the other branch cancels or the source ends
-      const cancel1 = reader1.cancel()
-      await sleep(0)
+        // A cancelled stream branch settles only once the other branch cancels or the source ends
+        const cancel1 = reader1.cancel()
+        await sleep(0)
 
-      expect(getEventListeners(controller1.signal, 'abort')).toHaveLength(listenerCount1 - 1)
-      expect(getEventListeners(controller2.signal, 'abort')).toHaveLength(listenerCount2)
+        expect(getEventListeners(controller1.signal, 'abort')).toHaveLength(listenerCount1 - 1)
+        expect(getEventListeners(controller2.signal, 'abort')).toHaveLength(listenerCount2)
 
-      const read2 = reader2.read().catch(error => error)
-      tick(end)
-      await expect(read2).resolves.toEqual(end === true ? { done: true, value: undefined } : end)
-      await cancel1
+        const read2 = reader2.read().catch((error) => error)
+        tick(end)
+        await expect(read2).resolves.toEqual(end === true ? { done: true, value: undefined } : end)
+        await cancel1
 
-      expect(getEventListeners(controller2.signal, 'abort')).toHaveLength(listenerCount2 - 1)
-    })
+        expect(getEventListeners(controller2.signal, 'abort')).toHaveLength(listenerCount2 - 1)
+      },
+    )
 
     it('swallows a failure to cancel the shared source when the last reader aborts', async () => {
       const controller = new AbortController()
@@ -692,18 +1001,22 @@ describe('dedupeLinkPlugin', () => {
       const transport = makeTransport(async () => body)
 
       const link = new StandardLink(codec, transport, {
-        plugins: [new DedupeLinkPlugin({
-          groups: [{ condition: () => true, context: { group: true } }],
-        })],
+        plugins: [
+          new DedupeLinkPlugin({
+            groups: [{ condition: () => true, context: { group: true } }],
+          }),
+        ],
       })
 
       const [reader1, reader2] = await Promise.all([
-        link.call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller.signal }).then(openReader),
+        link
+          .call(['GET', 'planet'], { value: 1 }, { context: {}, signal: controller.signal })
+          .then(openReader),
         link.call(['GET', 'planet'], { value: 1 }, { context: {} }).then(openReader),
       ])
 
       // A cancelled stream branch settles with the source's cancel result once the other branch cancels
-      const cancel2 = reader2.cancel().catch(error => error)
+      const cancel2 = reader2.cancel().catch((error) => error)
       const read1 = reader1.read()
       await sleep(0)
       controller.abort()
@@ -719,9 +1032,11 @@ describe('dedupeLinkPlugin', () => {
     const transport = makeTransport()
 
     const link = new StandardLink(codec, transport, {
-      plugins: [new DedupeLinkPlugin({
-        groups: [{ condition: () => false, context: { group: true } }],
-      })],
+      plugins: [
+        new DedupeLinkPlugin({
+          groups: [{ condition: () => false, context: { group: true } }],
+        }),
+      ],
     })
 
     const [output1, output2] = await Promise.all([
@@ -740,10 +1055,12 @@ describe('dedupeLinkPlugin', () => {
     const transport = makeTransport()
 
     const link = new StandardLink(codec, transport, {
-      plugins: [new DedupeLinkPlugin({
-        wait: 100,
-        groups: [{ condition: () => true, context: {} }],
-      })],
+      plugins: [
+        new DedupeLinkPlugin({
+          wait: 100,
+          groups: [{ condition: () => true, context: {} }],
+        }),
+      ],
     })
 
     const promise1 = link.call(['GET', 'planet'], { value: 1 }, { context: {} })
@@ -781,17 +1098,19 @@ describe('dedupeLinkPlugin', () => {
       }
     }
 
-    it('sends each request in its first caller\'s async context', async () => {
+    it("sends each request in its first caller's async context", async () => {
       const transport = makeUserTransport()
       const link = new StandardLink(makeCodec(), transport, {
         plugins: [new DedupeLinkPlugin({ groups: [{ condition: () => true, context: {} }] })],
       })
 
-      await expect(Promise.all([
-        storage.run('alice', () => link.call(['GET', 'a'], {}, { context: {} })),
-        storage.run('bob', () => link.call(['GET', 'b'], {}, { context: {} })),
-        storage.run('carol', () => link.call(['GET', 'b'], {}, { context: {} })),
-      ])).resolves.toEqual(['alice', 'bob', 'bob'])
+      await expect(
+        Promise.all([
+          storage.run('alice', () => link.call(['GET', 'a'], {}, { context: {} })),
+          storage.run('bob', () => link.call(['GET', 'b'], {}, { context: {} })),
+          storage.run('carol', () => link.call(['GET', 'b'], {}, { context: {} })),
+        ]),
+      ).resolves.toEqual(['alice', 'bob', 'bob'])
 
       expect(transport.send).toHaveBeenCalledTimes(2)
     })
@@ -802,10 +1121,14 @@ describe('dedupeLinkPlugin', () => {
       const controller = new AbortController()
       const transport = makeUserTransport()
       const link = new StandardLink(makeCodec(), transport, {
-        plugins: [new DedupeLinkPlugin({ wait: 100, groups: [{ condition: () => true, context: {} }] })],
+        plugins: [
+          new DedupeLinkPlugin({ wait: 100, groups: [{ condition: () => true, context: {} }] }),
+        ],
       })
 
-      const alice = storage.run('alice', () => link.call(['GET', 'me'], {}, { context: {}, signal: controller.signal }))
+      const alice = storage.run('alice', () =>
+        link.call(['GET', 'me'], {}, { context: {}, signal: controller.signal }),
+      )
       const bob = storage.run('bob', () => link.call(['GET', 'me'], {}, { context: {} }))
 
       await vi.advanceTimersByTimeAsync(10)
@@ -820,15 +1143,21 @@ describe('dedupeLinkPlugin', () => {
     it('dedupes only requests with the same scope', async () => {
       const transport = makeUserTransport()
       const link = new StandardLink(makeCodec(), transport, {
-        plugins: [new DedupeLinkPlugin({
-          groups: [{ condition: () => true, context: {} }],
-          scope: () => storage.getStore(),
-        })],
+        plugins: [
+          new DedupeLinkPlugin({
+            groups: [{ condition: () => true, context: {} }],
+            scope: () => storage.getStore(),
+          }),
+        ],
       })
 
-      await expect(Promise.all(['alice', 'bob', 'alice', 'bob'].map(user =>
-        storage.run(user, () => link.call(['GET', 'me'], {}, { context: {} })),
-      ))).resolves.toEqual(['alice', 'bob', 'alice', 'bob'])
+      await expect(
+        Promise.all(
+          ['alice', 'bob', 'alice', 'bob'].map((user) =>
+            storage.run(user, () => link.call(['GET', 'me'], {}, { context: {} })),
+          ),
+        ),
+      ).resolves.toEqual(['alice', 'bob', 'alice', 'bob'])
 
       expect(transport.send).toHaveBeenCalledTimes(2)
     })
@@ -848,24 +1177,27 @@ function createTickingIterator(cancelError?: Error): TickingBody<AsyncIteratorCl
   let cancelled = false
   let ticks = promiseWithResolvers<true | Error | undefined>()
 
-  const body = new AsyncIteratorClass<string, void>(async () => {
-    const end = await ticks.promise
-    ticks = promiseWithResolvers()
+  const body = new AsyncIteratorClass<string, void>(
+    async () => {
+      const end = await ticks.promise
+      ticks = promiseWithResolvers()
 
-    if (end instanceof Error) {
-      throw end
-    }
+      if (end instanceof Error) {
+        throw end
+      }
 
-    return end ? { done: true, value: undefined } : { done: false, value: 'tick' }
-  }, async ({ kind }) => {
-    cancelled ||= kind === 'cancelled'
+      return end ? { done: true, value: undefined } : { done: false, value: 'tick' }
+    },
+    async ({ kind }) => {
+      cancelled ||= kind === 'cancelled'
 
-    if (cancelled && cancelError) {
-      throw cancelError
-    }
-  })
+      if (cancelled && cancelError) {
+        throw cancelError
+      }
+    },
+  )
 
-  return { body, tick: end => ticks.resolve(end), isCancelled: () => cancelled }
+  return { body, tick: (end) => ticks.resolve(end), isCancelled: () => cancelled }
 }
 
 function createTickingStream(cancelError?: Error): TickingBody<ReadableStream<string>> {
@@ -873,14 +1205,17 @@ function createTickingStream(cancelError?: Error): TickingBody<ReadableStream<st
   return { body: asyncIteratorToStream(body), ...ticking }
 }
 
-function openReader(output: unknown): { read: () => Promise<unknown>, cancel: () => Promise<void> } {
+function openReader(output: unknown): {
+  read: () => Promise<unknown>
+  cancel: () => Promise<void>
+} {
   if (output instanceof ReadableStream) {
     const reader = output.getReader()
     return { read: () => reader.read(), cancel: () => reader.cancel() }
   }
 
   const iterator = output as AsyncIteratorObject<unknown>
-  return { read: () => iterator.next(), cancel: async () => void await iterator.return?.() }
+  return { read: () => iterator.next(), cancel: async () => void (await iterator.return?.()) }
 }
 
 async function readAllAsync<T>(iterator: AsyncIterable<T>): Promise<T[]> {
@@ -907,8 +1242,7 @@ async function readAllStream<T>(stream: ReadableStream<T>): Promise<T[]> {
 
       values.push(result.value)
     }
-  }
-  finally {
+  } finally {
     reader.releaseLock()
   }
 }

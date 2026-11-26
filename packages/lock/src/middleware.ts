@@ -1,18 +1,21 @@
-import type { Context, Middleware, MiddlewareOptions } from '@orpc/server'
-import type { Promisable, Value } from '@orpc/shared'
-import type { Locker } from './types'
+import type { AnyORPCError, Context, Middleware, MiddlewareOptions } from '@orpc/server'
 import { ORPCError } from '@orpc/server'
+import type { Promisable, Value } from '@orpc/shared'
 import { toArray, value } from '@orpc/shared'
-import { LockTimeoutError } from './error'
 
-export const LOCK_MIDDLEWARE_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_LOCK_MIDDLEWARE_CONTEXT')
+import { LockTimeoutError } from './error'
+import type { Locker } from './types'
+
+export const LOCK_MIDDLEWARE_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for(
+  'ORPC_LOCK_MIDDLEWARE_CONTEXT',
+)
 
 export interface LockMiddlewareContext {
   [LOCK_MIDDLEWARE_CONTEXT_SYMBOL]?: {
     /**
      * The locks held in this request, mainly for deduplication purposes
      */
-    held: { locker: Locker, key: string, waited: boolean }[]
+    held: { locker: Locker; key: string; waited: boolean }[]
   }
 }
 
@@ -24,33 +27,46 @@ export interface LockMiddlewareOutContext {
   ['lock/waited']: boolean
 }
 
-export interface LockMiddlewareOptions<
-  TInContext extends Context,
-  TInput,
-> {
+export interface LockMiddlewareOptions<TInContext extends Context, TInput> {
   /**
    * The locker to acquire the lock from
    */
-  locker: Value<Promisable<Locker>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
+  locker: Value<
+    Promisable<Locker>,
+    [options: MiddlewareOptions<TInContext, unknown, {}>, input: TInput]
+  >
 
   /**
    * The key to identify the work that must not run concurrently
    */
-  key: Value<Promisable<string>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
+  key: Value<
+    Promisable<string>,
+    [options: MiddlewareOptions<TInContext, unknown, {}>, input: TInput]
+  >
 
   /**
    * How long the lock is held before it expires automatically, in milliseconds.
    *
    * @default the adapter default
    */
-  ttl?: Value<Promisable<number | undefined>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
+  ttl?:
+    | Value<
+        Promisable<number | undefined>,
+        [options: MiddlewareOptions<TInContext, unknown, {}>, input: TInput]
+      >
+    | undefined
 
   /**
    * How long to wait for the lock to become available, in milliseconds.
    *
    * @default the adapter default
    */
-  timeout?: Value<Promisable<number | undefined>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
+  timeout?:
+    | Value<
+        Promisable<number | undefined>,
+        [options: MiddlewareOptions<TInContext, unknown, {}>, input: TInput]
+      >
+    | undefined
 
   /**
    * If your lock middleware is used multiple times
@@ -61,7 +77,23 @@ export interface LockMiddlewareOptions<
    *
    * @default true
    */
-  dedupe?: boolean
+  dedupe?: boolean | undefined
+
+  /**
+   * The error to throw when the lock cannot be acquired before the timeout elapses.
+   *
+   * @default ORPCError('CONFLICT')
+   */
+  error?:
+    | Value<
+        AnyORPCError,
+        [
+          error: LockTimeoutError,
+          options: MiddlewareOptions<TInContext, unknown, {}>,
+          input: TInput,
+        ]
+      >
+    | undefined
 }
 
 /**
@@ -69,14 +101,24 @@ export interface LockMiddlewareOptions<
  * sharing the same key never run concurrently. Rejects with a `CONFLICT` error
  * when the lock cannot be acquired before the timeout elapses.
  *
+ * @remarks
+ * **Warning**: Not supported for streaming responses, such as an event iterator (e.g. an
+ * `async function*` handler) or a `ReadableStream`: the lock is released once the handler
+ * returns the stream, so the work the stream does while it is consumed runs without the lock.
+ *
  * @see {@link https://orpc.dev/docs/helpers/lock#lock-middleware | Lock Helpers - Lock Middleware}
  */
-export function lock<
-  TInContext extends Context,
+export function lock<TInContext extends Context, TInput>({
+  dedupe = true,
+  error: timeoutError = (error) => new ORPCError('CONFLICT', { cause: error }),
+  ...options
+}: LockMiddlewareOptions<TInContext, TInput>): Middleware<
+  TInContext,
+  LockMiddlewareOutContext,
   TInput,
->(
-  { dedupe = true, ...options }: LockMiddlewareOptions<TInContext, TInput>,
-): Middleware<TInContext, LockMiddlewareOutContext, TInput, any, object> {
+  any,
+  object
+> {
   return async function lock(middlewareOptions, input) {
     const [locker, key, ttl, timeout] = await Promise.all([
       value(options.locker, middlewareOptions, input),
@@ -85,8 +127,10 @@ export function lock<
       value(options.timeout, middlewareOptions, input),
     ])
 
-    const middlewareContext = (middlewareOptions.context as LockMiddlewareContext)[LOCK_MIDDLEWARE_CONTEXT_SYMBOL]
-    const held = middlewareContext?.held.find(l => l.key === key && l.locker === locker)
+    const middlewareContext = (middlewareOptions.context as LockMiddlewareContext)[
+      LOCK_MIDDLEWARE_CONTEXT_SYMBOL
+    ]
+    const held = middlewareContext?.held.find((l) => l.key === key && l.locker === locker)
 
     if (dedupe && held) {
       return middlewareOptions.next({
@@ -99,26 +143,26 @@ export function lock<
     let acquired = false
 
     try {
-      return await locker.lock(key, ({ waited }) => {
-        acquired = true
+      return await locker.lock(
+        key,
+        ({ waited }) => {
+          acquired = true
 
-        return middlewareOptions.next({
-          context: {
-            'lock/waited': waited,
-            [LOCK_MIDDLEWARE_CONTEXT_SYMBOL]: {
-              ...middlewareContext,
-              held: [
-                ...toArray(middlewareContext?.held),
-                { locker, key, waited },
-              ],
-            },
-          } satisfies LockMiddlewareOutContext & LockMiddlewareContext,
-        })
-      }, { ttl, timeout, signal: middlewareOptions.signal })
-    }
-    catch (error) {
+          return middlewareOptions.next({
+            context: {
+              'lock/waited': waited,
+              [LOCK_MIDDLEWARE_CONTEXT_SYMBOL]: {
+                ...middlewareContext,
+                held: [...toArray(middlewareContext?.held), { locker, key, waited }],
+              },
+            } satisfies LockMiddlewareOutContext & LockMiddlewareContext,
+          })
+        },
+        { ttl, timeout, signal: middlewareOptions.signal },
+      )
+    } catch (error) {
       if (!acquired && error instanceof LockTimeoutError) {
-        throw new ORPCError('CONFLICT', { cause: error })
+        throw value(timeoutError, error, middlewareOptions, input)
       }
 
       throw error

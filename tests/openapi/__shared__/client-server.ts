@@ -1,6 +1,6 @@
+import { OpenAPISerializer } from '@orpc/openapi'
 import type { AnyRouter, Context, RouterClient } from '@orpc/server'
 import type { Public } from '@orpc/shared'
-import { OpenAPISerializer } from '@orpc/openapi'
 
 export interface OpenAPIClientServerTestOptions {
   context?: Context

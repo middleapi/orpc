@@ -1,3 +1,4 @@
+import { decodeBase64url, encodeBase64url } from './base64url'
 import { decrypt, encrypt } from './encryption'
 
 describe('encrypt/decrypt', () => {
@@ -75,7 +76,8 @@ describe('encrypt/decrypt', () => {
       {
         value: 'compatibility-value',
         secret: 'compatibility-encryption-secret',
-        encrypted: 'hbSNaYOIGOVnapa2UgZgzHgNr6ARf1zWk-3cNWhDBwsFOnQ9S4IZR5uUdqIM-WbTRAfryalkWnHJD8voMh5y',
+        encrypted:
+          'hbSNaYOIGOVnapa2UgZgzHgNr6ARf1zWk-3cNWhDBwsFOnQ9S4IZR5uUdqIM-WbTRAfryalkWnHJD8voMh5y',
       },
       {
         value: '',
@@ -85,12 +87,68 @@ describe('encrypt/decrypt', () => {
       {
         value: 'value.with.dots-🚀-中文',
         secret: 'compatibility-encryption-secret',
-        encrypted: 'xLe6faWGA5J3MUy-Cue5_mZXiJVlrzqKho8ywwhlCHbO4koT4XT3MxzesdTMLxZIAS6pPJLfU4qKKcZHwOwAAU5RHP-sMp8',
+        encrypted:
+          'xLe6faWGA5J3MUy-Cue5_mZXiJVlrzqKho8ywwhlCHbO4koT4XT3MxzesdTMLxZIAS6pPJLfU4qKKcZHwOwAAU5RHP-sMp8',
       },
     ] as const
 
     for (const fixture of fixtures) {
       expect(await decrypt(fixture.encrypted, fixture.secret)).toBe(fixture.value)
+    }
+  })
+})
+
+describe('decrypt canonical form', () => {
+  it('accepts only the canonical ciphertext string', async () => {
+    const secret = 'test-secret-key'
+    // 16 salt + 12 iv + 8 data + 16 tag = 52 bytes -> 70 chars; last char carries 4 unused bits
+    const encrypted = await encrypt('user1234', secret)
+    expect(encrypted).toHaveLength(70)
+    expect(await decrypt(encrypted, secret)).toBe('user1234')
+
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+    const last = alphabet.indexOf(encrypted.at(-1)!)
+    for (let flip = 1; flip < 16; flip++) {
+      expect(await decrypt(encrypted.slice(0, -1) + alphabet[last ^ flip], secret)).toBeUndefined()
+    }
+    expect(await decrypt(`${encrypted}=`, secret)).toBeUndefined()
+    expect(await decrypt(`${encrypted}==`, secret)).toBeUndefined()
+  })
+})
+
+describe('encryption wire format', () => {
+  const secret = 'wire-format-secret'
+
+  // the fixtures above pin `decrypt`, this pins `encrypt` with plain WebCrypto
+  it('is base64url(salt[16] || iv[12] || ciphertext || tag[16])', async () => {
+    const payload = decodeBase64url(await encrypt('wire-value', secret))!
+
+    const key = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', hash: 'SHA-256', iterations: 60_000, salt: payload.slice(0, 16) },
+      await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), 'PBKDF2', false, [
+        'deriveKey',
+      ]),
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt'],
+    )
+
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: payload.slice(16, 28) },
+      key,
+      payload.slice(28),
+    )
+
+    expect(new TextDecoder().decode(decrypted)).toBe('wire-value')
+  })
+
+  it('rejects a tampered salt, iv, ciphertext or tag', async () => {
+    const payload = decodeBase64url(await encrypt('wire-value', secret))!
+
+    for (const index of [0, 16, 28, payload.length - 1]) {
+      const tampered = payload.slice()
+      tampered[index]! ^= 1
+      expect(await decrypt(encodeBase64url(tampered), secret), `${index}`).toBeUndefined()
     }
   })
 })

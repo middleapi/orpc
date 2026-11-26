@@ -1,6 +1,7 @@
-import type { ErrorMap } from './error'
 import * as ClientModule from '@orpc/client'
-import z from 'zod'
+import * as z from 'zod'
+
+import type { ErrorMap } from './error'
 import { mergeErrorMap, reconcileORPCError } from './error-utils'
 
 const ORPCError = ClientModule.ORPCError
@@ -31,7 +32,7 @@ it('mergeErrorMap', () => {
 
 describe('reconcileORPCError', () => {
   describe('no map error matched', () => {
-    const map: ErrorMap = { }
+    const map: ErrorMap = {}
 
     it('should return error itself if error is not defined', async () => {
       const error = new ORPCError('CODE', { message: 'm', data: 'd' })

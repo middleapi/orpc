@@ -1,6 +1,7 @@
 import { AbortError } from '@orpc/shared'
-import { Cause, Effect } from 'effect'
-import { describe, expect, it } from 'vitest'
+import { Cause, Context, Effect, Option, Scheduler } from 'effect'
+import { describe, expect, it, vi } from 'vitest'
+
 import { runPromise } from './runtime'
 
 describe('runPromise & extractErrorFromCause', () => {
@@ -17,12 +18,33 @@ describe('runPromise & extractErrorFromCause', () => {
     })
   })
 
+  describe('context', () => {
+    class Service1 extends Context.Service<Service1, { readonly id: 'Service1' }>()('Service1') {}
+
+    it('runs the effect with the provided services', async () => {
+      const context = Context.empty().pipe(Context.add(Service1, { id: 'Service1' }))
+
+      await expect(runPromise(Effect.serviceOption(Service1), { context })).resolves.toEqual(
+        Option.some({ id: 'Service1' }),
+      )
+    })
+
+    it('runs the effect with the provided scheduler', async () => {
+      const scheduler = new Scheduler.MixedScheduler('sync')
+      const makeDispatcher = vi.spyOn(scheduler, 'makeDispatcher')
+      const context = Context.empty().pipe(Context.add(Scheduler.Scheduler, scheduler))
+
+      await expect(runPromise(Effect.yieldNow.pipe(Effect.as(42)), { context })).resolves.toBe(42)
+      expect(makeDispatcher).toHaveBeenCalled()
+    })
+  })
+
   describe('failure - throws original error without FiberFailure wrapper', () => {
     it('throws signal reason when interrupted with signal', async () => {
       const signal = AbortSignal.timeout(0)
-      await expect(
-        runPromise(Effect.never, { signal }),
-      ).rejects.toSatisfy(e => e === signal.reason)
+      await expect(runPromise(Effect.never, { signal })).rejects.toSatisfy(
+        (e) => e === signal.reason,
+      )
     })
 
     it('throws a generic AbortError when interrupted without signal', async () => {
@@ -30,12 +52,9 @@ describe('runPromise & extractErrorFromCause', () => {
         yield* Effect.interrupt
       })
 
-      await expect(runPromise(effect)).rejects.toThrow(new AbortError('All fibers interrupted without error'))
-    })
-
-    it('throws the original Error instance from Effect.fail', async () => {
-      const original = new TypeError('typed domain error')
-      await expect(runPromise(Effect.fail(original))).rejects.toThrow(original)
+      await expect(runPromise(effect)).rejects.toThrow(
+        new AbortError('All fibers interrupted without error'),
+      )
     })
 
     it('throws the original defect from Effect.die', async () => {
@@ -58,7 +77,7 @@ describe('runPromise & extractErrorFromCause', () => {
       const effect = Effect.acquireUseRelease(
         Effect.succeed('resource'),
         () => Effect.fail(useError),
-        () => Effect.fail(new Error('finalizer also failed')) as Effect.Effect<never, never>,
+        () => Effect.fail(new Error('finalizer also failed')) as Effect.Effect<never>,
       )
 
       await expect(runPromise(effect)).rejects.toThrow(useError)
@@ -68,25 +87,22 @@ describe('runPromise & extractErrorFromCause', () => {
       const leftError = new Error('left fiber failed')
       const rightError = new Error('right fiber failed')
 
-      const effect = Effect.all(
-        [Effect.fail(leftError), Effect.fail(rightError)],
-        { concurrency: 'unbounded' },
-      )
+      const effect = Effect.all([Effect.fail(leftError), Effect.fail(rightError)], {
+        concurrency: 'unbounded',
+      })
 
       await expect(runPromise(effect)).rejects.toThrow(leftError)
     })
 
-    it('does NOT wrap errors in FiberFailure', async () => {
-      const original = new TypeError('original')
+    it('throws the original Error instance from Effect.fail, not a FiberFailure', async () => {
+      const original = new TypeError('typed domain error')
       await expect(runPromise(Effect.fail(original))).rejects.toBe(original)
     })
 
     it('throws a empty Error when cause is empty', async () => {
       const effect = Effect.failCause(Cause.empty)
 
-      await expect(
-        runPromise(effect),
-      ).rejects.toThrow(new Error('Empty cause'))
+      await expect(runPromise(effect)).rejects.toThrow(new Error('Empty cause'))
     })
   })
 })

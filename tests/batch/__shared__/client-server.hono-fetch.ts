@@ -1,11 +1,13 @@
 import type { AddressInfo } from 'node:net'
-import type { CreateBatchClientServerTest } from './client-server'
+
 import { serve } from '@hono/node-server'
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { BatchLinkPlugin } from '@orpc/client/plugins'
 import { RPCHandler } from '@orpc/server/fetch'
 import { BatchHandlerPlugin } from '@orpc/server/plugins'
+
+import type { CreateBatchClientServerTest } from './client-server'
 import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server'
 
 export const createHonoFetchBatchClientServerTest: CreateBatchClientServerTest = (
@@ -13,8 +15,8 @@ export const createHonoFetchBatchClientServerTest: CreateBatchClientServerTest =
   {
     context = defaultBatchClientServerOptions.context,
     method = 'GET',
-    mode = defaultBatchClientServerOptions.mode,
     serializer = defaultBatchClientServerOptions.serializer,
+    mode,
   } = {},
 ) => {
   const handler = new RPCHandler(router, {
@@ -48,7 +50,7 @@ export const createHonoFetchBatchClientServerTest: CreateBatchClientServerTest =
     origin: `http://localhost:${addressInfo.port}`,
     serializer,
     fetch: fetchSpy,
-    plugins: [new BatchLinkPlugin({ groups: [defaultBatchGroup], mode })],
+    plugins: [new BatchLinkPlugin({ mode, groups: [defaultBatchGroup] })],
   })
 
   return {

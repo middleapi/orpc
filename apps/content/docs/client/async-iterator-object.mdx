@@ -1,8 +1,8 @@
 ---
-title: "AsyncIteratorObject in Client"
-description: "Consume an AsyncIteratorObject from the client like an AsyncGenerator, with stream cancellation, error handling, and event metadata."
+title: 'AsyncIteratorObject in Client'
+description: 'Consume an AsyncIteratorObject from the client like an AsyncGenerator, with stream cancellation, error handling, and event metadata.'
 sidebar:
-  label: "AsyncIteratorObject (SSE)"
+  label: 'AsyncIteratorObject (SSE)'
 ---
 
 ## Basic Usage
@@ -14,7 +14,7 @@ import { asyncIteratorObject, oc, RouterContractClient } from '@orpc/contract'
 import { z } from 'zod'
 
 const contract = {
-  streaming: oc.output(asyncIteratorObject(z.object({ message: z.string() })))
+  streaming: oc.output(asyncIteratorObject(z.object({ message: z.string() }))),
 }
 
 declare const client: RouterContractClient<typeof contract>
@@ -59,8 +59,7 @@ try {
   for await (const event of iterator) {
     console.log(event.message)
   }
-}
-catch (error) {
+} catch (error) {
   if (error instanceof ORPCError) {
     // Handle the error here
   }

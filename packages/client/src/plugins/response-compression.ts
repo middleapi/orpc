@@ -1,8 +1,14 @@
-import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor } from '../adapters/standard'
-import type { ClientContext } from '../types'
-import { toArray } from '@orpc/shared'
+import type { CompressionEncoding } from '@orpc/shared'
+import { isCompressionEncoding, parseContentEncodings, toArray } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
 import { toFetchHeaders, toStandardBody } from '@standard-server/fetch'
+
+import type {
+  StandardLinkOptions,
+  StandardLinkPlugin,
+  StandardLinkTransportInterceptor,
+} from '../adapters/standard/index'
+import type { ClientContext } from '../types'
 
 /**
  * Each coding adds a decompressor to the chain, so an unbounded list lets a tiny
@@ -17,7 +23,7 @@ export interface ResponseCompressionLinkPluginOptions<_T extends ClientContext> 
    *
    * @default ['gzip', 'deflate']
    */
-  encodings?: readonly ('gzip' | 'deflate' | 'deflate-raw')[]
+  encodings?: readonly CompressionEncoding[] | undefined
 }
 
 /**
@@ -27,15 +33,20 @@ export interface ResponseCompressionLinkPluginOptions<_T extends ClientContext> 
  *
  * @see {@link https://orpc.dev/docs/plugins/response-compression | Response Compression Plugin}
  */
-export class ResponseCompressionLinkPlugin<T extends ClientContext> implements StandardLinkPlugin<T> {
-  name = '~response-compression'
+export class ResponseCompressionLinkPlugin<
+  T extends ClientContext,
+> implements StandardLinkPlugin<T> {
+  readonly name = '~response-compression'
 
   /**
-   * Decompression should wrap the final batch response instead of sub-responses.
+   * Runs inside batch: decompresses the batch response, not sub-responses.
    */
-  after = ['~batch']
+  readonly after: readonly string[] = ['~batch']
 
-  private readonly encodings: Exclude<ResponseCompressionLinkPluginOptions<T>['encodings'], undefined>
+  private readonly encodings: Exclude<
+    ResponseCompressionLinkPluginOptions<T>['encodings'],
+    undefined
+  >
 
   constructor(options: ResponseCompressionLinkPluginOptions<T> = {}) {
     this.encodings = options.encodings ?? ['gzip', 'deflate']
@@ -44,7 +55,10 @@ export class ResponseCompressionLinkPlugin<T extends ClientContext> implements S
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
     const acceptEncodingHeader = this.encodings.join(', ')
 
-    const transportInterceptor: StandardLinkTransportInterceptor<T> = async ({ next, ...interceptorOptions }) => {
+    const transportInterceptor: StandardLinkTransportInterceptor<T> = async ({
+      next,
+      ...interceptorOptions
+    }) => {
       const response = await next({
         ...interceptorOptions,
         request: {
@@ -60,7 +74,7 @@ export class ResponseCompressionLinkPlugin<T extends ClientContext> implements S
         flattenStandardHeader(response.headers['content-encoding']),
       )
 
-      if (encodings.length === 0 || !encodings.every(isSupportedEncoding)) {
+      if (encodings.length === 0 || !encodings.every(isCompressionEncoding)) {
         return response
       }
 
@@ -103,32 +117,7 @@ export class ResponseCompressionLinkPlugin<T extends ClientContext> implements S
 
     return {
       ...options,
-      transportInterceptors: [
-        ...toArray(options.transportInterceptors),
-        transportInterceptor,
-      ],
+      transportInterceptors: [...toArray(options.transportInterceptors), transportInterceptor],
     }
   }
-}
-
-const SUPPORTED_ENCODINGS = ['gzip', 'deflate', 'deflate-raw'] as const
-type SupportedEncoding = (typeof SUPPORTED_ENCODINGS)[number]
-
-function isSupportedEncoding(encoding: string): encoding is SupportedEncoding {
-  return (SUPPORTED_ENCODINGS as readonly string[]).includes(encoding)
-}
-
-/**
- * Parse Content-Encoding into ordered codings (order applied).
- *
- * @see https://www.rfc-editor.org/rfc/rfc9110.html#name-content-encoding
- */
-function parseContentEncodings(header: string | undefined): string[] {
-  if (header === undefined) {
-    return []
-  }
-
-  return header
-    .split(',')
-    .map(part => part.trim().toLowerCase())
 }

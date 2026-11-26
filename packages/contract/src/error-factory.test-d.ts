@@ -1,9 +1,10 @@
 import type { ORPCError } from '@orpc/client'
+import * as z from 'zod'
+
 import type { ErrorMap, ORPCErrorFromErrorMap } from './error'
 import type { ORPCErrorConstructorMap, ORPCErrorFactory } from './error-factory'
-import type { Schema } from './schema'
-import z from 'zod'
 import { error } from './error-factory'
+import type { Schema } from './schema'
 
 describe('error factory', () => {
   const TestError = error('TEST', {
@@ -20,11 +21,15 @@ describe('error factory', () => {
   it('infers the factory type from the options', () => {
     expectTypeOf(TestError).toEqualTypeOf<ORPCErrorFactory<'TEST', { value: number }>>()
     expectTypeOf(SimpleError).toEqualTypeOf<ORPCErrorFactory<'SIMPLE', unknown>>()
-    expectTypeOf(OptionalError).toEqualTypeOf<ORPCErrorFactory<'OPTIONAL', { value: number } | undefined>>()
+    expectTypeOf(OptionalError).toEqualTypeOf<
+      ORPCErrorFactory<'OPTIONAL', { value: number } | undefined>
+    >()
   })
 
   it('creates a class that constructs typed ORPCError instances', () => {
-    expectTypeOf(new TestError({ data: { value: 1 } })).toEqualTypeOf<ORPCError<'TEST', { value: number }>>()
+    expectTypeOf(new TestError({ data: { value: 1 } })).toEqualTypeOf<
+      ORPCError<'TEST', { value: number }>
+    >()
     expectTypeOf(new SimpleError()).toEqualTypeOf<ORPCError<'SIMPLE', unknown>>()
 
     // @ts-expect-error - data is required
@@ -38,8 +43,12 @@ describe('error factory', () => {
   })
 
   it('options can be omitted when the data schema allows undefined', () => {
-    expectTypeOf(new OptionalError()).toEqualTypeOf<ORPCError<'OPTIONAL', { value: number } | undefined>>()
-    expectTypeOf(new OptionalError({ data: { value: 1 } })).toEqualTypeOf<ORPCError<'OPTIONAL', { value: number } | undefined>>()
+    expectTypeOf(new OptionalError()).toEqualTypeOf<
+      ORPCError<'OPTIONAL', { value: number } | undefined>
+    >()
+    expectTypeOf(new OptionalError({ data: { value: 1 } })).toEqualTypeOf<
+      ORPCError<'OPTIONAL', { value: number } | undefined>
+    >()
   })
 
   it('exposes typed static code, message, and data', () => {
@@ -65,11 +74,8 @@ describe('error factory', () => {
       [SimpleError.code]: SimpleError,
     } satisfies ErrorMap
 
-    expectTypeOf<
-      ORPCErrorFromErrorMap<typeof errorMap>
-    >().toEqualTypeOf<
-      | ORPCError<'TEST', { value: number }>
-      | ORPCError<'SIMPLE', unknown>
+    expectTypeOf<ORPCErrorFromErrorMap<typeof errorMap>>().toEqualTypeOf<
+      ORPCError<'TEST', { value: number }> | ORPCError<'SIMPLE', unknown>
     >()
   })
 })
@@ -87,8 +93,12 @@ describe('ORPCErrorConstructorMap', () => {
   const constructors = {} as ORPCErrorConstructorMap<typeof errorMap>
 
   it('constructs typed ORPCError instances', () => {
-    expectTypeOf(constructors.BASE({ data: { output: 123 } })).toEqualTypeOf<ORPCError<'BASE', { output: number }>>()
-    expectTypeOf(constructors.BASE({ data: { output: 123 }, message: 'custom', cause: 'cause' })).toEqualTypeOf<ORPCError<'BASE', { output: number }>>()
+    expectTypeOf(constructors.BASE({ data: { output: 123 } })).toEqualTypeOf<
+      ORPCError<'BASE', { output: number }>
+    >()
+    expectTypeOf(
+      constructors.BASE({ data: { output: 123 }, message: 'custom', cause: 'cause' }),
+    ).toEqualTypeOf<ORPCError<'BASE', { output: number }>>()
 
     // @ts-expect-error - invalid data
     constructors.BASE({ data: { output: '123' } })
@@ -99,8 +109,12 @@ describe('ORPCErrorConstructorMap', () => {
   })
 
   it('options can be omitted when the data schema allows undefined', () => {
-    expectTypeOf(constructors.OVERRIDE()).toEqualTypeOf<ORPCError<'OVERRIDE', { output: number } | undefined>>()
-    expectTypeOf(constructors.OVERRIDE({ data: { output: 123 } })).toEqualTypeOf<ORPCError<'OVERRIDE', { output: number } | undefined>>()
+    expectTypeOf(constructors.OVERRIDE()).toEqualTypeOf<
+      ORPCError<'OVERRIDE', { output: number } | undefined>
+    >()
+    expectTypeOf(constructors.OVERRIDE({ data: { output: 123 } })).toEqualTypeOf<
+      ORPCError<'OVERRIDE', { output: number } | undefined>
+    >()
   })
 
   it('uses the map key as the error code for error factory items', () => {
@@ -114,6 +128,39 @@ describe('ORPCErrorConstructorMap', () => {
 
     const factoryConstructors = {} as ORPCErrorConstructorMap<typeof factoryErrorMap>
 
-    expectTypeOf(factoryConstructors.FACTORY({ data: { output: 123 } })).toEqualTypeOf<ORPCError<'FACTORY', { output: number }>>()
+    expectTypeOf(factoryConstructors.FACTORY({ data: { output: 123 } })).toEqualTypeOf<
+      ORPCError<'FACTORY', { output: number }>
+    >()
+  })
+
+  it('constructors of optional and union-valued error codes are callable', () => {
+    const flag = true as boolean
+    const mixedErrorMap = {
+      FAILURE: flag ? { data: z.string() } : { data: z.number() },
+      ...(flag ? { RATE_LIMITED: { data: z.object({ retry: z.number() }) } } : {}),
+    } satisfies ErrorMap
+
+    const mixedConstructors = {} as ORPCErrorConstructorMap<typeof mixedErrorMap>
+
+    expectTypeOf(mixedConstructors.RATE_LIMITED({ data: { retry: 1 } })).toEqualTypeOf<
+      ORPCError<'RATE_LIMITED', { retry: number }>
+    >()
+    expectTypeOf(mixedConstructors.FAILURE({ data: 'x' })).toEqualTypeOf<
+      ORPCError<'FAILURE', string | number>
+    >()
+    expectTypeOf(mixedConstructors.FAILURE({ data: 1 })).toEqualTypeOf<
+      ORPCError<'FAILURE', string | number>
+    >()
+  })
+
+  it('constructors of the generic ErrorMap are callable', () => {
+    const genericConstructors = {} as ORPCErrorConstructorMap<ErrorMap>
+
+    expectTypeOf(genericConstructors.NOT_FOUND()).toEqualTypeOf<ORPCError<'NOT_FOUND', unknown>>()
+  })
+
+  it('is assignable to ORPCErrorConstructorMap<any> and ORPCErrorConstructorMap<ErrorMap>', () => {
+    expectTypeOf(constructors).toExtend<ORPCErrorConstructorMap<any>>()
+    expectTypeOf(constructors).toExtend<ORPCErrorConstructorMap<ErrorMap>>()
   })
 })

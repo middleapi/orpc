@@ -7,8 +7,8 @@ export {
   CORSHandlerPlugin as CORSPlugin,
 } from './cors'
 export * from './get-method-csrf-protection'
+export * from './head-method'
 export * from './method-override'
-export * from './prototype-pollution-protection'
 export * from './request-compression'
 export * from './request-headers'
 export {
@@ -39,4 +39,6 @@ export type {
   ResponseHeadersHandlerPluginContext as ResponseHeadersPluginContext,
 } from './response-headers'
 export * from './rethrow'
+export * from './signal-sync'
 export * from './timeout'
+export { BATCH_HEADER, DEFAULT_BATCH_MAX_SIZE } from '@orpc/client/plugins'

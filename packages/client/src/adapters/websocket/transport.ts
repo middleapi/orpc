@@ -1,10 +1,24 @@
 import type { Promisable } from '@orpc/shared'
+import {
+  loadBytes,
+  promiseWithResolvers,
+  runWithSignal,
+  sequential,
+  sleep,
+  toStringOrBytes,
+} from '@orpc/shared'
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import type { DecodePeerMessageOptions, EncodePeerMessageOptions } from '@standard-server/peer'
+import {
+  ClientPeer,
+  decodePeerMessage,
+  encodePeerMessage,
+  isServerPeerSendMessage,
+} from '@standard-server/peer'
+
+import { ConnectionClosedError } from '../../error'
 import type { ClientContext, ClientOptions } from '../../types'
-import type { StandardLinkTransport } from '../standard'
-import { AbortError, loadBytes, promiseWithResolvers, runWithSignal, sequential, sleep, toStringOrBytes } from '@orpc/shared'
-import { ClientPeer, decodePeerMessage, encodePeerMessage, isServerPeerSendMessage } from '@standard-server/peer'
+import type { StandardLinkTransport } from '../standard/index'
 
 /**
  * Some env maybe not available WebSocket global, like node 20
@@ -12,82 +26,85 @@ import { ClientPeer, decodePeerMessage, encodePeerMessage, isServerPeerSendMessa
 const WEBSOCKET_CONNECTING = 0 satisfies WebSocket['CONNECTING']
 const WEBSOCKET_OPEN = 1 satisfies WebSocket['OPEN']
 
-export type WebSocketLike = Pick<WebSocket, 'addEventListener' | 'removeEventListener' | 'send' | 'readyState'>
+const HEALTHY_CONNECTION_DURATION = 5_000
+
+export type WebSocketLike = Pick<
+  WebSocket,
+  'addEventListener' | 'removeEventListener' | 'send' | 'readyState'
+>
 
 export interface WebSocketLinkTransportAttemptInfo {
   /**
-   * Total number of connection attempts for this transport's lifetime.
+   * Total number of connection attempts for this transport's lifetime, this one included.
    * Starts at 1 on the first attempt, increments on every subsequent
    * attempt, and never resets.
    */
-  totalAttempt: number
+  totalAttempts: number
 
   /**
    * Attempt number within the current (re)connect cycle.
    * Starts at 1, increments on each consecutive failure, and resets to 1
-   * once a connection succeeds or the cycle gives up. Use this for backoff calculations.
+   * once a connection proves healthy or the cycle gives up. Use this for backoff calculations.
+   *
+   * A connection proves healthy when it receives a message from the server or stays
+   * open for 5 seconds. A connection that closes sooner counts as a failure.
    */
   attempt: number
 }
 
+/**
+ * Reconnection behavior when the connection is lost. Passing it enables reconnection.
+ */
 export interface WebSocketLinkTransportReconnectOptions {
-  /**
-   * Whether to automatically reconnect when the connection is lost.
-   *
-   * @default false
-   */
-  enabled: boolean
-
   /**
    * Delay before a (re)connect attempt, in milliseconds.
    *
    * @default info => info.attempt === 1 ? 0 : 2_000
    */
-  delay?: undefined | ((info: WebSocketLinkTransportAttemptInfo) => number)
+  delay?: ((info: WebSocketLinkTransportAttemptInfo) => number) | undefined
 
   /**
    * Maximum number of consecutive failed attempts before giving up.
+   * It counts every attempt of a (re)connect cycle, the first one included (see `attempt`),
+   * so it should be at least 1.
    * When reached, calls waiting for the connection fail, and the next
    * call starts a new reconnect cycle.
-   * Should greater than 1
    *
    * @default Infinity
    */
-  maxAttempt?: undefined | number
+  maxAttempts?: number | undefined
 
   /**
    * Maximum number of connection attempts over the transport's lifetime,
-   * successful ones included (see `totalAttempt`).
+   * successful ones included (see `totalAttempts`).
    * When reached, calls that need a new connection fail instead of connecting.
    *
    * @default Infinity
    */
-  maxTotalAttempt?: undefined | number
+  maxTotalAttempts?: number | undefined
 
   /**
    * Whether to proactively reconnect right after the socket closes,
    * rather than waiting for the next call to trigger reconnection.
    * Reduces latency for the next request.
    *
-   * @default { enabled: false }
+   * `true` enables it, {@link WebSocketLinkTransportReconnectOnCloseOptions} enables and customizes it.
+   *
+   * @default false
    */
-  onClose?: undefined | {
-    /**
-     * Whether to proactively reconnect right after the socket closes,
-     * rather than waiting for the next call to trigger reconnection.
-     * Reduces latency for the next request.
-     *
-     * @default false
-     */
-    enabled: boolean
+  onClose?: boolean | WebSocketLinkTransportReconnectOnCloseOptions | undefined
+}
 
-    /**
-     * Delay before reconnecting after the socket closes, in milliseconds.
-     *
-     * @default 0
-     */
-    delay?: number
-  }
+/**
+ * Proactive reconnection right after the socket closes. Passing it enables it.
+ */
+export interface WebSocketLinkTransportReconnectOnCloseOptions {
+  /**
+   * Delay before reconnecting after the socket closes, in milliseconds.
+   *
+   * @default 0
+   */
+  delay?: number | undefined
 }
 
 export interface WebSocketLinkTransportOptions<_T extends ClientContext> {
@@ -103,14 +120,15 @@ export interface WebSocketLinkTransportOptions<_T extends ClientContext> {
    *
    * @default false
    */
-  connectOnInit?: undefined | boolean
+  connectOnInit?: boolean | undefined
 
   /**
-   * Reconnection behavior when the connection is lost.
+   * Reconnection when the connection is lost. `true` enables it,
+   * {@link WebSocketLinkTransportReconnectOptions} enables and customizes it.
    *
-   * @default { enabled: false }
+   * @default false
    */
-  reconnect?: undefined | WebSocketLinkTransportReconnectOptions
+  reconnect?: boolean | WebSocketLinkTransportReconnectOptions | undefined
 
   /**
    * Options for encoding peer messages. such as `prefix` for distinguishing messages on the same channel..
@@ -121,6 +139,13 @@ export interface WebSocketLinkTransportOptions<_T extends ClientContext> {
    * Options for decoding peer messages. such as `prefix` for distinguishing messages on the same channel..
    */
   decodePeerMessage?: DecodePeerMessageOptions | undefined
+}
+
+interface Connection {
+  websocket: WebSocketLike
+  peer: ClientPeer
+  isHealthy: () => boolean
+  closeReason: () => undefined | ConnectionClosedError
 }
 
 export class WebSocketLinkTransport<T extends ClientContext> implements StandardLinkTransport<T> {
@@ -136,12 +161,16 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
 
   constructor(options: WebSocketLinkTransportOptions<T>) {
     this.connect = options.connect
-    this.reconnectEnabled = options.reconnect?.enabled ?? false
-    this.reconnectDelay = options.reconnect?.delay ?? (info => info.attempt === 1 ? 0 : 2_000)
-    this.reconnectMaxAttempt = options.reconnect?.maxAttempt ?? Infinity
-    this.reconnectMaxTotalAttempt = options.reconnect?.maxTotalAttempt ?? Infinity
-    this.reconnectOnCloseEnabled = this.reconnectEnabled && (options.reconnect?.onClose?.enabled ?? false)
-    this.reconnectOnCloseDelay = options.reconnect?.onClose?.delay ?? 0
+    const reconnect = typeof options.reconnect === 'object' ? options.reconnect : {}
+    const onClose = typeof reconnect.onClose === 'object' ? reconnect.onClose : {}
+
+    this.reconnectEnabled = options.reconnect !== undefined && options.reconnect !== false
+    this.reconnectDelay = reconnect.delay ?? ((info) => (info.attempt === 1 ? 0 : 2_000))
+    this.reconnectMaxAttempt = reconnect.maxAttempts ?? Infinity
+    this.reconnectMaxTotalAttempt = reconnect.maxTotalAttempts ?? Infinity
+    this.reconnectOnCloseEnabled =
+      this.reconnectEnabled && reconnect.onClose !== undefined && reconnect.onClose !== false
+    this.reconnectOnCloseDelay = onClose.delay ?? 0
 
     this.encodePeerMessageOptions = options.encodePeerMessage
     this.decodePeerMessageOptions = options.decodePeerMessage
@@ -151,18 +180,19 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
     }
   }
 
-  async send(standardRequest: StandardRequest, _path: string[], _options: ClientOptions<T>): Promise<StandardLazyResponse> {
-    const peer = await runWithSignal(
-      standardRequest.signal,
-      () => this.getConnectedPeer(),
-    )
+  async send(
+    standardRequest: StandardRequest,
+    _path: string[],
+    _options: ClientOptions<T>,
+  ): Promise<StandardLazyResponse> {
+    const peer = await runWithSignal(standardRequest.signal, () => this.getConnectedPeer())
 
     return peer.request(standardRequest)
   }
 
   private totalAttempt = 0
   private attempt = 0
-  private current: undefined | Promise<void | { websocket: WebSocketLike, peer: ClientPeer }>
+  private current: undefined | Promise<void | Connection>
   private async getConnectedPeer(): Promise<ClientPeer> {
     const current = this.current
     const resolved = await current
@@ -175,24 +205,46 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
       return this.getConnectedPeer()
     }
 
+    if (resolved?.isHealthy()) {
+      this.attempt = 0
+    }
+
     if (this.totalAttempt >= this.reconnectMaxTotalAttempt) {
-      throw new AbortError(`WebSocket reconnect stopped after ${this.totalAttempt} total attempt(s)`)
+      throw new ConnectionClosedError(
+        `WebSocket reconnect stopped after ${this.totalAttempt} total attempt(s)`,
+      )
     }
 
     this.current = (async () => {
+      // Rejecting `current` lets the `.catch` below fail every call waiting on it
+      if (this.attempt >= this.reconnectMaxAttempt) {
+        throw (
+          resolved?.closeReason() ??
+          new ConnectionClosedError('WebSocket is already closing or closed')
+        )
+      }
+
       this.totalAttempt += 1
       this.attempt += 1
 
-      const info: WebSocketLinkTransportAttemptInfo = { totalAttempt: this.totalAttempt, attempt: this.attempt }
+      const info: WebSocketLinkTransportAttemptInfo = {
+        totalAttempts: this.totalAttempt,
+        attempt: this.attempt,
+      }
 
       await sleep(this.reconnectDelay(info))
       const websocket = await this.connect(info)
 
-      if (websocket.readyState !== WEBSOCKET_CONNECTING && websocket.readyState !== WEBSOCKET_OPEN) {
-        throw new AbortError('WebSocket is already closing or closed')
+      if (
+        websocket.readyState !== WEBSOCKET_CONNECTING &&
+        websocket.readyState !== WEBSOCKET_OPEN
+      ) {
+        throw new ConnectionClosedError('WebSocket is already closing or closed')
       }
 
-      let closeReason: undefined | AbortError
+      let closeReason: undefined | ConnectionClosedError
+      let closedAt: undefined | number
+      let receivedMessage = false
 
       const peer = new ClientPeer(async (message) => {
         // `send` silently discards data once the socket is closed, so requests would never settle
@@ -204,7 +256,7 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
         return websocket.send(encoded)
       })
 
-      let connectingResolvers: undefined | { promise: Promise<void>, resolve: () => void }
+      let connectingResolvers: undefined | { promise: Promise<void>; resolve: () => void }
       if (websocket.readyState === WEBSOCKET_CONNECTING) {
         connectingResolvers = promiseWithResolvers()
         websocket.addEventListener('open', () => {
@@ -216,19 +268,27 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
        * Message order is important: loading -> decode -> .message.
        * This flow must stay synchronous, or we need to use `sequential` helper
        */
-      websocket.addEventListener('message', sequential(async (event: MessageEvent) => {
-        // For better compatibility avoid control or depend on websocket.binaryType
-        const message = event.data instanceof Blob ? await loadBytes(event.data) : toStringOrBytes(event.data)
-        const result = decodePeerMessage(message, this.decodePeerMessageOptions)
-        if (result.matched && isServerPeerSendMessage(result.message)) {
-          // Not awaited: `peer.message` runs handling message may be slow,
-          // and awaiting it would block decoding of subsequent messages.
-          peer.message(result.message)
-        }
-      }))
+      websocket.addEventListener(
+        'message',
+        sequential(async (event: MessageEvent) => {
+          // For better compatibility avoid control or depend on websocket.binaryType
+          const message =
+            event.data instanceof Blob ? await loadBytes(event.data) : toStringOrBytes(event.data)
+          const result = decodePeerMessage(message, this.decodePeerMessageOptions)
+          if (result.matched && isServerPeerSendMessage(result.message)) {
+            receivedMessage = true
+            // Not awaited: `peer.message` runs handling message may be slow,
+            // and awaiting it would block decoding of subsequent messages.
+            void peer.message(result.message)
+          }
+        }),
+      )
 
       websocket.addEventListener('close', async (event) => {
-        closeReason = new AbortError(`WebSocket closed (code ${event.code}: ${event.reason})`)
+        closeReason = new ConnectionClosedError(
+          `WebSocket closed (code ${event.code}: ${event.reason})`,
+        )
+        closedAt = Date.now()
         connectingResolvers?.resolve()
         await peer.close(closeReason)
       })
@@ -251,8 +311,11 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
         })
       }
 
-      this.attempt = 0
-      return { websocket, peer }
+      const openedAt = Date.now()
+      const isHealthy = () =>
+        receivedMessage || (closedAt ?? Date.now()) - openedAt >= HEALTHY_CONNECTION_DURATION
+
+      return { websocket, peer, isHealthy, closeReason: () => closeReason }
     })().catch((error) => {
       if (!this.reconnectEnabled) {
         throw error
@@ -262,7 +325,9 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
         const attempt = this.attempt
         this.attempt = 0
         this.current = undefined
-        throw new AbortError(`WebSocket reconnect failed after ${attempt} attempt(s)`, { cause: error })
+        throw new ConnectionClosedError(`WebSocket reconnect failed after ${attempt} attempt(s)`, {
+          cause: error,
+        })
       }
     })
 

@@ -1,11 +1,12 @@
 import type { AnyMetaPlugin } from '@orpc/contract'
 import { oc } from '@orpc/contract'
-import z from 'zod'
+import * as z from 'zod'
+
 import { os } from './builder'
 import { Lazy, unlazy } from './lazy'
 import { Procedure } from './procedure'
 import * as ProcedureClient from './procedure-client'
-import { call, createContractProcedure, createGuardedProcedureLazy } from './procedure-utils'
+import { call, createContractedProcedure, createGuardedProcedureLazy } from './procedure-utils'
 
 const createProcedureClientSpy = vi.spyOn(ProcedureClient, 'createProcedureClient')
 
@@ -48,9 +49,15 @@ it('createGuardedProcedureLazy', async () => {
   )
 })
 
-it('createContractProcedure', () => {
-  const metaPlugin1: AnyMetaPlugin = { name: 'plugin1', init: meta => ({ ...meta, plugin1: true }) }
-  const metaPlugin2: AnyMetaPlugin = { name: 'plugin2', init: meta => ({ ...meta, plugin2: true }) }
+it('createContractedProcedure', () => {
+  const metaPlugin1: AnyMetaPlugin = {
+    name: 'plugin1',
+    init: (meta) => ({ ...meta, plugin1: true }),
+  }
+  const metaPlugin2: AnyMetaPlugin = {
+    name: 'plugin2',
+    init: (meta) => ({ ...meta, plugin2: true }),
+  }
 
   const procedure = os
     .errors({ CONFLICT: {}, NOT_FOUND: {} })
@@ -65,18 +72,20 @@ it('createContractProcedure', () => {
     .output(z.object({ greeting: z.string() }))
     .meta(metaPlugin1)
 
-  const contractProcedure = createContractProcedure(procedure, contract)
+  const contractedProcedure = createContractedProcedure(procedure, contract)
 
-  expect(contractProcedure).toBeInstanceOf(Procedure)
+  expect(contractedProcedure).toBeInstanceOf(Procedure)
 
-  expect(contractProcedure['~orpc'].inputSchemas).toBe(procedure['~orpc'].inputSchemas)
-  expect(contractProcedure['~orpc'].outputSchemas).toBe(procedure['~orpc'].outputSchemas)
-  expect(contractProcedure['~orpc'].handler).toBe(procedure['~orpc'].handler)
-  expect(contractProcedure['~orpc'].orderedMiddlewares).toBe(procedure['~orpc'].orderedMiddlewares)
+  expect(contractedProcedure['~orpc'].inputSchemas).toBe(procedure['~orpc'].inputSchemas)
+  expect(contractedProcedure['~orpc'].outputSchemas).toBe(procedure['~orpc'].outputSchemas)
+  expect(contractedProcedure['~orpc'].handler).toBe(procedure['~orpc'].handler)
+  expect(contractedProcedure['~orpc'].orderedMiddlewares).toBe(
+    procedure['~orpc'].orderedMiddlewares,
+  )
 
-  expect(contractProcedure['~orpc'].errorMap).toBe(contract['~orpc'].errorMap)
-  expect(contractProcedure['~orpc'].meta).toBe(contract['~orpc'].meta)
-  expect(contractProcedure['~orpc'].metaPlugins).toBe(contract['~orpc'].metaPlugins)
+  expect(contractedProcedure['~orpc'].errorMap).toBe(contract['~orpc'].errorMap)
+  expect(contractedProcedure['~orpc'].meta).toBe(contract['~orpc'].meta)
+  expect(contractedProcedure['~orpc'].metaPlugins).toBe(contract['~orpc'].metaPlugins)
 })
 
 it('call', async () => {
@@ -88,7 +97,11 @@ it('call', async () => {
   const client = vi.fn(async () => '__output__')
   vi.mocked(createProcedureClientSpy).mockReturnValueOnce(client as any)
 
-  const options = { context: { db: 'postgres' }, signal: AbortSignal.timeout(1000), lastEventId: '123' }
+  const options = {
+    context: { db: 'postgres' },
+    signal: AbortSignal.timeout(1000),
+    lastEventId: '123',
+  }
   const input = { input: 123 }
   const output = await call(procedure, input, options)
 

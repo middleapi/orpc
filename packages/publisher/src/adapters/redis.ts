@@ -1,4 +1,6 @@
+import type { ThrowableError } from '@orpc/shared'
 import type { RedisClientType } from 'redis'
+
 import type { BaseRedisPublisherOptions, RedisStreamEntry } from './base-redis'
 import { BaseRedisPublisher } from './base-redis'
 
@@ -10,8 +12,17 @@ export interface RedisPublisherOptions extends BaseRedisPublisherOptions {
    *
    * @default redis.duplicate()
    */
-  subscriber?: undefined | RedisClientType<any, any, any, any, any>
+  subscriber?: RedisClientType<any, any, any, any, any> | undefined
 }
+
+/**
+ * The `onError` callbacks of the subscriptions on each subscriber, so publishers sharing
+ * a subscriber, such as those created by `prefix`, add a single `error` listener to it.
+ */
+const subscriberOnErrors = /* @__PURE__ */ new WeakMap<
+  object,
+  Array<(error: ThrowableError) => void>
+>()
 
 /**
  * Publisher adapter for Redis. Distributes events across processes via
@@ -28,20 +39,47 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
    */
   private readonly channelPrefix: string
 
+  private readonly onErrors: Array<(error: ThrowableError) => void>
+
   constructor(
     private readonly redis: RedisClientType<any, any, any, any, any>,
-    { subscriber, ...options }: RedisPublisherOptions = {},
+    private readonly options: RedisPublisherOptions = {},
   ) {
     super(options)
 
-    const keyPrefix = redis.options?.keyPrefix
+    const clientKeyPrefix = redis.options?.keyPrefix
 
-    if (keyPrefix !== undefined && typeof keyPrefix !== 'string') {
+    if (clientKeyPrefix !== undefined && typeof clientKeyPrefix !== 'string') {
       throw new TypeError('RedisPublisher only supports a string keyPrefix on the Redis client.')
     }
 
-    this.subscriber = subscriber ?? redis.duplicate()
-    this.channelPrefix = keyPrefix ?? ''
+    this.subscriber = options.subscriber ?? redis.duplicate()
+    this.channelPrefix = clientKeyPrefix ?? ''
+
+    if (!subscriberOnErrors.has(this.subscriber)) {
+      const onErrors: Array<(error: ThrowableError) => void> = []
+      subscriberOnErrors.set(this.subscriber, onErrors)
+
+      this.subscriber.on('error', (error) => {
+        // Snapshot, since a callback may unsubscribe itself mid-dispatch.
+        onErrors.slice().forEach((onError) => onError(error))
+      })
+    }
+
+    this.onErrors = subscriberOnErrors.get(this.subscriber)!
+  }
+
+  /**
+   * Creates a publisher with `prefix` appended to this publisher's prefix, sharing its Redis client and subscriber.
+   *
+   * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
+   */
+  prefix(prefix: string): RedisPublisher<T> {
+    return new RedisPublisher(this.redis, {
+      ...this.options,
+      subscriber: this.subscriber,
+      prefix: `${this.keyPrefix}${prefix}`,
+    })
   }
 
   protected async publishMessage(channel: string, message: string): Promise<void> {
@@ -49,13 +87,30 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
     await this.redis.publish(`${this.channelPrefix}${channel}`, message)
   }
 
-  protected async subscribeChannel(channel: string, listener: (message: unknown) => void): Promise<() => Promise<void>> {
+  protected async subscribeChannel(
+    channel: string,
+    listener: (message: unknown) => void,
+    onError?: (error: ThrowableError) => void,
+  ): Promise<() => Promise<void>> {
     const prefixedChannel = `${this.channelPrefix}${channel}`
 
     await connectIfNeeded(this.subscriber)
     await this.subscriber.subscribe(prefixedChannel, listener)
 
+    // Registered after subscribing because a failed subscription rejects instead.
+    if (onError) {
+      this.onErrors.push(onError)
+    }
+
     return async () => {
+      if (onError) {
+        const index = this.onErrors.indexOf(onError)
+
+        if (index !== -1) {
+          this.onErrors.splice(index, 1)
+        }
+      }
+
       await this.subscriber.unsubscribe(prefixedChannel, listener)
     }
   }
@@ -71,7 +126,8 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
 
     const results = await this.redis.xRead({ key, id: lastId })
 
-    const entries: Array<{ id: string, message: Record<string, string> }> = results?.[0]?.messages ?? []
+    const entries: Array<{ id: string; message: Record<string, string> }> =
+      results?.[0]?.messages ?? []
 
     return entries.map(({ id, message }) => ({ id, data: message.data! }))
   }

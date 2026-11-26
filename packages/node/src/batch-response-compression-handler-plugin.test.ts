@@ -1,9 +1,16 @@
+import { Buffer } from 'node:buffer'
+
 import type { AnyRouter } from '@orpc/server'
-import type { BatchResponseCompressionHandlerPluginOptions } from './batch-response-compression-handler-plugin'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
-import { BATCH_CONTENT_TYPE, BatchHandlerPlugin, ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
+import {
+  BATCH_CONTENT_TYPE,
+  BatchHandlerPlugin,
+  ResponseCompressionHandlerPlugin,
+} from '@orpc/server/plugins'
 import { promiseWithResolvers } from '@orpc/shared'
+
+import type { BatchResponseCompressionHandlerPluginOptions } from './batch-response-compression-handler-plugin'
 import { BatchResponseCompressionHandlerPlugin } from './batch-response-compression-handler-plugin'
 
 // Long enough that a compressed body is unmistakably smaller than the identity one
@@ -15,19 +22,20 @@ type Encoding = 'gzip' | 'deflate' | 'deflate-raw'
  * A batch request for one subrequest per url, which is all any of these tests needs to name.
  */
 function createBatchRequest(
-  mode: 'buffered' | 'streaming',
   urls: string[],
   headers: Record<string, string> = { 'accept-encoding': 'gzip' },
 ) {
   return new Request('https://example.com/__batch__', {
     method: 'POST',
-    headers: { ...headers, 'content-type': 'application/json', 'orpc-batch': mode },
-    body: JSON.stringify(urls.map((url, id) => ({
-      kind: 'request',
-      id,
-      json: { method: 'POST', url, headers: {}, body: undefined },
-      binary: undefined,
-    }))),
+    headers: { ...headers, 'content-type': 'application/json', 'orpc-batch': '1' },
+    body: JSON.stringify(
+      urls.map((url, index) => ({
+        kind: 'request',
+        id: String(index),
+        json: { method: 'POST', url, headers: {}, body: undefined },
+        binary: undefined,
+      })),
+    ),
   })
 }
 
@@ -39,6 +47,9 @@ describe('batchResponseCompressionHandlerPlugin', () => {
   const router = {
     ping: os.handler(() => largeValue),
     blob: os.handler(() => new Blob([largeValue], { type: 'application/octet-stream' })),
+    events: os.handler(async function* () {
+      yield largeValue
+    }),
   }
 
   function createHandler(
@@ -46,15 +57,14 @@ describe('batchResponseCompressionHandlerPlugin', () => {
     handlerRouter: AnyRouter = router as AnyRouter,
   ) {
     return new RPCHandler(handlerRouter, {
-      plugins: [
-        new BatchHandlerPlugin(),
-        new BatchResponseCompressionHandlerPlugin(options),
-      ],
+      plugins: [new BatchHandlerPlugin(), new BatchResponseCompressionHandlerPlugin(options)],
     })
   }
 
-  it('compresses streaming batch responses', async () => {
-    const { matched, response } = await createHandler().handle(createBatchRequest('streaming', ['/ping', '/ping']))
+  it('compresses batch responses that stream', async () => {
+    const { matched, response } = await createHandler().handle(
+      createBatchRequest(['/events', '/ping']),
+    )
 
     expect(matched).toBe(true)
     expect(response!.status).toBe(207)
@@ -71,17 +81,22 @@ describe('batchResponseCompressionHandlerPlugin', () => {
 
   /**
    * The reason this plugin exists: `CompressionStream` cannot flush, so every message of a
-   * streaming batch would sit in the compressor until the slowest subrequest resolved.
+   * batch that streams would sit in the compressor until the stream ended.
    */
-  it('delivers each message as soon as it is produced, without waiting for the whole batch', async () => {
+  it('delivers each message as soon as it is produced, without waiting for the stream to end', async () => {
     const slow = promiseWithResolvers<string>()
 
-    const handler = createHandler({}, {
-      fast: os.handler(() => largeValue),
-      slow: os.handler(() => slow.promise),
-    })
+    const handler = createHandler(
+      {},
+      {
+        stream: os.handler(async function* () {
+          yield largeValue
+          yield await slow.promise
+        }),
+      },
+    )
 
-    const { response } = await handler.handle(createBatchRequest('streaming', ['/fast', '/slow']))
+    const { response } = await handler.handle(createBatchRequest(['/stream']))
     const reader = response!.body!.pipeThrough(new DecompressionStream('gzip')).getReader()
     const decoder = new TextDecoder()
     let received = ''
@@ -89,7 +104,7 @@ describe('batchResponseCompressionHandlerPlugin', () => {
     const readUntil = async (text: string) => {
       while (!received.includes(text)) {
         const { done, value } = await reader.read()
-        // A buffering compressor ends the stream (or stalls) before the fast message arrives
+        // A buffering compressor ends the stream (or stalls) before the first message arrives
         expect(done).toBe(false)
         received += decoder.decode(value, { stream: true })
       }
@@ -101,36 +116,49 @@ describe('batchResponseCompressionHandlerPlugin', () => {
   })
 
   /**
-   * Keep-alive frames hold the connection open while no subrequest has resolved, so a compressor
+   * Keep-alive frames hold the connection open while a stream is idle, so a compressor
    * that buffered them would let the very connection they protect time out.
    */
   it('keeps sending keep-alive frames while the batch is idle', async () => {
     const pending = promiseWithResolvers<string>()
 
-    const handler = new RPCHandler({ pending: os.handler(() => pending.promise) }, {
+    const router = {
+      pending: os.handler(async function* () {
+        yield await pending.promise
+      }),
+    }
+
+    const handler = new RPCHandler(router, {
       plugins: [
-        new BatchHandlerPlugin({ keepAlive: { enabled: true, interval: 20 } }),
+        new BatchHandlerPlugin({ keepAlive: { interval: 20 } }),
         new BatchResponseCompressionHandlerPlugin(),
       ],
     })
 
-    const { response } = await handler.handle(createBatchRequest('streaming', ['/pending']))
+    const { response } = await handler.handle(createBatchRequest(['/pending']))
     const reader = response!.body!.pipeThrough(new DecompressionStream('gzip')).getReader()
+    let received = Buffer.alloc(0)
 
-    // Two zero-length length-prefixed frames, four bytes each
-    let bytes = 0
-    while (bytes < 8) {
-      const { done, value } = await reader.read()
-      expect(done).toBe(false)
-      bytes += value!.byteLength
+    const readAtLeast = async (length: number) => {
+      while (received.byteLength < length) {
+        const { done, value } = await reader.read()
+        expect(done).toBe(false)
+        received = Buffer.concat([received, value!])
+      }
     }
+
+    // The response message frame, then two zero-length length-prefixed frames, four bytes each
+    await readAtLeast(4)
+    const messageEnd = 4 + received.readUInt32BE(0)
+    await readAtLeast(messageEnd + 8)
+    expect(received.subarray(messageEnd, messageEnd + 8)).toEqual(Buffer.alloc(8))
 
     pending.resolve('done')
     await reader.cancel()
   })
 
-  it('compresses buffered batch responses that carry binary subresponses', async () => {
-    const { response } = await createHandler().handle(createBatchRequest('buffered', ['/blob', '/ping']))
+  it('compresses batch responses that carry binary subresponses', async () => {
+    const { response } = await createHandler().handle(createBatchRequest(['/blob', '/ping']))
 
     expect(response!.status).toBe(207)
     expect(response!.headers.get('content-encoding')).toBe('gzip')
@@ -144,11 +172,11 @@ describe('batchResponseCompressionHandlerPlugin', () => {
   })
 
   /**
-   * A json-only buffered batch is a plain array of messages rather than a framed body, and it is
+   * A json-only batch is a plain array of messages rather than a framed body, and it is
    * still a batch response, so this plugin compresses it as json instead of leaving it behind.
    */
-  it('compresses json-only buffered batch responses', async () => {
-    const { response } = await createHandler().handle(createBatchRequest('buffered', ['/ping', '/ping']))
+  it('compresses json-only batch responses', async () => {
+    const { response } = await createHandler().handle(createBatchRequest(['/ping', '/ping']))
 
     expect(response!.status).toBe(207)
     expect(response!.headers.get('content-encoding')).toBe('gzip')
@@ -163,17 +191,45 @@ describe('batchResponseCompressionHandlerPlugin', () => {
     expect(JSON.stringify(decoded)).toContain(largeValue)
   })
 
+  it.each([
+    ['that streams', ['/events', '/ping'], 'octet-stream'],
+    ['with a binary subresponse', ['/blob', '/ping'], 'octet-stream'],
+    ['of json only', ['/ping', '/ping'], 'json'],
+  ])('keeps the content type the batch headers set on a batch %s', async (_case, urls, hint) => {
+    const handler = new RPCHandler(router, {
+      plugins: [
+        new BatchHandlerPlugin({ headers: { 'content-type': 'application/x-custom' } }),
+        new BatchResponseCompressionHandlerPlugin(),
+      ],
+    })
+
+    const { response } = await handler.handle(createBatchRequest(urls))
+    const { response: uncompressed } = await handler.handle(
+      createBatchRequest(urls, { 'accept-encoding': 'identity' }),
+    )
+
+    expect(response!.headers.get('content-encoding')).toBe('gzip')
+    expect(response!.headers.get('content-type')).toBe('application/x-custom')
+    expect(response!.headers.get('standard-server')).toBe(hint)
+    expect(uncompressed!.headers.get('content-type')).toBe('application/x-custom')
+
+    await expect(decompress(response!, 'gzip')).resolves.toContain(largeValue)
+  })
+
   // Each shape measures its own size, the binary one on the blob and the json one on its bytes
   it.each([
     ['with a binary subresponse', '/blob'],
     ['of json only', '/tiny'],
-  ] as const)('leaves a buffered batch %s below the threshold alone', async (_case, url) => {
-    const handler = createHandler({ threshold: 10 * 1024 }, {
-      ...router,
-      tiny: os.handler(() => 'ok'),
-    })
+  ] as const)('leaves a batch %s below the threshold alone', async (_case, url) => {
+    const handler = createHandler(
+      { threshold: 10 * 1024 },
+      {
+        ...router,
+        tiny: os.handler(() => 'ok'),
+      },
+    )
 
-    const { response } = await handler.handle(createBatchRequest('buffered', [url]))
+    const { response } = await handler.handle(createBatchRequest([url]))
 
     expect(response!.headers.get('content-encoding')).toBe(null)
   })
@@ -182,21 +238,29 @@ describe('batchResponseCompressionHandlerPlugin', () => {
    * A batch that fails as a whole answers with a plain message rather than subresponses.
    */
   it('leaves a failed batch response alone', async () => {
-    const { response } = await createHandler().handle(new Request('https://example.com/__batch__', {
-      method: 'POST',
-      headers: { 'accept-encoding': 'gzip', 'content-type': 'application/json', 'orpc-batch': 'streaming' },
-      body: JSON.stringify({ not: 'an array of messages' }),
-    }))
+    const { response } = await createHandler().handle(
+      new Request('https://example.com/__batch__', {
+        method: 'POST',
+        headers: {
+          'accept-encoding': 'gzip',
+          'content-type': 'application/json',
+          'orpc-batch': '1',
+        },
+        body: JSON.stringify({ not: 'an array of messages' }),
+      }),
+    )
 
     expect(response!.status).toBe(400)
     expect(response!.headers.get('content-encoding')).toBe(null)
   })
 
   it('leaves responses that are not batch responses alone', async () => {
-    const { response } = await createHandler().handle(new Request('https://example.com/ping', {
-      method: 'POST',
-      headers: { 'accept-encoding': 'gzip' },
-    }))
+    const { response } = await createHandler().handle(
+      new Request('https://example.com/ping', {
+        method: 'POST',
+        headers: { 'accept-encoding': 'gzip' },
+      }),
+    )
 
     expect(response!.status).toBe(200)
     expect(response!.headers.get('content-encoding')).toBe(null)
@@ -204,10 +268,12 @@ describe('batchResponseCompressionHandlerPlugin', () => {
   })
 
   it('leaves a request that matched no procedure alone', async () => {
-    const { matched, response } = await createHandler().handle(new Request('https://example.com/absent', {
-      method: 'POST',
-      headers: { 'accept-encoding': 'gzip' },
-    }))
+    const { matched, response } = await createHandler().handle(
+      new Request('https://example.com/absent', {
+        method: 'POST',
+        headers: { 'accept-encoding': 'gzip' },
+      }),
+    )
 
     expect(matched).toBe(false)
     expect(response).toBeUndefined()
@@ -216,27 +282,40 @@ describe('batchResponseCompressionHandlerPlugin', () => {
   it('leaves an invalid batch response alone', async () => {
     const handler = new RPCHandler(router, {
       plugins: [new BatchResponseCompressionHandlerPlugin({ threshold: 0 })],
-      routingInterceptors: [async () => ({
-        matched: true,
-        response: { status: 200, headers: { 'content-type': BATCH_CONTENT_TYPE }, body: 'invalid' },
-      })],
+      routingInterceptors: [
+        async () => ({
+          matched: true,
+          response: {
+            status: 200,
+            headers: { 'content-type': BATCH_CONTENT_TYPE },
+            body: 'invalid',
+          },
+        }),
+      ],
     })
 
-    const { response } = await handler.handle(createBatchRequest('streaming', ['/ping']))
+    const { response } = await handler.handle(createBatchRequest(['/ping']))
 
     expect(response!.headers.get('content-encoding')).toBe(null)
     await expect(response!.text()).resolves.toContain('invalid')
   })
 
   it('leaves non-batch responses alone even when they carry the batch content type', async () => {
-    const handler = createHandler({}, {
-      export: os.handler(() => new File([largeValue], 'export.batch', { type: BATCH_CONTENT_TYPE })),
-    })
+    const handler = createHandler(
+      {},
+      {
+        export: os.handler(
+          () => new File([largeValue], 'export.batch', { type: BATCH_CONTENT_TYPE }),
+        ),
+      },
+    )
 
-    const { response } = await handler.handle(new Request('https://example.com/export', {
-      method: 'POST',
-      headers: { 'accept-encoding': 'gzip' },
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com/export', {
+        method: 'POST',
+        headers: { 'accept-encoding': 'gzip' },
+      }),
+    )
 
     expect(response!.headers.get('content-encoding')).toBe(null)
     expect(response!.headers.get('content-type')).toBe(BATCH_CONTENT_TYPE)
@@ -249,17 +328,19 @@ describe('batchResponseCompressionHandlerPlugin', () => {
 
     const handler = new RPCHandler(router, {
       plugins: [new BatchResponseCompressionHandlerPlugin({ threshold: 0 })],
-      routingInterceptors: [async () => ({
-        matched: true,
-        response: {
-          status: 206,
-          headers: { 'content-type': BATCH_CONTENT_TYPE, 'content-range': contentRange },
-          body: new Blob([largeValue], { type: BATCH_CONTENT_TYPE }),
-        },
-      })],
+      routingInterceptors: [
+        async () => ({
+          matched: true,
+          response: {
+            status: 206,
+            headers: { 'content-type': BATCH_CONTENT_TYPE, 'content-range': contentRange },
+            body: new Blob([largeValue], { type: BATCH_CONTENT_TYPE }),
+          },
+        }),
+      ],
     })
 
-    const { response } = await handler.handle(createBatchRequest('streaming', ['/ping']))
+    const { response } = await handler.handle(createBatchRequest(['/ping']))
 
     expect(response!.status).toBe(206)
     expect(response!.headers.get('content-encoding')).toBe(null)
@@ -273,29 +354,39 @@ describe('batchResponseCompressionHandlerPlugin', () => {
       ['deflate', 'deflate'],
       ['deflate-raw', 'deflate-raw'],
       ['gzip;q=0, *', 'deflate'],
-    ] as const)('given accept-encoding %s, compresses with %s', async (acceptEncoding, encoding) => {
-      const handler = createHandler({ encodings: ['gzip', 'deflate', 'deflate-raw'] })
+    ] as const)(
+      'given accept-encoding %s, compresses with %s',
+      async (acceptEncoding, encoding) => {
+        const handler = createHandler({ encodings: ['gzip', 'deflate', 'deflate-raw'] })
 
-      const { response } = await handler.handle(createBatchRequest('streaming', ['/ping'], { 'accept-encoding': acceptEncoding }))
+        const { response } = await handler.handle(
+          createBatchRequest(['/ping'], { 'accept-encoding': acceptEncoding }),
+        )
 
-      expect(response!.headers.get('content-encoding')).toBe(encoding)
-      await expect(decompress(response!, encoding)).resolves.toContain(largeValue)
-    })
+        expect(response!.headers.get('content-encoding')).toBe(encoding)
+        await expect(decompress(response!, encoding)).resolves.toContain(largeValue)
+      },
+    )
 
     it('prefers the first configured encoding the client accepts', async () => {
       const handler = createHandler({ encodings: ['deflate', 'gzip'] })
 
-      const { response } = await handler.handle(createBatchRequest('streaming', ['/ping'], { 'accept-encoding': 'gzip, deflate' }))
+      const { response } = await handler.handle(
+        createBatchRequest(['/ping'], { 'accept-encoding': 'gzip, deflate' }),
+      )
 
       expect(response!.headers.get('content-encoding')).toBe('deflate')
     })
 
     it.each([
       ['the client accepts only an unsupported coding', { 'accept-encoding': 'br' }],
-      ['the client rejects every configured coding', { 'accept-encoding': 'gzip;q=0, deflate;q=0' }],
+      [
+        'the client rejects every configured coding',
+        { 'accept-encoding': 'gzip;q=0, deflate;q=0' },
+      ],
       ['the client sends no accept-encoding', {}],
     ])('does not compress when %s', async (_case, headers) => {
-      const { response } = await createHandler().handle(createBatchRequest('streaming', ['/ping'], headers))
+      const { response } = await createHandler().handle(createBatchRequest(['/ping'], headers))
 
       expect(response!.headers.get('content-encoding')).toBe(null)
       await expect(response!.text()).resolves.toContain(largeValue)
@@ -310,7 +401,7 @@ describe('batchResponseCompressionHandlerPlugin', () => {
       ],
     })
 
-    const { response } = await handler.handle(createBatchRequest('streaming', ['/ping']))
+    const { response } = await handler.handle(createBatchRequest(['/ping']))
 
     expect(response!.headers.get('vary')).toBe('origin, accept-encoding')
   })
@@ -323,7 +414,7 @@ describe('batchResponseCompressionHandlerPlugin', () => {
       ],
     })
 
-    const { response } = await handler.handle(createBatchRequest('streaming', ['/ping']))
+    const { response } = await handler.handle(createBatchRequest(['/ping']))
 
     expect(response!.headers.get('content-encoding')).toBe('gzip')
     // A strong tag shared with the identity bytes would let If-Range splice them into compressed ones
@@ -341,7 +432,7 @@ describe('batchResponseCompressionHandlerPlugin', () => {
       ],
     })
 
-    const { response } = await handler.handle(createBatchRequest('streaming', ['/ping']))
+    const { response } = await handler.handle(createBatchRequest(['/ping']))
 
     expect(response!.headers.get('content-encoding')).toBe('gzip')
     await expect(decompress(response!, 'gzip')).resolves.toContain(largeValue)
@@ -355,36 +446,56 @@ describe('batchResponseCompressionHandlerPlugin', () => {
       ],
     })
 
-    const { response } = await handler.handle(createBatchRequest('streaming', ['/ping']))
+    const { response } = await handler.handle(createBatchRequest(['/ping']))
 
     expect(response!.headers.get('content-encoding')).toBe(null)
     await expect(response!.text()).resolves.toContain(largeValue)
   })
 
   it.each([
-    ['batch compression first', () => [new BatchResponseCompressionHandlerPlugin(), new ResponseCompressionHandlerPlugin({ threshold: 0 })]],
-    ['response compression first', () => [new ResponseCompressionHandlerPlugin({ threshold: 0 }), new BatchResponseCompressionHandlerPlugin()]],
-  ] as const)('coexists with the response compression plugin, %s, without compressing twice', async (_case, createPlugins) => {
-    const handler = new RPCHandler(router, {
-      plugins: [new BatchHandlerPlugin(), ...createPlugins()],
-    })
+    [
+      'batch compression first',
+      () => [
+        new BatchResponseCompressionHandlerPlugin(),
+        new ResponseCompressionHandlerPlugin({ threshold: 0 }),
+      ],
+    ],
+    [
+      'response compression first',
+      () => [
+        new ResponseCompressionHandlerPlugin({ threshold: 0 }),
+        new BatchResponseCompressionHandlerPlugin(),
+      ],
+    ],
+  ] as const)(
+    'coexists with the response compression plugin, %s, without compressing twice',
+    async (_case, createPlugins) => {
+      const handler = new RPCHandler(router, {
+        plugins: [new BatchHandlerPlugin(), ...createPlugins()],
+      })
 
-    const { response } = await handler.handle(createBatchRequest('streaming', ['/ping']))
+      const { response } = await handler.handle(createBatchRequest(['/ping']))
 
-    expect(response!.headers.get('content-encoding')).toBe('gzip')
-    expect(response!.headers.get('vary')).toBe('accept-encoding')
-    await expect(decompress(response!, 'gzip')).resolves.toContain(largeValue)
-  })
+      expect(response!.headers.get('content-encoding')).toBe('gzip')
+      expect(response!.headers.get('vary')).toBe('accept-encoding')
+      await expect(decompress(response!, 'gzip')).resolves.toContain(largeValue)
+    },
+  )
 
   it('stops a batch cleanly when the client cancels mid-stream', async () => {
-    const handler = createHandler({}, {
-      fast: os.handler(() => largeValue),
-      never: os.handler(({ signal }) => new Promise<string>((_, reject) => {
-        signal?.addEventListener('abort', () => reject(signal.reason))
-      })),
-    })
+    const handler = createHandler(
+      {},
+      {
+        stream: os.handler(async function* ({ signal }) {
+          yield largeValue
+          await new Promise((_, reject) =>
+            signal?.addEventListener('abort', () => reject(signal.reason)),
+          )
+        }),
+      },
+    )
 
-    const { response } = await handler.handle(createBatchRequest('streaming', ['/fast', '/never']))
+    const { response } = await handler.handle(createBatchRequest(['/stream']))
 
     const reader = response!.body!.getReader()
     const { value } = await reader.read()

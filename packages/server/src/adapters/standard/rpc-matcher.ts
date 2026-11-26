@@ -1,14 +1,14 @@
 import type { AnyProcedureContract } from '@orpc/contract'
 import type { Value } from '@orpc/shared'
+import { normalizeHttpPath, pathToHttpPath, stripHttpPathPrefix, value } from '@orpc/shared'
 import type { StandardMethod } from '@standard-server/core'
+
+import { unlazy } from '../../lazy'
 import type { AnyProcedure } from '../../procedure'
+import { Procedure } from '../../procedure'
 import type { AnyRouter } from '../../router'
 import type { WalkProcedureContractsLazyResult } from '../../router-utils'
-import { normalizeHttpPath, pathToHttpPath, value } from '@orpc/shared'
-import { unlazy } from '../../lazy'
-import { Procedure } from '../../procedure'
-import { createContractProcedure } from '../../procedure-utils'
-import { getRouter, walkProcedureContractsSync } from '../../router-utils'
+import { resolveContractedProcedure, walkProcedureContractsSync } from '../../router-utils'
 
 /**
  * Methods that can invoke procedures by default. Browsers cannot trigger them
@@ -19,7 +19,12 @@ import { getRouter, walkProcedureContractsSync } from '../../router-utils'
  *
  * @see {@link https://orpc.dev/docs/rpc/handler#supported-http-methods | RPC Handler - Supported HTTP Methods}
  */
-export const RPC_DEFAULT_ALLOW_METHODS: readonly StandardMethod[] = ['POST', 'PUT', 'PATCH', 'DELETE']
+export const RPC_DEFAULT_ALLOW_METHODS: readonly StandardMethod[] = [
+  'POST',
+  'PUT',
+  'PATCH',
+  'DELETE',
+]
 
 export interface RPCMatcherOptions {
   /**
@@ -27,7 +32,9 @@ export interface RPCMatcherOptions {
    *
    * @default true
    */
-  filter?: Value<boolean, [procedure: AnyProcedureContract | AnyProcedure, path: string[]]>
+  filter?:
+    | Value<boolean, [procedure: AnyProcedureContract | AnyProcedure, path: string[]]>
+    | undefined
 
   /**
    * Restricts which HTTP methods can invoke procedures, either with a list of allowed
@@ -38,8 +45,14 @@ export interface RPCMatcherOptions {
    * @default RPC_DEFAULT_ALLOW_METHODS (['POST', 'PUT', 'PATCH', 'DELETE'])
    * @see {@link https://orpc.dev/docs/rpc/handler#supported-http-methods | RPC Handler - Supported HTTP Methods}
    */
-  allowMethods?: readonly StandardMethod[] | ((method: StandardMethod, procedure: AnyProcedure, path: string[]) => boolean)
+  allowMethods?:
+    | readonly StandardMethod[]
+    | ((method: StandardMethod, procedure: AnyProcedure, path: string[]) => boolean)
+    | undefined
 }
+
+// `%` or a char `encodeURIComponent` encodes, meaning normalization may change the pathname
+const NORMALIZABLE_PATHNAME_REGEX = /[^\w\-.!~*'()/]/
 
 interface TreeEntry {
   path: string[]
@@ -47,19 +60,18 @@ interface TreeEntry {
   procedure?: AnyProcedure | undefined
 }
 
-interface PendingLazyRouter extends WalkProcedureContractsLazyResult {
-  /** in-flight load, shared so concurrent matches never load or re-index the same router twice */
-  loading?: Promise<void> | undefined
-}
-
 export class RPCMatcher {
   private readonly filter: Exclude<RPCMatcherOptions['filter'], undefined>
   private readonly allowMethodsSet: undefined | ReadonlySet<StandardMethod>
-  private readonly allowMethodsFn: undefined | ((method: StandardMethod, procedure: AnyProcedure, path: string[]) => boolean)
+  private readonly allowMethodsFn:
+    | undefined
+    | ((method: StandardMethod, procedure: AnyProcedure, path: string[]) => boolean)
   private readonly rootRouter: AnyRouter
 
   private readonly tree: Map<`/${string}`, TreeEntry> = new Map()
-  private readonly pendingLazyRouters: Map<string, PendingLazyRouter> = new Map()
+  private readonly pendingLazyRouters: Map<string, WalkProcedureContractsLazyResult> = new Map()
+  /** segment count of the deepest pending key, never lowered so it stays an upper bound */
+  private maxPendingLazyRouterDepth = 0
 
   constructor(router: AnyRouter, options: RPCMatcherOptions = {}) {
     this.filter = options.filter ?? true
@@ -67,8 +79,7 @@ export class RPCMatcher {
     const allowMethods = options.allowMethods ?? RPC_DEFAULT_ALLOW_METHODS
     if (typeof allowMethods !== 'function') {
       this.allowMethodsSet = new Set(allowMethods)
-    }
-    else {
+    } else {
       this.allowMethodsFn = allowMethods
     }
 
@@ -77,48 +88,46 @@ export class RPCMatcher {
   }
 
   private index(router: AnyRouter, path: string[] = []): void {
-    const lazyResults = walkProcedureContractsSync(router, (procedure, procedurePath) => {
-      if (!value(this.filter, procedure, procedurePath)) {
-        return
-      }
+    const lazyResults = walkProcedureContractsSync(
+      router,
+      (procedure, procedurePath) => {
+        if (!value(this.filter, procedure, procedurePath)) {
+          return
+        }
 
-      this.tree.set(pathToHttpPath(procedurePath), {
-        path: procedurePath,
-        contract: procedure,
-        // contract-first entries have no implementation yet, resolveProcedure fills it in on demand
-        procedure: procedure instanceof Procedure ? procedure : undefined,
-      })
-    }, path)
+        this.tree.set(pathToHttpPath(procedurePath), {
+          path: procedurePath,
+          contract: procedure,
+          // contract-first entries have no implementation yet, resolveProcedure fills it in on demand
+          procedure: procedure instanceof Procedure ? procedure : undefined,
+        })
+      },
+      path,
+    )
 
     for (const result of lazyResults) {
       this.pendingLazyRouters.set(pathToHttpPath(result.path), result)
+      this.maxPendingLazyRouterDepth = Math.max(this.maxPendingLazyRouterDepth, result.path.length)
     }
   }
 
-  async match(method: StandardMethod, pathname: `/${string}`, prefix: `/${string}` | undefined): Promise<{ path: string[], procedure: AnyProcedure } | undefined> {
+  async match(
+    method: StandardMethod,
+    pathname: `/${string}`,
+    prefix: `/${string}` | undefined,
+  ): Promise<{ path: string[]; procedure: AnyProcedure } | undefined> {
     if (this.allowMethodsSet && !this.allowMethodsSet.has(method)) {
       return undefined
     }
 
     if (prefix) {
-      if (!pathname.startsWith(prefix)) {
+      const stripped = stripHttpPathPrefix(pathname, prefix)
+
+      if (stripped === undefined) {
         return undefined
       }
 
-      const charAfterPrefix = pathname[prefix.length]
-
-      if (charAfterPrefix === '/') {
-        pathname = pathname.slice(prefix.length) as `/${string}`
-      }
-      else if (charAfterPrefix === undefined) {
-        pathname = '/'
-      }
-      else if (prefix[prefix.length - 1] === '/') {
-        pathname = pathname.slice(prefix.length - 1) as `/${string}`
-      }
-      else {
-        return undefined
-      }
+      pathname = stripped
     }
 
     if (pathname.length > 1 && pathname.endsWith('/')) {
@@ -133,10 +142,10 @@ export class RPCMatcher {
 
     let entry = this.tree.get(pathname)
 
-    if (entry === undefined && pathname.includes('%')) {
-      // Retry with a normalized path: users may percent-encode characters that
-      // we store unencoded (e.g. "a%62c" vs "abc"), so normalization lets us
-      // handle those requests without storing duplicate entries.
+    if (entry === undefined && NORMALIZABLE_PATHNAME_REGEX.test(pathname)) {
+      // Retry with a normalized path: users may percent-encode characters that we store
+      // unencoded ("a%62c" vs "abc"), or leave raw characters that we store encoded
+      // ("a^b" vs "a%5Eb"), so normalization handles both without duplicate entries.
 
       const normalizedPathname = normalizeHttpPath(pathname)
 
@@ -153,7 +162,7 @@ export class RPCMatcher {
       return undefined
     }
 
-    const procedure = entry.procedure ?? await this.resolveProcedure(entry)
+    const procedure = entry.procedure ?? (await this.resolveProcedure(entry))
 
     if (this.allowMethodsFn && !this.allowMethodsFn(method, procedure, entry.path)) {
       return undefined
@@ -172,65 +181,41 @@ export class RPCMatcher {
 
     let slashIndex = 0
 
-    while (slashIndex !== -1) {
+    // a pending key has as many segments as its path, so deeper prefixes can never match,
+    // and scanning them would cost quadratic time on slash-heavy pathnames
+    for (let depth = 1; slashIndex !== -1 && depth <= this.maxPendingLazyRouterDepth; depth++) {
       const nextSlashIndex = pathname.indexOf('/', slashIndex + 1)
       const httpPathPrefix = nextSlashIndex === -1 ? pathname : pathname.slice(0, nextSlashIndex)
-
-      if (this.pendingLazyRouters.has(httpPathPrefix)) {
-        return this.loadPendingLazyRouters(pathname, slashIndex)
-      }
-
-      slashIndex = nextSlashIndex
-    }
-  }
-
-  private async loadPendingLazyRouters(pathname: `/${string}`, slashIndex: number): Promise<void> {
-    while (slashIndex !== -1) {
-      const nextSlashIndex = pathname.indexOf('/', slashIndex + 1)
-      const httpPathPrefix = nextSlashIndex === -1 ? pathname : pathname.slice(0, nextSlashIndex)
-
       const pending = this.pendingLazyRouters.get(httpPathPrefix)
 
       if (pending !== undefined) {
-        await this.loadPendingLazyRouter(httpPathPrefix, pending)
+        return this.indexPendingLazyRouter(httpPathPrefix, pending).then(() =>
+          this.resolvePendingLazyRouters(pathname),
+        )
       }
 
       slashIndex = nextSlashIndex
     }
   }
 
-  private loadPendingLazyRouter(httpPathPrefix: string, pending: PendingLazyRouter): Promise<void> {
-    if (pending.loading === undefined) {
-      pending.loading = this.indexPendingLazyRouter(httpPathPrefix, pending).catch((error) => {
-        pending.loading = undefined
-        throw error
-      })
-    }
-
-    return pending.loading
-  }
-
-  private async indexPendingLazyRouter(httpPathPrefix: string, pending: PendingLazyRouter): Promise<void> {
+  /** Not shared across matches: on Cloudflare Workers, a promise never settles once its request ends. */
+  private async indexPendingLazyRouter(
+    httpPathPrefix: string,
+    pending: WalkProcedureContractsLazyResult,
+  ): Promise<void> {
     const { default: router } = await unlazy(pending.router)
 
-    this.index(router, pending.path)
+    // already indexed by a concurrent match
+    if (this.pendingLazyRouters.get(httpPathPrefix) !== pending) {
+      return
+    }
 
-    // removed only once indexed, so a concurrent match never observes this router as
-    // neither pending nor indexed
+    this.index(router, pending.path)
     this.pendingLazyRouters.delete(httpPathPrefix)
   }
 
   private async resolveProcedure(entry: TreeEntry): Promise<AnyProcedure> {
-    const { default: maybeProcedure } = await unlazy(getRouter(this.rootRouter, entry.path))
-
-    if (!(maybeProcedure instanceof Procedure)) {
-      throw new TypeError(
-        `[Contract-First] Missing or invalid implementation for procedure at path: "${entry.path.join('.')}". `
-        + `Ensure the procedure is correctly implemented and matches its contract.`,
-      )
-    }
-
-    entry.procedure = createContractProcedure(maybeProcedure, entry.contract)
+    entry.procedure = await resolveContractedProcedure(this.rootRouter, entry.contract, entry.path)
 
     return entry.procedure
   }

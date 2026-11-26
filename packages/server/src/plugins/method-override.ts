@@ -1,16 +1,21 @@
-import type { StandardMethod, StandardUrl } from '@standard-server/core'
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '../adapters/standard'
-import type { Context } from '../context'
 import { toArray } from '@orpc/shared'
+import type { StandardMethod, StandardUrl } from '@standard-server/core'
 import { parseStandardUrl } from '@standard-server/core'
+
+import type {
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+  StandardHandlerRoutingInterceptor,
+} from '../adapters/standard/index'
+import type { Context } from '../context'
 
 export interface MethodOverrideHandlerPluginOptions {
   /**
    * The query parameter carrying the override method.
    *
-   * @default 'method'
+   * @default '_method'
    */
-  param?: string
+  param?: string | undefined
 
   /**
    * The methods a POST request may be overridden to.
@@ -20,7 +25,7 @@ export interface MethodOverrideHandlerPluginOptions {
    *
    * @default ['PUT', 'PATCH', 'DELETE']
    */
-  methods?: readonly StandardMethod[]
+  methods?: readonly StandardMethod[] | undefined
 }
 
 /**
@@ -31,23 +36,28 @@ export interface MethodOverrideHandlerPluginOptions {
  * @see {@link https://orpc.dev/docs/plugins/method-override | Method Override Plugin}
  */
 export class MethodOverrideHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  name = '~method-override'
+  readonly name = '~method-override'
 
   /**
-   * Should override batch sub-request methods, not the original batch request.
+   * Runs inside batch: overrides sub-request methods, not the batch request's.
    */
-  before = ['~batch']
+  readonly before: readonly string[] = ['~batch']
 
   private readonly param: string
   private readonly methods: ReadonlySet<string>
 
   constructor(options: MethodOverrideHandlerPluginOptions = {}) {
-    this.param = options.param ?? 'method'
-    this.methods = new Set((options.methods ?? ['PUT', 'PATCH', 'DELETE']).map(method => method.toUpperCase()))
+    this.param = options.param ?? '_method'
+    this.methods = new Set(
+      (options.methods ?? ['PUT', 'PATCH', 'DELETE']).map((method) => method.toUpperCase()),
+    )
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
-    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({ next, ...interceptorOptions }) => {
+    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({
+      next,
+      ...interceptorOptions
+    }) => {
       const { request } = interceptorOptions
 
       if (request.method !== 'POST') {
@@ -68,8 +78,13 @@ export class MethodOverrideHandlerPlugin<T extends Context> implements StandardH
         return next()
       }
 
-      params.delete(this.param)
-      const url = `${pathname}${params.size ? `?${params}` : ''}${hash ?? ''}` as StandardUrl
+      // Drop only the override param, leaving the rest of the query untouched.
+      const rest = search!
+        .slice(1)
+        .split('&')
+        .filter((pair) => new URLSearchParams(`?${pair}`).keys().next().value !== this.param)
+      const url =
+        `${pathname}${rest.length ? `?${rest.join('&')}` : ''}${hash ?? ''}` as StandardUrl
 
       return next({
         ...interceptorOptions,

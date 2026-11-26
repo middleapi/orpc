@@ -1,11 +1,36 @@
-import type { AnySchema, InferSchemaInput, InferSchemaOutput, MergedSchema, Schema } from './schema'
 import { type as arktypeType } from 'arktype'
 import * as v from 'valibot'
-import z from 'zod'
+import * as z from 'zod'
+
+import type { AnySchema, InferSchemaInput, InferSchemaOutput, MergedSchema, Schema } from './schema'
 
 // Schemas should have distinct TInput and TOutput types to ensure correct inference.
-const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
-const outputSchema = z.object({ output: z.string().transform(s => Number(s)) })
+const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })
+const outputSchema = z.object({ output: z.string().transform((s) => Number(s)) })
+const valibotSchema = v.object({
+  value: v.pipe(
+    v.string(),
+    v.transform((s) => Number(s)),
+  ),
+})
+const arktypeSchema = arktypeType({ value: 'string' })
+const untypedSchema = {
+  '~standard': {
+    version: 1 as const,
+    vendor: 'custom',
+    validate: (value: unknown) => ({ value: value as string }),
+  },
+}
+const undefinedTypesSchema = {
+  '~standard': {
+    version: 1 as const,
+    vendor: 'custom',
+    validate: (value: unknown) => ({ value: value as string }),
+    types: undefined,
+  },
+}
+
+type UnionSchema = Schema<{ a: number }, { a: string }> | Schema<{ b: number }, { b: string }>
 
 describe('Schema', () => {
   it('supports any standard schema', () => {
@@ -13,7 +38,10 @@ describe('Schema', () => {
       value: z.string().transform(() => 123),
     })
     const _valibot: AnySchema = v.object({
-      value: v.pipe(v.string(), v.transform(() => 123)),
+      value: v.pipe(
+        v.string(),
+        v.transform(() => 123),
+      ),
     })
     const _arktype: AnySchema = arktypeType({
       value: 'string',
@@ -24,11 +52,53 @@ describe('Schema', () => {
 it('InferSchemaInput', () => {
   expectTypeOf<InferSchemaInput<typeof inputSchema>>().toEqualTypeOf<{ input: number }>()
   expectTypeOf<InferSchemaInput<typeof outputSchema>>().toEqualTypeOf<{ output: string }>()
+  expectTypeOf<InferSchemaInput<typeof valibotSchema>>().toEqualTypeOf<{ value: string }>()
+  expectTypeOf<InferSchemaInput<typeof arktypeSchema>>().toEqualTypeOf<{ value: string }>()
+  expectTypeOf<InferSchemaInput<UnionSchema>>().toEqualTypeOf<{ a: number } | { b: number }>()
+  expectTypeOf<InferSchemaInput<AnySchema>>().toBeAny()
+  expectTypeOf<InferSchemaInput<any>>().toEqualTypeOf<unknown>()
+  expectTypeOf<InferSchemaInput<typeof untypedSchema>>().toEqualTypeOf<unknown>()
+  expectTypeOf<InferSchemaInput<typeof undefinedTypesSchema>>().toEqualTypeOf<never>()
+})
+
+it('InferSchemaInput with a generic schema', () => {
+  function _generic<T extends Schema<{ id: string }>>(value: InferSchemaInput<T>) {
+    expectTypeOf(value.id).toEqualTypeOf<string>()
+
+    const _id: string = value.id
+    const _value: { id: string } = value
+  }
+
+  function _unsound<T extends AnySchema>(value: unknown): InferSchemaInput<T> {
+    // @ts-expect-error - unknown is not assignable to an unresolved schema type
+    return value
+  }
 })
 
 it('InferSchemaOutput', () => {
   expectTypeOf<InferSchemaOutput<typeof inputSchema>>().toEqualTypeOf<{ input: string }>()
   expectTypeOf<InferSchemaOutput<typeof outputSchema>>().toEqualTypeOf<{ output: number }>()
+  expectTypeOf<InferSchemaOutput<typeof valibotSchema>>().toEqualTypeOf<{ value: number }>()
+  expectTypeOf<InferSchemaOutput<typeof arktypeSchema>>().toEqualTypeOf<{ value: string }>()
+  expectTypeOf<InferSchemaOutput<UnionSchema>>().toEqualTypeOf<{ a: string } | { b: string }>()
+  expectTypeOf<InferSchemaOutput<AnySchema>>().toBeAny()
+  expectTypeOf<InferSchemaOutput<any>>().toEqualTypeOf<unknown>()
+  expectTypeOf<InferSchemaOutput<typeof untypedSchema>>().toEqualTypeOf<unknown>()
+  expectTypeOf<InferSchemaOutput<typeof undefinedTypesSchema>>().toEqualTypeOf<never>()
+})
+
+it('InferSchemaOutput with a generic schema', () => {
+  function _generic<T extends Schema<{ id: string }>>(value: InferSchemaOutput<T>) {
+    expectTypeOf(value.id).toEqualTypeOf<string>()
+
+    const _id: string = value.id
+    const _value: { id: string } = value
+  }
+
+  function _unsound<T extends AnySchema>(value: unknown): InferSchemaOutput<T> {
+    // @ts-expect-error - unknown is not assignable to an unresolved schema type
+    return value
+  }
 })
 
 describe('MergedSchema', () => {
@@ -49,16 +119,22 @@ describe('MergedSchema', () => {
 
     type TMerged = MergedSchema<Schema1, MergedSchema<Schema2, Schema3>>
     expectTypeOf<TMerged>().toEqualTypeOf<
-      Schema<{ schema1: number } & { schema2: string } & { schema3: string }, { schema1: string } & { schema2: number } & { schema3: boolean }>
+      Schema<
+        { schema1: number } & { schema2: string } & { schema3: string },
+        { schema1: string } & { schema2: number } & { schema3: boolean }
+      >
     >()
   })
 
   it('works with zod, valibot, arktype', () => {
     const schema1 = z.object({
-      schema1: z.number().transform(n => `${n}`),
+      schema1: z.number().transform((n) => `${n}`),
     })
     const schema2 = v.object({
-      schema2: v.pipe(v.string(), v.transform(s => Number(s))),
+      schema2: v.pipe(
+        v.string(),
+        v.transform((s) => Number(s)),
+      ),
     })
     const schema3 = arktypeType({
       schema3: 'string',
@@ -66,7 +142,10 @@ describe('MergedSchema', () => {
 
     type TMerged = MergedSchema<typeof schema1, MergedSchema<typeof schema2, typeof schema3>>
     expectTypeOf<TMerged>().toEqualTypeOf<
-      Schema<{ schema1: number } & { schema2: string } & { schema3: string }, { schema1: string } & { schema2: number } & { schema3: string }>
+      Schema<
+        { schema1: number } & { schema2: string } & { schema3: string },
+        { schema1: string } & { schema2: number } & { schema3: string }
+      >
     >()
   })
 
@@ -76,7 +155,11 @@ describe('MergedSchema', () => {
     type Schema3 = Schema<{ schema3: string }, { schema3: boolean }>
 
     type TMerged = MergedSchema<Schema1, MergedSchema<Schema2, Schema3>>
-    expectTypeOf<InferSchemaInput<TMerged>>().toEqualTypeOf<{ schema1: number } & { schema2: string } & { schema3: string }>()
-    expectTypeOf<InferSchemaOutput<TMerged>>().toEqualTypeOf<{ schema1: string } & { schema2: number } & { schema3: boolean }>()
+    expectTypeOf<InferSchemaInput<TMerged>>().toEqualTypeOf<
+      { schema1: number } & { schema2: string } & { schema3: string }
+    >()
+    expectTypeOf<InferSchemaOutput<TMerged>>().toEqualTypeOf<
+      { schema1: string } & { schema2: number } & { schema3: boolean }
+    >()
   })
 })

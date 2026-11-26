@@ -1,17 +1,16 @@
 import { os } from '@orpc/server'
 import { z } from 'zod'
+
 import { createServerFunction } from '../server-function'
 import { useOptimisticServerFunction } from './optimistic-server-function'
 
-const inputSchema = z.object({ input: z.number().transform(v => v.toString()) })
+const inputSchema = z.object({ input: z.number().transform((v) => v.toString()) })
 
 describe('useOptimisticServerFunction', () => {
   const fn = createServerFunction(
-    os
-      .input(inputSchema.optional())
-      .handler(async ({ input }) => {
-        return { output: Number(input) }
-      }),
+    os.input(inputSchema.optional()).handler(async ({ input }) => {
+      return { output: Number(input) }
+    }),
   )
 
   it('can infer optimistic state', () => {

@@ -1,6 +1,8 @@
 import { oc } from '@orpc/contract'
-import { os, withHiddenRouterContract } from '@orpc/server'
-import { findAllRoutes } from 'rou3'
+import { call, implement, os } from '@orpc/server'
+import { promiseWithResolvers } from '@orpc/shared'
+import { z } from 'zod'
+
 import { getOpenAPIMeta, openapi } from '../../meta'
 import { OpenAPIMatcher } from './openapi-matcher'
 
@@ -33,14 +35,14 @@ describe('openAPIMatcher', () => {
         params: { value: 'dinwwwh/' },
       })
 
-      await expect(matcher.match('POST', '/nested/echo/dinwwwh%2F', undefined)).resolves.toBeUndefined()
+      await expect(
+        matcher.match('POST', '/nested/echo/dinwwwh%2F', undefined),
+      ).resolves.toBeUndefined()
     })
 
     it('normalizes trailing slashes in request paths and OpenAPI route definitions', async () => {
       const ping = os.handler(() => 'pong')
-      const echo = os
-        .meta(openapi({ method: 'GET', path: '/echo/' }))
-        .handler(() => 'echo')
+      const echo = os.meta(openapi({ method: 'GET', path: '/echo/' })).handler(() => 'echo')
 
       const matcher = new OpenAPIMatcher({ ping, echo })
 
@@ -64,9 +66,7 @@ describe('openAPIMatcher', () => {
     })
 
     it('decodes catch-all params, keeps their empty segments, and trims trailing slashes', async () => {
-      const files = os
-        .meta(openapi({ method: 'GET', path: '/files/{+path}' }))
-        .handler(() => 'ok')
+      const files = os.meta(openapi({ method: 'GET', path: '/files/{+path}' })).handler(() => 'ok')
 
       const matcher = new OpenAPIMatcher({ files })
 
@@ -76,7 +76,9 @@ describe('openAPIMatcher', () => {
         params: { path: 'a/b/c/d' },
       })
 
-      await expect(matcher.match('GET', '/files/https%3A//example.com/a', undefined)).resolves.toEqual({
+      await expect(
+        matcher.match('GET', '/files/https%3A//example.com/a', undefined),
+      ).resolves.toEqual({
         path: ['files'],
         procedure: files,
         params: { path: 'https://example.com/a' },
@@ -90,9 +92,7 @@ describe('openAPIMatcher', () => {
     })
 
     it('applies OpenAPI prefixes to generated and explicit routes', async () => {
-      const ping = os
-        .meta(openapi({ prefix: '/api' }))
-        .handler(() => 'pong')
+      const ping = os.meta(openapi({ prefix: '/api' })).handler(() => 'pong')
 
       const echo = os
         .meta(openapi({ method: 'GET', prefix: '/api/v1', path: '/echo/{value}' }))
@@ -121,12 +121,15 @@ describe('openAPIMatcher', () => {
       const secret = os.handler(() => 'hidden')
       const filter = vi.fn((_procedure: unknown, path: string[]) => !path.includes('secret'))
 
-      const matcher = new OpenAPIMatcher({
-        ping,
-        internal: { secret },
-      }, {
-        filter,
-      })
+      const matcher = new OpenAPIMatcher(
+        {
+          ping,
+          internal: { secret },
+        },
+        {
+          filter,
+        },
+      )
 
       await expect(matcher.match('POST', '/ping', undefined)).resolves.toEqual({
         path: ['ping'],
@@ -168,9 +171,15 @@ describe('openAPIMatcher', () => {
     })
 
     it('supports param names that are not identifiers, and repeated names', async () => {
-      const hyphen = os.meta(openapi({ method: 'GET', path: '/users/{user-id}' })).handler(() => 'ok')
-      const digit = os.meta(openapi({ method: 'GET', path: '/digits/{0}/{1st}' })).handler(() => 'ok')
-      const repeated = os.meta(openapi({ method: 'GET', path: '/repeated/{id}/{id}' })).handler(() => 'ok')
+      const hyphen = os
+        .meta(openapi({ method: 'GET', path: '/users/{user-id}' }))
+        .handler(() => 'ok')
+      const digit = os
+        .meta(openapi({ method: 'GET', path: '/digits/{0}/{1st}' }))
+        .handler(() => 'ok')
+      const repeated = os
+        .meta(openapi({ method: 'GET', path: '/repeated/{id}/{id}' }))
+        .handler(() => 'ok')
 
       const matcher = new OpenAPIMatcher({ hyphen, digit, repeated })
 
@@ -200,8 +209,12 @@ describe('openAPIMatcher', () => {
       const dotDotPing = os.handler(() => 'pong')
       const star = os.handler(() => 'star')
       const group = os.handler(() => 'group')
-      const batch = os.meta(openapi({ method: 'GET', path: '/items:batchGet' })).handler(() => 'batch')
-      const braces = os.meta(openapi({ method: 'GET', path: '/a/{id}.json' })).handler(() => 'braces')
+      const batch = os
+        .meta(openapi({ method: 'GET', path: '/items:batchGet' }))
+        .handler(() => 'batch')
+      const braces = os
+        .meta(openapi({ method: 'GET', path: '/a/{id}.json' }))
+        .handler(() => 'braces')
       const question = os.meta(openapi({ method: 'GET', path: '/what?' })).handler(() => 'question')
 
       const matcher = new OpenAPIMatcher({
@@ -215,24 +228,45 @@ describe('openAPIMatcher', () => {
         question,
       })
 
-      await expect(matcher.match('POST', '/ping', undefined)).resolves.toMatchObject({ procedure: ping })
-      await expect(matcher.match('POST', '/./ping', undefined)).resolves.toMatchObject({ procedure: dotPing })
-      await expect(matcher.match('POST', '/../ping', undefined)).resolves.toMatchObject({ procedure: dotDotPing })
+      await expect(matcher.match('POST', '/ping', undefined)).resolves.toMatchObject({
+        procedure: ping,
+      })
+      await expect(matcher.match('POST', '/./ping', undefined)).resolves.toMatchObject({
+        procedure: dotPing,
+      })
+      await expect(matcher.match('POST', '/../ping', undefined)).resolves.toMatchObject({
+        procedure: dotDotPing,
+      })
 
-      await expect(matcher.match('POST', '/*', undefined)).resolves.toMatchObject({ procedure: star, params: undefined })
+      await expect(matcher.match('POST', '/*', undefined)).resolves.toMatchObject({
+        procedure: star,
+        params: undefined,
+      })
       await expect(matcher.match('POST', '/anything', undefined)).resolves.toBeUndefined()
 
-      await expect(matcher.match('POST', '/(x)', undefined)).resolves.toMatchObject({ procedure: group, params: undefined })
+      await expect(matcher.match('POST', '/(x)', undefined)).resolves.toMatchObject({
+        procedure: group,
+        params: undefined,
+      })
       await expect(matcher.match('POST', '/x', undefined)).resolves.toBeUndefined()
 
-      await expect(matcher.match('GET', '/items:batchGet', undefined)).resolves.toMatchObject({ procedure: batch, params: undefined })
+      await expect(matcher.match('GET', '/items:batchGet', undefined)).resolves.toMatchObject({
+        procedure: batch,
+        params: undefined,
+      })
       await expect(matcher.match('GET', '/itemsfoo', undefined)).resolves.toBeUndefined()
 
       // only whole-segment `{name}` is a param
-      await expect(matcher.match('GET', '/a/%7Bid%7D.json', undefined)).resolves.toMatchObject({ procedure: braces, params: undefined })
+      await expect(matcher.match('GET', '/a/%7Bid%7D.json', undefined)).resolves.toMatchObject({
+        procedure: braces,
+        params: undefined,
+      })
       await expect(matcher.match('GET', '/a/id.json', undefined)).resolves.toBeUndefined()
 
-      await expect(matcher.match('GET', '/what%3F', undefined)).resolves.toMatchObject({ procedure: question, params: undefined })
+      await expect(matcher.match('GET', '/what%3F', undefined)).resolves.toMatchObject({
+        procedure: question,
+        params: undefined,
+      })
       await expect(matcher.match('GET', '/what', undefined)).resolves.toBeUndefined()
     })
 
@@ -250,8 +284,124 @@ describe('openAPIMatcher', () => {
       }
     })
 
+    it('matches path text whether the request leaves it raw or percent-encodes it', async () => {
+      const procedure = os
+        .meta(openapi({ method: 'GET', path: '/v1^beta/items:batchGet/{id}' }))
+        .handler(() => 'ok')
+
+      const matcher = new OpenAPIMatcher({ procedure })
+
+      for (const pathname of [
+        '/v1^beta/items:batchGet/a^b',
+        '/v1%5Ebeta/items:batchGet/a^b',
+        '/v1%5ebeta/items%3AbatchGet/a%5Eb',
+      ] as const) {
+        await expect(matcher.match('GET', pathname, undefined)).resolves.toEqual({
+          path: ['procedure'],
+          procedure,
+          params: { id: 'a^b' },
+        })
+      }
+
+      await expect(
+        matcher.match('GET', '/v1beta/items:batchGet/a^b', undefined),
+      ).resolves.toBeUndefined()
+    })
+
+    it('prefers a static route over a dynamic sibling however the request path is percent-encoded', async () => {
+      const beta = os.meta(openapi({ method: 'GET', path: '/v1^beta/items' })).handler(() => 'beta')
+      const version = os
+        .meta(openapi({ method: 'GET', path: '/{version}/items' }))
+        .handler(() => 'version')
+      const me = os.meta(openapi({ method: 'GET', path: '/users/me' })).handler(() => 'me')
+      const byId = os.meta(openapi({ method: 'GET', path: '/users/{id}' })).handler(() => 'byId')
+
+      const matcher = new OpenAPIMatcher({ beta, version, me, byId })
+
+      for (const pathname of ['/v1^beta/items', '/v1%5Ebeta/items', '/v1%5ebeta/items'] as const) {
+        await expect(matcher.match('GET', pathname, undefined)).resolves.toEqual({
+          path: ['beta'],
+          procedure: beta,
+          params: undefined,
+        })
+      }
+
+      for (const pathname of ['/users/me', '/users/m%65', '/users/%6D%65'] as const) {
+        await expect(matcher.match('GET', pathname, undefined)).resolves.toEqual({
+          path: ['me'],
+          procedure: me,
+          params: undefined,
+        })
+      }
+
+      // the dynamic siblings still match everything else, with decoded params
+      await expect(matcher.match('GET', '/v2^beta/items', undefined)).resolves.toEqual({
+        path: ['version'],
+        procedure: version,
+        params: { version: 'v2^beta' },
+      })
+
+      await expect(matcher.match('GET', '/users/m%2Fe', undefined)).resolves.toEqual({
+        path: ['byId'],
+        procedure: byId,
+        params: { id: 'm/e' },
+      })
+    })
+
+    it('matches path text however the route and the request encode it', async () => {
+      const generated = os.handler(() => 'generated')
+      const explicit = os
+        .meta(openapi({ method: 'GET', path: '/x%3Ay/a%2Fb/{id}' }))
+        .handler(() => 'explicit')
+
+      const matcher = new OpenAPIMatcher({ 'a:b{c}': generated, explicit })
+
+      for (const pathname of ['/a:b%7Bc%7D', '/a%3Ab%7bc%7d', '/a:b{c}'] as const) {
+        await expect(matcher.match('POST', pathname, undefined)).resolves.toMatchObject({
+          procedure: generated,
+          params: undefined,
+        })
+      }
+
+      for (const pathname of ['/x:y/a%2Fb/1', '/x%3Ay/a%2fb/1'] as const) {
+        await expect(matcher.match('GET', pathname, undefined)).resolves.toMatchObject({
+          procedure: explicit,
+          params: { id: '1' },
+        })
+      }
+
+      // an encoded slash stays part of its segment
+      await expect(matcher.match('GET', '/x:y/a/b/1', undefined)).resolves.toBeUndefined()
+    })
+
+    it('matches every ASCII char in path text, raw or percent-encoded', async () => {
+      const chars = Array.from({ length: 0x7f - 0x20 }, (_, i) =>
+        String.fromCharCode(0x20 + i),
+      ).filter((char) => char !== '/')
+
+      const matcher = new OpenAPIMatcher(
+        Object.fromEntries(
+          chars.map((char) => [
+            char,
+            os.meta(openapi({ method: 'GET', path: `/x${char}y` })).handler(() => char),
+          ]),
+        ),
+      )
+
+      for (const char of chars) {
+        for (const pathname of [`/x${char}y`, `/x${encodeURIComponent(char)}y`] as const) {
+          await expect(matcher.match('GET', pathname, undefined)).resolves.toMatchObject({
+            path: [char],
+            params: undefined,
+          })
+        }
+      }
+    })
+
     it('matches segments after a catch-all param', async () => {
-      const raw = os.meta(openapi({ method: 'GET', path: '/files/{+path}/raw' })).handler(() => 'ok')
+      const raw = os
+        .meta(openapi({ method: 'GET', path: '/files/{+path}/raw' }))
+        .handler(() => 'ok')
 
       const matcher = new OpenAPIMatcher({ raw })
 
@@ -298,11 +448,29 @@ describe('openAPIMatcher', () => {
     })
 
     it('throws when a path has more than one catch-all param', () => {
-      const procedure = os.meta(openapi({ method: 'GET', path: '/{+a}/x/{+b}' })).handler(() => 'ok')
+      const procedure = os
+        .meta(openapi({ method: 'GET', path: '/{+a}/x/{+b}' }))
+        .handler(() => 'ok')
 
       expect(() => new OpenAPIMatcher({ procedure })).toThrowError(
         'OpenAPI path "/{+a}/x/{+b}" has more than one catch-all param ({+name}), but only one is supported per path.',
       )
+    })
+
+    it('treats `{+name}` that is not a whole segment as literal text, even more than once', async () => {
+      const procedure = os
+        .meta(openapi({ method: 'GET', path: '/a{+b}/c{+d}' }))
+        .handler(() => 'ok')
+
+      const matcher = new OpenAPIMatcher({ procedure })
+
+      for (const pathname of ['/a{+b}/c{+d}', '/a%7B+b%7D/c%7B%2Bd%7D'] as const) {
+        await expect(matcher.match('GET', pathname, undefined)).resolves.toEqual({
+          path: ['procedure'],
+          procedure,
+          params: undefined,
+        })
+      }
     })
   })
 
@@ -342,9 +510,7 @@ describe('openAPIMatcher', () => {
 
   describe('lazy routers', () => {
     it('resolves unprefixed lazy routers once and reuses indexed routes', async () => {
-      const info = os
-        .meta(openapi({ method: 'GET', path: '/info' }))
-        .handler(() => 'info')
+      const info = os.meta(openapi({ method: 'GET', path: '/info' })).handler(() => 'info')
 
       const loader = vi.fn(async () => ({
         default: { info },
@@ -370,9 +536,7 @@ describe('openAPIMatcher', () => {
     })
 
     it('resolves prefixed lazy routers only when the pathname matches the prefix pattern', async () => {
-      const info = os
-        .meta(openapi({ method: 'GET', path: '/info/{tab}' }))
-        .handler(() => 'info')
+      const info = os.meta(openapi({ method: 'GET', path: '/info/{tab}' })).handler(() => 'info')
 
       const loader = vi.fn(async () => ({
         default: { info },
@@ -382,7 +546,9 @@ describe('openAPIMatcher', () => {
         user: os.meta(openapi({ prefix: '/users/{userId}' })).lazy(loader),
       })
 
-      await expect(matcher.match('GET', '/projects/42/info/general', undefined)).resolves.toBeUndefined()
+      await expect(
+        matcher.match('GET', '/projects/42/info/general', undefined),
+      ).resolves.toBeUndefined()
       expect(loader).toHaveBeenCalledTimes(0)
 
       const firstResult = await matcher.match('GET', '/users/din/info/settings', undefined)
@@ -396,7 +562,9 @@ describe('openAPIMatcher', () => {
         prefix: '/users/{userId}',
       })
 
-      await expect(matcher.match('GET', '/users/din/info/settings', undefined)).resolves.toEqual(firstResult)
+      await expect(matcher.match('GET', '/users/din/info/settings', undefined)).resolves.toEqual(
+        firstResult,
+      )
 
       expect(loader).toHaveBeenCalledTimes(1)
     })
@@ -429,24 +597,27 @@ describe('openAPIMatcher', () => {
       expect(catchAllLoader).toHaveBeenCalledTimes(1)
     })
 
-    it('leaves a lazy router pending without indexing any of its routes when one path is invalid', async () => {
+    it('retries a lazy router whose indexing fails on every match', async () => {
       const valid = os.meta(openapi({ method: 'GET', path: '/valid' })).handler(() => 'valid')
-      const invalid = os.meta(openapi({ method: 'GET', path: '/{+a}/x/{+b}' })).handler(() => 'invalid')
+      const invalid = os
+        .meta(openapi({ method: 'GET', path: '/{+a}/x/{+b}' }))
+        .handler(() => 'invalid')
 
-      const matcher = new OpenAPIMatcher({
-        lazy: os.lazy(async () => ({ default: { valid, invalid } })),
-      })
+      const loader = vi.fn(async () => ({ default: { valid, invalid } }))
 
-      await expect(matcher.match('GET', '/valid', undefined)).rejects.toThrowError('more than one catch-all param')
-      await expect(matcher.match('GET', '/valid', undefined)).rejects.toThrowError('more than one catch-all param')
+      const matcher = new OpenAPIMatcher({ lazy: os.lazy(loader) })
 
-      expect(findAllRoutes((matcher as any).tree, 'GET', '/valid')).toEqual([])
+      for (let i = 0; i < 3; i++) {
+        await expect(matcher.match('GET', '/valid', undefined)).rejects.toThrowError(
+          'more than one catch-all param',
+        )
+      }
+
+      expect(loader).toHaveBeenCalledTimes(3)
     })
 
     it('retries a lazy router whose load fails, synchronously or asynchronously', async () => {
-      const info = os
-        .meta(openapi({ method: 'GET', path: '/info' }))
-        .handler(() => 'info')
+      const info = os.meta(openapi({ method: 'GET', path: '/info' })).handler(() => 'info')
 
       let attempts = 0
       const loader = vi.fn(() => {
@@ -477,9 +648,7 @@ describe('openAPIMatcher', () => {
     })
 
     it('resolves a prefixed lazy router that only matches after percent-decoding', async () => {
-      const info = os
-        .meta(openapi({ method: 'GET', path: '/info' }))
-        .handler(() => 'info')
+      const info = os.meta(openapi({ method: 'GET', path: '/info' })).handler(() => 'info')
 
       const loader = vi.fn(async () => ({ default: { info } }))
 
@@ -487,8 +656,7 @@ describe('openAPIMatcher', () => {
         user: os.meta(openapi({ prefix: '/users' })).lazy(loader),
       })
 
-      // "%75" is "u": the prefix RegExp is tested against the raw pathname first and fails,
-      // so the retry has to re-run lazy resolution against the normalized pathname
+      // "%75" is "u"
       const result = await matcher.match('GET', '/%75sers/info', undefined)
 
       expect(result).toBeDefined()
@@ -503,10 +671,49 @@ describe('openAPIMatcher', () => {
       expect(loader).toHaveBeenCalledTimes(1)
     })
 
+    it.each(['/v1^beta/info', '/v1%5Ebeta/info', '/v1%5ebeta/info'] as const)(
+      'resolves a prefixed lazy router whose prefix holds a char the request may percent-encode: %s',
+      async (pathname) => {
+        const info = os.meta(openapi({ method: 'GET', path: '/info' })).handler(() => 'info')
+        const loader = vi.fn(async () => ({ default: { info } }))
+
+        const matcher = new OpenAPIMatcher({
+          beta: os.meta(openapi({ prefix: '/v1^beta' })).lazy(loader),
+        })
+
+        await expect(matcher.match('GET', '/v1beta/info', undefined)).resolves.toBeUndefined()
+        expect(loader).toHaveBeenCalledTimes(0)
+
+        await expect(matcher.match('GET', pathname, undefined)).resolves.toMatchObject({
+          path: ['beta', 'info'],
+          params: undefined,
+        })
+        expect(loader).toHaveBeenCalledTimes(1)
+      },
+    )
+
+    it('resolves a prefixed lazy router before a dynamic sibling can catch a percent-encoded path', async () => {
+      const info = os.meta(openapi({ method: 'GET', path: '/info' })).handler(() => 'info')
+      const version = os
+        .meta(openapi({ method: 'GET', path: '/{version}/info' }))
+        .handler(() => 'version')
+
+      const loader = vi.fn(async () => ({ default: { info } }))
+
+      const matcher = new OpenAPIMatcher({
+        version,
+        beta: os.meta(openapi({ prefix: '/v1^beta' })).lazy(loader),
+      })
+
+      await expect(matcher.match('GET', '/v1^beta/info', undefined)).resolves.toMatchObject({
+        path: ['beta', 'info'],
+        params: undefined,
+      })
+      expect(loader).toHaveBeenCalledTimes(1)
+    })
+
     it('resolves nested lazy routers added during the same match', async () => {
-      const summary = os
-        .meta(openapi({ method: 'GET', path: '/summary' }))
-        .handler(() => 'summary')
+      const summary = os.meta(openapi({ method: 'GET', path: '/summary' })).handler(() => 'summary')
 
       const projectLoader = vi.fn(async () => ({
         default: { summary },
@@ -533,18 +740,18 @@ describe('openAPIMatcher', () => {
         prefix: '/projects/{projectId}',
       })
 
-      await expect(matcher.match('GET', '/projects/42/summary', undefined)).resolves.toEqual(firstResult)
+      await expect(matcher.match('GET', '/projects/42/summary', undefined)).resolves.toEqual(
+        firstResult,
+      )
 
       expect(outerLoader).toHaveBeenCalledTimes(1)
       expect(projectLoader).toHaveBeenCalledTimes(1)
     })
 
-    it('resolves a deep lazy chain for concurrent matches without losing or reloading routers', async () => {
+    it('resolves a deep lazy chain for concurrent matches without losing or re-indexing routers', async () => {
       const leaf1 = os.meta(openapi({ method: 'GET', path: '/leaf1' })).handler(() => '1')
       const leaf2 = os.meta(openapi({ method: 'GET', path: '/leaf2' })).handler(() => '2')
       const leaf3 = os.meta(openapi({ method: 'GET', path: '/leaf3' })).handler(() => '3')
-
-      const loads = { l1: 0, l2: 0, l3: 0 }
 
       /** settle after N microtask turns so the three levels interleave */
       const settle = async (turns: number) => {
@@ -554,34 +761,32 @@ describe('openAPIMatcher', () => {
       }
 
       const l3 = os.meta(openapi({ prefix: '/p3' })).lazy(async () => {
-        loads.l3++
         await settle(2)
         return { default: { leaf3 } }
       })
 
       const l2 = os.meta(openapi({ prefix: '/p2' })).lazy(async () => {
-        loads.l2++
         await settle(3)
         return { default: { leaf2, l3 } }
       })
 
       const matcher = new OpenAPIMatcher({
         lazy: os.lazy(async () => {
-          loads.l1++
           await settle(4)
           return { default: { leaf1, l2 } }
         }),
       })
+      const indexSpy = vi.spyOn(matcher as any, 'index')
 
       const paths = ['/leaf1', '/p2/leaf2', '/p2/p3/leaf3'] as const
       const results = await Promise.all(
-        paths.flatMap(path => [
+        paths.flatMap((path) => [
           matcher.match('GET', path, undefined),
           matcher.match('GET', path, undefined),
         ]),
       )
 
-      expect(results.map(result => result?.path.join('/'))).toEqual([
+      expect(results.map((result) => result?.path.join('/'))).toEqual([
         'lazy/leaf1',
         'lazy/leaf1',
         'lazy/l2/leaf2',
@@ -590,28 +795,79 @@ describe('openAPIMatcher', () => {
         'lazy/l2/l3/leaf3',
       ])
 
-      // every level is loaded exactly once even though six matches raced for it
-      expect(loads).toEqual({ l1: 1, l2: 1, l3: 1 })
+      const indexed = () => indexSpy.mock.calls.map(([, path]) => (path as string[]).join('/'))
+      expect(indexed()).toEqual(['lazy', 'lazy/l2', 'lazy/l2/l3'])
 
-      // and the deepest route stays matchable afterwards
       await expect(matcher.match('GET', '/p2/p3/leaf3', undefined)).resolves.toBeDefined()
-      expect(loads).toEqual({ l1: 1, l2: 1, l3: 1 })
+      expect(indexed()).toEqual(['lazy', 'lazy/l2', 'lazy/l2/l3'])
+    })
+
+    it('matches while another match is still loading, and drops the slower load', async () => {
+      const first = os.meta(openapi({ method: 'GET', path: '/ping' })).handler(() => 'first')
+      const second = os.meta(openapi({ method: 'GET', path: '/ping' })).handler(() => 'second')
+      const firstLoad = promiseWithResolvers<{ default: any }>()
+      const loader = vi
+        .fn()
+        .mockReturnValueOnce(firstLoad.promise)
+        .mockResolvedValueOnce({ default: { ping: second } })
+      const matcher = new OpenAPIMatcher({ runs: os.lazy(loader) })
+
+      const slow = matcher.match('GET', '/ping', undefined)
+      await expect(matcher.match('GET', '/ping', undefined)).resolves.toMatchObject({
+        procedure: second,
+      })
+
+      firstLoad.resolve({ default: { ping: first } })
+
+      await expect(slow).resolves.toMatchObject({ procedure: second })
+      await expect(matcher.match('GET', '/ping', undefined)).resolves.toMatchObject({
+        procedure: second,
+      })
+    })
+
+    it('indexes lazy routers sharing a prefix once each while one load is stuck', async () => {
+      const find = os.meta(openapi({ method: 'GET', path: '/find' })).handler(() => 'find')
+      const list = os.meta(openapi({ method: 'GET', path: '/list' })).handler(() => 'list')
+      const stuckLoad = promiseWithResolvers<{ default: any }>()
+      const findLoader = vi
+        .fn()
+        .mockReturnValueOnce(stuckLoad.promise)
+        .mockResolvedValue({ default: { find } })
+      const matcher = new OpenAPIMatcher({
+        a: os.meta(openapi({ prefix: '/users' })).lazy(findLoader),
+        b: os.meta(openapi({ prefix: '/users' })).lazy(async () => ({ default: { list } })),
+      })
+      const indexSpy = vi.spyOn(matcher as any, 'index')
+
+      const stuck = matcher.match('GET', '/users/find', undefined)
+      const [found, listed] = await Promise.all([
+        matcher.match('GET', '/users/find', undefined),
+        matcher.match('GET', '/users/list', undefined),
+      ])
+
+      expect(found).toMatchObject({ path: ['a', 'find'] })
+      expect(listed).toMatchObject({ path: ['b', 'list'] })
+
+      stuckLoad.resolve({ default: { find } })
+
+      await expect(stuck).resolves.toMatchObject({ path: ['a', 'find'] })
+      expect(
+        indexSpy.mock.calls.map(([, path]) => (path as string[]).join('/')).toSorted(),
+      ).toEqual(['a', 'b'])
     })
   })
 
   describe('contract-first routers', () => {
     it('wraps implementations with contract metadata and caches wrapped procedures', async () => {
       const implementation = {
-        ping: os
-          .meta(openapi({ method: 'GET', path: '/implementation' }))
-          .handler(() => 'pong'),
+        ping: os.meta(openapi({ method: 'GET', path: '/implementation' })).handler(() => 'pong'),
       }
 
       const contract = {
         ping: oc.meta(openapi({ method: 'DELETE', path: '/contract/{id}' })),
       }
 
-      const matcher = new OpenAPIMatcher(withHiddenRouterContract(implementation, contract))
+      const matcher = new OpenAPIMatcher(implement(contract).router(implementation))
       const firstResult = await matcher.match('DELETE', '/contract/42', undefined)
 
       expect(firstResult).toBeDefined()
@@ -632,15 +888,38 @@ describe('openAPIMatcher', () => {
     })
 
     it('throws when a contract-first implementation is missing', async () => {
-      const matcher = new OpenAPIMatcher(withHiddenRouterContract({
-        ping: os.handler(() => 'pong'),
-      }, {
+      const contract = {
         missing: oc.meta(openapi({ method: 'GET', path: '/missing' })),
-      }))
+      }
+
+      const matcher = new OpenAPIMatcher(
+        implement(contract).router({
+          ping: os.handler(() => 'pong'),
+        } as any),
+      )
 
       await expect(matcher.match('GET', '/missing', undefined)).rejects.toThrowError(
         '[Contract-First] Missing or invalid implementation for procedure at path: "missing"',
       )
+    })
+
+    it('uses the implemented handler and config when implementing a server router', async () => {
+      const original = {
+        ping: os
+          .$config({ disableInputValidation: true })
+          .meta(openapi({ method: 'GET', path: '/ping' }))
+          .input(z.string())
+          .handler(() => 'original'),
+      }
+      const implementer = implement(original, { disableInputValidation: false })
+      const matcher = new OpenAPIMatcher(
+        implementer.router({ ping: implementer.ping.handler(() => 'implemented') }),
+      )
+
+      const { procedure } = (await matcher.match('GET', '/ping', undefined))!
+
+      await expect(call(procedure, 'input')).resolves.toBe('implemented')
+      await expect(call(procedure, 123)).rejects.toThrow('Input validation failed')
     })
   })
 })

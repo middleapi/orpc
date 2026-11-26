@@ -1,5 +1,6 @@
 import { isAsyncIteratorObject, parseEmptyableJSON } from '@orpc/shared'
-import { ErrorEvent, getEventMeta, withEventMeta } from '@standard-server/core'
+import { EventStreamErrorEvent, getEventMeta, withEventMeta } from '@standard-server/core'
+
 import { builtInRPCSupportDataTypes } from '../../../tests/rpc/__shared__/built-in-support-data-types'
 import { ORPCError } from './error'
 import { RPCSerializer } from './rpc-serializer'
@@ -19,11 +20,7 @@ describe('rpcSerializer', () => {
     }
 
     it('should work on flat', async () => {
-      expect(
-        serializeAndDeserialize(value),
-      ).toEqual(
-        expected,
-      )
+      expect(serializeAndDeserialize(value)).toEqual(expected)
     })
 
     it('should work on nested object', async () => {
@@ -31,11 +28,9 @@ describe('rpcSerializer', () => {
         serializeAndDeserialize({
           data: value,
         }),
-      ).toEqual(
-        {
-          data: expected,
-        },
-      )
+      ).toEqual({
+        data: expected,
+      })
     })
 
     it('should work on complex object', async () => {
@@ -183,7 +178,9 @@ describe('rpcSerializer', () => {
     })
 
     it('on error with ORPCError', async () => {
-      const error = withEventMeta(new ORPCError('BAD_GATEWAY', { data: { order: 3 } }), { id: '123456' })
+      const error = withEventMeta(new ORPCError('BAD_GATEWAY', { data: { order: 3 } }), {
+        id: '123456',
+      })
 
       const iterator = (async function* () {
         yield 1
@@ -213,7 +210,7 @@ describe('rpcSerializer', () => {
       await expect(deserialized.next()).rejects.toSatisfy((e: any) => {
         expect(e).toEqual(error)
         expect(e).toBeInstanceOf(ORPCError)
-        expect(e.cause).toBeInstanceOf(ErrorEvent)
+        expect(e.cause).toBeInstanceOf(EventStreamErrorEvent)
 
         return true
       })
@@ -250,13 +247,39 @@ describe('rpcSerializer', () => {
       await expect(deserialized.next()).rejects.toBe(error)
     })
 
+    it('keeps a data-less error event as is', async () => {
+      const event = new EventStreamErrorEvent(undefined)
+
+      const iterator = serializer.deserialize(
+        (async function* () {
+          throw event
+        })(),
+      ) as any
+
+      await expect(iterator.next()).rejects.toBe(event)
+    })
+
+    it('keeps an error event with malformed data as is', async () => {
+      const event = new EventStreamErrorEvent('Upstream is down')
+
+      const iterator = serializer.deserialize(
+        (async function* () {
+          throw event
+        })(),
+      ) as any
+
+      await expect(iterator.next()).rejects.toBe(event)
+    })
+
     it('deserialize an invalid ORPCError json', async () => {
-      const iterator = serializer.deserialize((async function* () {
-        throw new ErrorEvent({ json: { value: 1234 } })
-      })()) as any
+      const iterator = serializer.deserialize(
+        (async function* () {
+          throw new EventStreamErrorEvent({ json: { value: 1234 } })
+        })(),
+      ) as any
 
       await expect(iterator.next()).rejects.toSatisfy((e: any) => {
-        expect(e).toBeInstanceOf(ErrorEvent)
+        expect(e).toBeInstanceOf(EventStreamErrorEvent)
         expect(e.data).toEqual({ value: 1234 })
 
         return true
@@ -323,6 +346,98 @@ describe('rpcSerializer', () => {
     })
   })
 
+  describe('malformed payloads', () => {
+    const serializer = new RPCSerializer()
+
+    it.each([
+      ['a string', 'hello'],
+      ['an array', [{ json: 1 }]],
+      ['null', null],
+      ['a number', 1],
+      ['an unknown key', { status: 'maintenance' }],
+      ['maps', { json: 1, maps: [] }],
+      ['blobs', { json: 1, blobs: [] }],
+      ['a non-array meta', { json: 1, meta: 'x' }],
+    ])('rejects a plain payload that is or has %s', (_, body) => {
+      expect(() => serializer.deserialize(body as any)).toThrow(
+        'Invalid RPC serialized data format.',
+      )
+    })
+
+    it.each([
+      ['a string', 'hello'],
+      ['an unknown key', { json: 1, status: 'maintenance' }],
+      ['blobs', { json: 1, maps: [], blobs: [] }],
+      ['a non-array maps', { json: 1, maps: {} }],
+    ])('rejects a form data payload that is or has %s', (_, payload) => {
+      const form = new FormData()
+      form.set('data', JSON.stringify(payload))
+
+      expect(() => serializer.deserialize(form)).toThrow('Invalid RPC serialized data format.')
+    })
+
+    it.each([
+      ['an unknown file part', [['a', new Blob(['x'])]]],
+      [
+        'a non-canonical file part index',
+        [
+          ['data', JSON.stringify({ json: [null], maps: [[0]] })],
+          ['00', new Blob(['x'])],
+        ],
+      ],
+      ['a string at a file part index', [['0', 'x']]],
+      ['a file as data', [['data', new Blob(['{}'])]]],
+      [
+        'a duplicated data',
+        [
+          ['data', '{}'],
+          ['data', '{}'],
+        ],
+      ],
+    ] as const)('rejects form data with %s', (_, entries) => {
+      const form = new FormData()
+      entries.forEach(([key, value]) => form.append(key, value))
+
+      expect(() => serializer.deserialize(form)).toThrow('Invalid RPC serialized data format.')
+    })
+
+    it.each([
+      [
+        'with data',
+        [
+          ['data', JSON.stringify({ json: [null] })],
+          ['0', new Blob(['x'])],
+        ],
+      ],
+      ['beyond the array index range', [['4294967295', new Blob(['x'])]]],
+    ] as const)('rejects form data file parts without maps %s', (_, entries) => {
+      const form = new FormData()
+      entries.forEach(([key, value]) => form.append(key, value))
+
+      expect(() => serializer.deserialize(form)).toThrow('Invalid RPC serialized data format.')
+    })
+
+    it('treats a missing json as undefined, as the spec allows', () => {
+      expect(serializer.deserialize({} as any)).toBeUndefined()
+
+      expect(serializer.deserialize(new FormData())).toBeUndefined()
+    })
+
+    it('ignores inherited enumerable keys', () => {
+      const proto = Object.assign(Object.create(null), { extra: 1 })
+
+      expect(serializer.deserialize(Object.assign(Object.create(proto), { json: 1 }))).toBe(1)
+    })
+
+    it('accepts a null-prototype envelope', () => {
+      expect(
+        serializer.deserialize(
+          Object.assign(Object.create(null), { json: '1', meta: [['bigint']] }),
+        ),
+      ).toBe(1n)
+    })
+  })
+
   describe('malicious payloads', () => {
     const serializer = new RPCSerializer()
 
@@ -332,31 +447,39 @@ describe('rpcSerializer', () => {
     })
 
     it('rejects meta paths escaping the payload in plain bodies', () => {
-      const body = JSON.parse(JSON.stringify({
-        json: { o: {} },
-        meta: [['date', '__proto__', 'polluted']],
-      }))
+      const body = JSON.parse(
+        JSON.stringify({
+          json: { o: {} },
+          meta: [['date', '__proto__', 'polluted']],
+        }),
+      )
 
       expect(() => serializer.deserialize(body)).toThrow('Invalid RPC serialized data')
     })
 
     it('rejects meta paths escaping the payload in form data bodies', () => {
       const form = new FormData()
-      form.set('data', JSON.stringify({
-        json: { o: {} },
-        meta: [['date', '__proto__', 'polluted']],
-        maps: [],
-      }))
+      form.set(
+        'data',
+        JSON.stringify({
+          json: { o: {} },
+          meta: [['date', '__proto__', 'polluted']],
+          maps: [],
+        }),
+      )
 
       expect(() => serializer.deserialize(form)).toThrow('Invalid RPC serialized data')
     })
 
     it('rejects blob maps escaping the payload in form data bodies', () => {
       const form = new FormData()
-      form.set('data', JSON.stringify({
-        json: { o: {} },
-        maps: [['__proto__', 'polluted']],
-      }))
+      form.set(
+        'data',
+        JSON.stringify({
+          json: { o: {} },
+          maps: [['__proto__', 'polluted']],
+        }),
+      )
       form.set('0', new Blob(['x']))
 
       expect(() => serializer.deserialize(form)).toThrow('Invalid RPC serialized data')
@@ -364,27 +487,27 @@ describe('rpcSerializer', () => {
 
     it('rejects blobs smuggled in plain bodies', () => {
       // would otherwise resize the array to 2 ** 32 - 1 empty slots for `set` to iterate
-      const body = JSON.parse('{"json":[1],"meta":[["set"]],"maps":[["length"]],"blobs":[4294967295]}')
+      const body = JSON.parse(
+        '{"json":[1],"meta":[["set"]],"maps":[["length"]],"blobs":[4294967295]}',
+      )
 
-      expect(() => serializer.deserialize(body)).toThrow('Invalid RPC serialized data: blob 0 is not a Blob.')
+      expect(() => serializer.deserialize(body)).toThrow('Invalid RPC serialized data format.')
     })
 
     it('cannot resize an array through blob maps in form data bodies', () => {
       const form = new FormData()
-      form.set('data', JSON.stringify({
-        json: [1],
-        meta: [['set']],
-        maps: [['length']],
-      }))
+      form.set(
+        'data',
+        JSON.stringify({
+          json: [1],
+          meta: [['set']],
+          maps: [['length']],
+        }),
+      )
       form.set('0', new Blob(['x']))
 
       // only a Blob can land there, and the spec rejects it as an array length
       expect(() => serializer.deserialize(form)).toThrow(RangeError)
-    })
-
-    it('rejects unknown meta types instead of resolving them on the prototype chain', () => {
-      expect(() => serializer.deserialize({ json: 1, meta: [['constructor']] })).toThrow()
-      expect(() => serializer.deserialize({ json: 1, meta: [['__proto__']] })).toThrow()
     })
   })
 })

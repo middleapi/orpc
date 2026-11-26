@@ -1,6 +1,8 @@
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+
 import { sleep } from '@orpc/shared'
 import { RedisClient } from 'bun'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+
 import { BunRedisRateLimiter } from './redis-ratelimit'
 
 const REDIS_URL = Bun.env.REDIS_URL
@@ -28,244 +30,257 @@ describe.skipIf(!REDIS_URL)('bun redis rate limiter integration', async () => {
     })
   }
 
-  it('accepts weighted requests', async () => {
-    const limiter = await createTestingRateLimiter()
-    const key = 'weighted'
+  it(
+    'tracks counters independently for each key',
+    async () => {
+      const limiter = await createTestingRateLimiter()
 
-    await expect(
-      limiter.limit(key, { weight: 2 }),
-    ).resolves.toMatchObject({
-      success: true,
-      limit: 3,
-      remaining: 1,
-    })
-  }, { timeout: 20_000 })
+      const aliceKey = 'alice'
+      const bobKey = 'bob'
 
-  it('tracks counters independently for each key', async () => {
-    const limiter = await createTestingRateLimiter()
-
-    const aliceKey = 'alice'
-    const bobKey = 'bob'
-
-    await expect(
-      limiter.limit(aliceKey),
-    ).resolves.toMatchObject({
-      success: true,
-      limit: 3,
-      remaining: 2,
-    })
-
-    await expect(
-      limiter.limit(bobKey),
-    ).resolves.toMatchObject({
-      success: true,
-      limit: 3,
-      remaining: 2,
-    })
-  }, { timeout: 20_000 })
-
-  it('returns a stable reset timestamp within the same window', async () => {
-    const window = 2000
-    const limiter = await createTestingRateLimiter({
-      maxRequests: 2,
-      window,
-    })
-    const key = 'reset'
-    const tolerance = 500
-
-    const firstStartedAt = Date.now()
-    const first = await limiter.limit(key)
-    const firstCompletedAt = Date.now()
-
-    expect(first).toMatchObject({
-      success: true,
-      limit: 2,
-      remaining: 1,
-    })
-    expect(first.reset).toBeGreaterThanOrEqual(firstStartedAt + window - tolerance)
-    expect(first.reset).toBeLessThanOrEqual(firstCompletedAt + window)
-
-    await sleep(100)
-
-    const second = await limiter.limit(key)
-
-    expect(second).toMatchObject({
-      success: true,
-      limit: 2,
-      remaining: 0,
-    })
-    expect(Math.abs(second.reset - first.reset)).toBeLessThanOrEqual(tolerance)
-
-    const denied = await limiter.limit(key)
-
-    expect(denied).toMatchObject({
-      success: false,
-      limit: 2,
-      remaining: 0,
-    })
-    expect(Math.abs(denied.reset - first.reset)).toBeLessThanOrEqual(tolerance)
-  }, { timeout: 20_000 })
-
-  it('uses an empty prefix when none is provided', async () => {
-    const limiter = await createTestingRateLimiter({
-      prefix: undefined,
-      maxRequests: 3,
-      window: 10_000,
-    })
-
-    await expect(
-      limiter.limit(`no-prefix-${crypto.randomUUID()}`),
-    ).resolves.toMatchObject({
-      success: true,
-      limit: 3,
-      remaining: 2,
-    })
-  }, { timeout: 20_000 })
-
-  it('rejects invalid weights', async () => {
-    const limiter = await createTestingRateLimiter()
-    const key = 'invalid-weight'
-
-    await expect(
-      limiter.limit(key, { weight: 0 }),
-    ).rejects.toThrow(TypeError)
-
-    await expect(
-      limiter.limit(key, { weight: -1 }),
-    ).rejects.toThrow(TypeError)
-
-    await expect(
-      limiter.limit(key, { weight: 1.5 }),
-    ).rejects.toThrow(
-      'Rate limit weight must be an integer greater than 0',
-    )
-  }, { timeout: 20_000 })
-
-  it('consumes quota across multiple requests', async () => {
-    const limiter = await createTestingRateLimiter()
-    const key = 'quota'
-
-    await expect(limiter.limit(key))
-      .resolves
-      .toMatchObject({
+      await expect(limiter.limit(aliceKey)).resolves.toMatchObject({
         success: true,
+        limit: 3,
         remaining: 2,
       })
 
-    await expect(limiter.limit(key))
-      .resolves
-      .toMatchObject({
+      await expect(limiter.limit(bobKey)).resolves.toMatchObject({
         success: true,
-        remaining: 1,
+        limit: 3,
+        remaining: 2,
       })
+    },
+    { timeout: 20_000 },
+  )
 
-    await expect(limiter.limit(key))
-      .resolves
-      .toMatchObject({
+  it(
+    'shares counters with limiters created by prefix',
+    async () => {
+      const limiter = await createTestingRateLimiter({ maxRequests: 1, window: 10_000 })
+
+      await expect(limiter.limit('tenant:key')).resolves.toMatchObject({
         success: true,
         remaining: 0,
       })
-  }, { timeout: 20_000 })
+      await expect(limiter.prefix('tenant:').limit('key')).resolves.toMatchObject({
+        success: false,
+        remaining: 0,
+      })
+      await expect(limiter.prefix('other:').limit('key')).resolves.toMatchObject({
+        success: true,
+        remaining: 0,
+      })
+    },
+    { timeout: 20_000 },
+  )
 
-  it('rejects requests that exceed the limit', async () => {
-    const limiter = await createTestingRateLimiter()
-    const key = 'exceeded'
-
-    await limiter.limit(key)
-    await limiter.limit(key)
-    await limiter.limit(key)
-
-    await expect(
-      limiter.limit(key),
-    ).resolves.toMatchObject({
-      success: false,
-      limit: 3,
-      remaining: 0,
-    })
-  }, { timeout: 20_000 })
-
-  describe('blockingUntilReady', () => {
-    it('waits until the next window when capacity is unavailable', async () => {
+  it(
+    'returns a stable reset timestamp within the same window',
+    async () => {
+      const window = 2000
       const limiter = await createTestingRateLimiter({
         maxRequests: 2,
-        window: 1000,
-        blockingUntilReady: {
-          enabled: true,
-          timeout: 4000,
-        },
+        window,
       })
+      const key = 'reset'
+      const tolerance = 500
 
-      const key = 'blocking'
+      const firstStartedAt = Date.now()
+      const first = await limiter.limit(key)
+      const firstCompletedAt = Date.now()
 
-      await limiter.limit(key)
-      await limiter.limit(key)
-
-      const start = Date.now()
-
-      const result = await limiter.limit(key)
-
-      expect(result).toMatchObject({
+      expect(first).toMatchObject({
         success: true,
         limit: 2,
-      })
-
-      expect(Date.now() - start).toBeGreaterThanOrEqual(900)
-      expect(result.reset - Date.now()).toBeGreaterThanOrEqual(700)
-    }, { timeout: 20_000 })
-
-    it('waits until enough quota is available for weighted requests', async () => {
-      const limiter = await createTestingRateLimiter({
-        maxRequests: 2,
-        window: 1000,
-        blockingUntilReady: {
-          enabled: true,
-          timeout: 4000,
-        },
-      })
-
-      const key = 'blocking-weighted'
-
-      await expect(
-        limiter.limit(key),
-      ).resolves.toMatchObject({
-        success: true,
         remaining: 1,
       })
+      expect(first.reset).toBeGreaterThanOrEqual(firstStartedAt + window - tolerance)
+      expect(first.reset).toBeLessThanOrEqual(firstCompletedAt + window)
 
       await sleep(100)
 
-      await expect(
-        limiter.limit(key, { weight: 2 }),
-      ).resolves.toMatchObject({
+      const second = await limiter.limit(key)
+
+      expect(second).toMatchObject({
         success: true,
         limit: 2,
         remaining: 0,
       })
-    }, { timeout: 20_000 })
+      expect(Math.abs(second.reset - first.reset)).toBeLessThanOrEqual(tolerance)
 
-    it('returns denial when reset exceeds timeout', async () => {
-      const limiter = await createTestingRateLimiter({
-        maxRequests: 2,
-        window: 10_000,
-        blockingUntilReady: {
-          enabled: true,
-          timeout: 100,
-        },
-      })
+      const denied = await limiter.limit(key)
 
-      const key = 'blocking-timeout'
-
-      await limiter.limit(key)
-
-      await sleep(100)
-
-      await expect(
-        limiter.limit(key, { weight: 2 }),
-      ).resolves.toMatchObject({
+      expect(denied).toMatchObject({
         success: false,
         limit: 2,
         remaining: 0,
       })
-    }, { timeout: 20_000 })
+      expect(Math.abs(denied.reset - first.reset)).toBeLessThanOrEqual(tolerance)
+    },
+    { timeout: 20_000 },
+  )
+
+  it(
+    'rejects invalid weights',
+    async () => {
+      const limiter = await createTestingRateLimiter()
+      const key = 'invalid-weight'
+
+      await expect(limiter.limit(key, { weight: 0 })).rejects.toThrow(TypeError)
+
+      await expect(limiter.limit(key, { weight: -1 })).rejects.toThrow(TypeError)
+
+      await expect(limiter.limit(key, { weight: 1.5 })).rejects.toThrow(
+        'Rate limit weight must be an integer greater than 0',
+      )
+    },
+    { timeout: 20_000 },
+  )
+
+  it(
+    'consumes quota, then rejects requests that exceed the limit',
+    async () => {
+      const limiter = await createTestingRateLimiter()
+      const key = 'quota'
+
+      await expect(limiter.limit(key)).resolves.toMatchObject({
+        success: true,
+        remaining: 2,
+      })
+
+      await expect(limiter.limit(key)).resolves.toMatchObject({
+        success: true,
+        remaining: 1,
+      })
+
+      await expect(limiter.limit(key)).resolves.toMatchObject({
+        success: true,
+        remaining: 0,
+      })
+
+      await expect(limiter.limit(key)).resolves.toMatchObject({
+        success: false,
+        limit: 3,
+        remaining: 0,
+      })
+    },
+    { timeout: 20_000 },
+  )
+
+  it(
+    'does not count rejected requests',
+    async () => {
+      const limiter = await createTestingRateLimiter()
+      const key = 'rejected-not-counted'
+
+      await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({
+        success: true,
+        remaining: 1,
+      })
+
+      for (let i = 0; i < 5; i++) {
+        await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({
+          success: false,
+          limit: 3,
+          remaining: 1,
+        })
+      }
+
+      await expect(limiter.limit(key)).resolves.toMatchObject({
+        success: true,
+        remaining: 0,
+      })
+
+      // a request that can never fit does not start a window for a new key
+      const oversized = await limiter.limit('oversized', { weight: 4 })
+      expect(oversized).toMatchObject({ success: false, limit: 3, remaining: 3 })
+      expect(oversized.reset).toBeGreaterThan(Date.now())
+      await expect(limiter.limit('oversized', { weight: 3 })).resolves.toMatchObject({
+        success: true,
+        remaining: 0,
+      })
+    },
+    { timeout: 20_000 },
+  )
+
+  describe('timeout', () => {
+    it(
+      'waits until the next window when capacity is unavailable',
+      async () => {
+        const limiter = await createTestingRateLimiter({
+          maxRequests: 2,
+          window: 1000,
+          timeout: 4000,
+        })
+
+        const key = 'blocking'
+
+        await limiter.limit(key)
+        await limiter.limit(key)
+
+        const start = Date.now()
+
+        const result = await limiter.limit(key)
+
+        expect(result).toMatchObject({
+          success: true,
+          limit: 2,
+        })
+
+        expect(Date.now() - start).toBeGreaterThanOrEqual(900)
+        expect(result.reset - Date.now()).toBeGreaterThanOrEqual(700)
+      },
+      { timeout: 20_000 },
+    )
+
+    it(
+      'waits until enough quota is available for weighted requests',
+      async () => {
+        const limiter = await createTestingRateLimiter({
+          maxRequests: 2,
+          window: 1000,
+          timeout: 4000,
+        })
+
+        const key = 'blocking-weighted'
+
+        await expect(limiter.limit(key)).resolves.toMatchObject({
+          success: true,
+          remaining: 1,
+        })
+
+        await sleep(100)
+
+        await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({
+          success: true,
+          limit: 2,
+          remaining: 0,
+        })
+      },
+      { timeout: 20_000 },
+    )
+
+    it(
+      'returns denial when reset exceeds timeout',
+      async () => {
+        const limiter = await createTestingRateLimiter({
+          maxRequests: 2,
+          window: 10_000,
+          timeout: 100,
+        })
+
+        const key = 'blocking-timeout'
+
+        await limiter.limit(key)
+
+        await sleep(100)
+
+        await expect(limiter.limit(key, { weight: 2 })).resolves.toMatchObject({
+          success: false,
+          limit: 2,
+        })
+      },
+      { timeout: 20_000 },
+    )
   })
 })

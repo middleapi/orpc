@@ -1,6 +1,6 @@
 ---
-title: "Router Contract"
-description: "Define router contracts that describe the shape of a router without business logic, useful for documentation, testing, and aligned implementations."
+title: 'Router Contract'
+description: 'Define router contracts that describe the shape of a router without business logic, useful for documentation, testing, and aligned implementations.'
 ---
 
 :::info
@@ -22,7 +22,7 @@ const pong = oc.output(z.string())
 export const router = {
   ping,
   pong,
-  nested: { ping, pong }
+  nested: { ping, pong },
 }
 ```
 
@@ -41,13 +41,26 @@ const router = oc.meta(requireAuthMeta).router({
   nested: {
     ping,
     pong,
-  }
+  },
 })
 ```
 
+:::warning
+Router-level metadata applies again, even if a procedure already has it:
+
+```ts
+const base = oc.meta(openapi({ prefix: '/api' }))
+
+const router = base.router({
+  list: base.output(z.array(z.string())), // prefix: '/api/api'
+})
+```
+
+:::
+
 ## Router to Contract
 
-A normal [router](/docs/router) can be used as a contract router as long as it does not include a [lazy router](/docs/router#lazy-router). If necessary, use `unlazyRouter` to fully resolve it and make it contract-compatible.
+A normal [router](/docs/router) can be used as a router contract as long as it does not include a [lazy router](/docs/router#lazy-router). If necessary, use `unlazyRouter` to fully resolve it and make it contract-compatible.
 
 ```ts
 import { unlazyRouter } from '@orpc/server'
@@ -59,7 +72,7 @@ const compatibleContract = await unlazyRouter(router)
 
 Sometimes you need to import the contract on the client, for example when using [OpenAPI Link](/docs/openapi/link). If you derive the contract from a [router](/docs/router), importing it directly can be heavy and may expose internal logic. To avoid this, follow the steps below to safely minify and export the contract.
 
-1.  **Minify the Contract Router and Export to JSON**
+1.  **Minify the Router Contract and Export to JSON**
 
     ```ts
     import fs from 'node:fs'
@@ -72,7 +85,7 @@ Sometimes you need to import the contract on the client, for example when using 
     fs.writeFileSync('./contract.json', JSON.stringify(minifiedRouter))
     ```
 
-    ::: info
+    :::info
     `minifyRouterContract` preserves only the metadata needed by the client; all other data is stripped out.
     :::
 
@@ -84,7 +97,7 @@ Sometimes you need to import the contract on the client, for example when using 
     const link = new OpenAPILink(contract as typeof router)
     ```
 
-    ::: info
+    :::info
     Cast `contract` to `typeof router` to preserve type safety, since standard schema types cannot be serialized to JSON and must be cast manually.
     :::
 

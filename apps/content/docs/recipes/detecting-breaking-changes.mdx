@@ -1,0 +1,92 @@
+---
+title: 'Detecting Breaking Changes'
+description: 'Learn how to detect breaking API changes before they reach your clients, by comparing the OpenAPI documents of any oRPC project with oasdiff in CI.'
+---
+
+Catch changes that break existing clients, such as a new required input or a removed output field, by comparing [OpenAPI documents](/docs/openapi/specification) with [oasdiff](https://github.com/oasdiff/oasdiff).
+
+:::info
+Your project does not need [`openapi` metadata](/docs/openapi/specification#metadata) or the [OpenAPI Handler](/docs/openapi/handler). The document is only used for the comparison, and every procedure is included by default, so this works for any oRPC project.
+:::
+
+## Generate the Document
+
+Write the OpenAPI document of your router to a file, and commit it to your main branch. The comparison needs it there as a baseline.
+
+```ts scripts/openapi.ts
+import { writeFile } from 'node:fs/promises'
+
+import { OpenAPIGenerator } from '@orpc/openapi'
+import { ZodToJsonSchemaConverter } from '@orpc/zod'
+
+const generator = new OpenAPIGenerator({
+  converters: [new ZodToJsonSchemaConverter()],
+})
+
+const spec = await generator.generate(router)
+
+await writeFile('openapi.json', `${JSON.stringify(spec, null, 2)}\n`)
+```
+
+:::warning
+Configure the [JSON Schema converter](/docs/openapi/specification#json-schema-converters) of your schema library. A schema that cannot be converted becomes an empty schema, so its changes are never reported.
+:::
+
+:::info
+A procedure without an output schema is documented with an empty response, so changes to what it returns are not reported. Use [Type Inference](/docs/openapi/specification#type-inference) to document those procedures from their TypeScript types.
+:::
+
+## Compare
+
+[Install oasdiff](https://github.com/oasdiff/oasdiff#installation), then regenerate the document and compare it with the one on your main branch:
+
+```bash
+node scripts/openapi.ts
+oasdiff breaking --fail-on WARN origin/main:openapi.json openapi.json
+```
+
+The `oasdiff` command exits with a non-zero code when it finds a breaking change.
+
+## Run in CI
+
+This workflow regenerates `openapi.json`, commits it to the pull request, and compares it with the base branch using the [oasdiff GitHub Action](https://github.com/oasdiff/oasdiff-action):
+
+```yaml .github/workflows/oasdiff.yaml
+name: oasdiff
+
+on:
+  pull_request:
+    branches: ['main']
+
+permissions:
+  contents: write # lets the workflow commit the generated document
+  pull-requests: write # lets the action post the changes as a PR comment
+
+jobs:
+  breaking-changes:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.head_ref }}
+
+      - run: git fetch --depth=1 origin ${{ github.base_ref }}
+
+      - uses: pnpm/action-setup@v6
+
+      - run: pnpm i
+
+      - run: node scripts/openapi.ts
+
+      - uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: 'chore: update openapi.json'
+          file_pattern: openapi.json
+
+      - uses: oasdiff/oasdiff-action/breaking@v0
+        with:
+          base: 'origin/${{ github.base_ref }}:openapi.json'
+          revision: 'openapi.json'
+          fail-on: WARN
+```

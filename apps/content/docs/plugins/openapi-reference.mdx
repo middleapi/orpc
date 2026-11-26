@@ -1,8 +1,8 @@
 ---
-title: "OpenAPI Reference Plugin (Swagger/Scalar)"
-description: "Serve interactive API reference documentation powered by Scalar or Swagger UI and expose your OpenAPI specification as JSON."
+title: 'OpenAPI Reference Plugin (Swagger/Scalar)'
+description: 'Serve interactive API reference documentation powered by Scalar or Swagger UI and expose your OpenAPI specification as JSON.'
 sidebar:
-  label: "OpenAPI Reference"
+  label: 'OpenAPI Reference'
 ---
 
 :::info
@@ -18,27 +18,24 @@ import { OpenAPIGenerator } from '@orpc/openapi'
 import { OpenAPIReferenceHandlerPlugin } from '@orpc/openapi/plugins'
 
 const generator = new OpenAPIGenerator({
-  converters: [
-    new ZodToJsonSchemaConverter(),
-  ],
+  converters: [new ZodToJsonSchemaConverter()],
 })
 
 const handler = new OpenAPIHandler(router, {
   plugins: [
     new OpenAPIReferenceHandlerPlugin({
-      spec: () => generator.generate(router, {
-        base: {
-          info: {
-            title: 'ORPC Playground',
-            version: '1.0.0',
+      spec: () =>
+        generator.generate(router, {
+          base: {
+            info: {
+              title: 'ORPC Playground',
+              version: '1.0.0',
+            },
+            servers: [{ url: 'https://api.example.com/v1' }],
           },
-          servers: [
-            { url: 'https://api.example.com/v1', },
-          ],
-        },
-      }),
+        }),
     }),
-  ]
+  ],
 })
 ```
 
@@ -59,7 +56,7 @@ const handler = new OpenAPIHandler(router, {
         // Swagger UI specific configuration
       },
     }),
-  ]
+  ],
 })
 ```
 
@@ -90,7 +87,8 @@ With Swagger UI, `presets` and `plugins` are paths to global variables, resolved
 ```ts
 new OpenAPIReferenceHandlerPlugin({
   provider: 'swagger',
-  docsHead: '<script src="https://unpkg.com/swagger-ui-dist/swagger-ui-standalone-preset.js"></script>',
+  docsHead:
+    '<script src="https://unpkg.com/swagger-ui-dist/swagger-ui-standalone-preset.js"></script>',
   providerConfig: {
     presets: ['SwaggerUIBundle.presets.apis', 'SwaggerUIStandalonePreset'],
     plugins: ['SwaggerUIBundle.plugins.DownloadUrl'],
@@ -110,7 +108,7 @@ const handler = new OpenAPIHandler(router, {
       spec: () => generator.generate(router),
       allow: async ({ context }) => context.user !== undefined,
     }),
-  ]
+  ],
 })
 ```
 

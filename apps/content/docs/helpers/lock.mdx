@@ -1,8 +1,8 @@
 ---
-title: "Lock Helpers"
-description: "Prevent the same work from running concurrently in oRPC with a unified Locker interface, storage adapters, and procedure middleware."
+title: 'Lock Helpers'
+description: 'Prevent the same work from running concurrently in oRPC with a unified Locker interface, storage adapters, and procedure middleware.'
 sidebar:
-  label: "Lock"
+  label: 'Lock'
 ---
 
 ## Installation
@@ -30,7 +30,7 @@ import { MemoryLocker } from '@orpc/experimental-lock/memory'
 declare function generateReport(id: string): Promise<{ url: string }>
 declare const cache: { get: (key: string) => Promise<{ url: string } | undefined> }
 // ---cut---
-const locker = new MemoryLocker()
+const locker = new MemoryLocker({ ttl: 30_000 })
 
 const report = await locker.lock('report:123', async ({ waited }) => {
   if (waited) {
@@ -48,8 +48,8 @@ const report = await locker.lock('report:123', async ({ waited }) => {
 
 ### Options
 
-- `ttl`: how long the lock is held before it expires automatically, in milliseconds. Guards against holders that never release the lock. Each adapter has its own default.
-- `timeout`: how long to wait for the lock to become available, in milliseconds. `lock` rejects with a `LockTimeoutError` once it elapses.
+- `ttl`: how long the lock is held before it expires automatically, in milliseconds. Guards against holders that never release the lock. Defaults to the adapter's `ttl`.
+- `timeout`: how long to wait for the lock to become available, in milliseconds. `lock` rejects with a `LockTimeoutError` once it elapses. Defaults to the adapter's `timeout`.
 - `signal`: stops waiting early and rejects with the abort reason. Has no effect once the lock is acquired.
 
 ```ts
@@ -59,6 +59,10 @@ await locker.lock('report:123', () => generateReport('123'), {
   signal: request.signal,
 })
 ```
+
+:::info
+Every adapter requires a `ttl`, since the right value depends on how long your work takes.
+:::
 
 ## Lock Middleware
 
@@ -98,14 +102,27 @@ const procedure = os
     return await generateReport(input.id)
   })
 
-const locker = new MemoryLocker()
+const locker = new MemoryLocker({ ttl: 30_000 })
 
-const result = await call(
-  procedure,
-  { id: '123' },
-  { context: { locker } }
-)
+const result = await call(procedure, { id: '123' }, { context: { locker } })
 ```
+
+:::tip[Custom Error]
+Use `error` to throw your own error instead of `CONFLICT`. A custom code responds with `400` unless you map it in [`errorStatusMap`](/docs/rpc/handler#custom-error-response), and is [defined](/docs/error-handling#orpcerror-compatibility) when its `code` and `data` match an error the procedure declares.
+
+```ts
+lock({
+  locker,
+  key,
+  error: (error) => new ORPCError('LOCKED', { data: { key: error.key } }),
+})
+```
+
+:::
+
+:::warning[Streaming Procedures]
+The lock middleware does not support streaming responses, such as procedures that return an [AsyncIteratorObject](/docs/async-iterator-object) (for example `async function*` handlers) or a [`ReadableStream<Uint8Array>`](/docs/binary-data#readablestreamuint8array). The lock is released once the handler returns the stream, so the work the stream does while it is consumed, such as the body of an `async function*` handler, runs without the lock. Streams sharing a key can then run concurrently. Nested calls made from inside the stream with the same context, `locker`, and `key` also skip locking through deduplication, even though no lock is held.
+:::
 
 :::info[Automatic Deduplication]
 When the same `locker` and `key` combination is used multiple times in a single request chain, the `lock` middleware acquires the lock only once, so a procedure never waits for a lock it already holds. This behavior follows the [Dedupe Middleware](/docs/recipes/dedupe-middleware) recipe. To disable deduplication, set `dedupe: false`.
@@ -124,8 +141,6 @@ const locker = new MemoryLocker({
   /**
    * How long a lock is held before it expires automatically, in milliseconds.
    * Can be overridden per call.
-   *
-   * @default undefined (held until released)
    */
   ttl: 30_000,
 
@@ -183,6 +198,9 @@ const locker = new RedisLocker(client, {
    */
   retryInterval: 100,
 })
+
+// Creates a locker with an extra prefix that shares this client, e.g. per tenant
+const tenantLocker = locker.prefix('tenant:123:')
 ```
 
 ### Upstash
@@ -225,6 +243,9 @@ const locker = new UpstashLocker(redis, {
    */
   retryInterval: 100,
 })
+
+// Creates a locker with an extra prefix that shares this client, e.g. per tenant
+const tenantLocker = locker.prefix('tenant:123:')
 ```
 
 ### Bun Redis
@@ -265,6 +286,9 @@ const locker = new BunRedisLocker(redis, {
    */
   retryInterval: 100,
 })
+
+// Creates a locker with an extra prefix that shares this client, e.g. per tenant
+const tenantLocker = locker.prefix('tenant:123:')
 ```
 
 ### Cloudflare
@@ -274,14 +298,17 @@ Stores locks in Durable Objects, so every Worker instance shares the same locks.
 ```jsonc title="wrangler.jsonc"
 {
   "durable_objects": {
-    "bindings": [{ "name": "LOCK_DON", "class_name": "LockDO" }]
+    "bindings": [{ "name": "LOCK_DON", "class_name": "LockDO" }],
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LockDO"] }]
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LockDO"] }],
 }
 ```
 
 ```ts cloudflare
-import { experimental_DurableLocker as DurableLocker, experimental_DurableLockObject as DurableLockObject } from '@orpc/cloudflare'
+import {
+  experimental_DurableLocker as DurableLocker,
+  experimental_DurableLockObject as DurableLockObject,
+} from '@orpc/cloudflare'
 
 export class LockDO extends DurableLockObject {}
 
@@ -316,6 +343,9 @@ export default {
        */
       getStubByName: (namespace, key) => namespace.getByName(key),
     })
+
+    // Creates a locker with an extra prefix that shares this namespace, e.g. per tenant
+    const tenantLocker = locker.prefix('tenant:123:')
   },
 }
 ```

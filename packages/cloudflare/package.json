@@ -1,54 +1,53 @@
 {
   "name": "@orpc/cloudflare",
-  "type": "module",
-  "version": "2.0.0-beta.42",
+  "version": "2.0.0-beta.53",
   "description": "Cloudflare integration for oRPC: Durable Object pub/sub and locking, Workers rate limiting, Workers Caching, and Workers Traces adapters",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "cache",
+    "cloudflare",
+    "cloudflare-workers",
+    "durable-objects",
+    "lock",
+    "observability",
+    "orpc",
+    "pubsub",
+    "ratelimit",
+    "tracing",
+    "typescript"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/cloudflare"
   },
-  "keywords": [
-    "orpc",
-    "cloudflare",
-    "cloudflare-workers",
-    "durable-objects",
-    "ratelimit",
-    "lock",
-    "pubsub",
-    "cache",
-    "tracing",
-    "observability",
-    "typescript"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
-  "publishConfig": {
-    "exports": {
-      "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
-      }
-    }
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts"
   },
-  "files": [
-    "dist"
-  ],
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      }
+    }
+  },
   "scripts": {
     "prepare": "wrangler types",
-    "prepack": "unbuild",
-    "type:check": "wrangler types && tsc -b",
+    "prepack": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
   },
@@ -59,12 +58,16 @@
     "@orpc/publisher": "workspace:*",
     "@orpc/ratelimit": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.10.1"
+    "@standard-server/core": "~0.16.0"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@cloudflare/vitest-plugin": "^1.5.0",
+    "@modelcontextprotocol/server": "^2.4.0",
+    "@orpc/mcp": "workspace:*",
+    "@orpc/openapi": "workspace:*",
+    "@orpc/server": "workspace:*",
     "@vitest/coverage-istanbul": "^4.1.11",
     "vitest": "^4.1.11",
-    "wrangler": "^4.141.0"
+    "wrangler": "^4.164.0"
   }
 }

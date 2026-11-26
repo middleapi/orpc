@@ -1,17 +1,18 @@
-import type { ProcedureContractBuilderWithInput, ProcedureContractBuilderWithOutput } from './builder-variants'
+import { toArray } from '@orpc/shared'
+
+import type { ContractBuilderWithInput, ContractBuilderWithOutput } from './builder-variants'
 import type { ErrorMap } from './error'
 import type { MergedErrorMap } from './error-utils'
-import type { MetaPlugin } from './meta'
-import type { ProcedureContractDefinition } from './procedure'
-import type { RouterContract } from './router'
-import type { AugmentedContractRouter } from './router-utils'
-import type { AnySchema, Schema } from './schema'
-import { toArray } from '@orpc/shared'
 import { mergeErrorMap } from './error-utils'
+import type { MetaPlugin } from './meta'
 import { getHiddenMetaPlugins } from './meta'
 import { resolveMetaPlugins } from './meta-utils'
+import type { ProcedureContractDefinition } from './procedure'
 import { ProcedureContract } from './procedure'
-import { augmentContractRouter } from './router-utils'
+import type { RouterContract } from './router'
+import type { AugmentedRouterContract } from './router-utils'
+import { augmentRouterContract } from './router-utils'
+import type { AnySchema, Schema } from './schema'
 
 /**
  * The input schema type used before `.input` is called.
@@ -32,14 +33,18 @@ export type InitialOutputSchema = Schema<unknown>
  *
  * @see {@link https://orpc.dev/docs/contract/procedure | Procedure Contract}
  */
-export class ContractBuilder<
-  TErrorMap extends ErrorMap,
-> extends ProcedureContract<InitialInputSchema, InitialOutputSchema, TErrorMap> {
+export class ContractBuilder<TErrorMap extends ErrorMap> extends ProcedureContract<
+  InitialInputSchema,
+  InitialOutputSchema,
+  TErrorMap
+> {
   /**
    * Private constructor to prevent direct instantiation.
    * Use the static `create` method to initialize a new instance with a safe initial definition.
    */
-  private constructor(definition: ProcedureContractDefinition<InitialInputSchema, InitialOutputSchema, TErrorMap>) {
+  private constructor(
+    definition: ProcedureContractDefinition<InitialInputSchema, InitialOutputSchema, TErrorMap>,
+  ) {
     super(definition)
   }
 
@@ -49,7 +54,7 @@ export class ContractBuilder<
    *
    * @see {@link https://orpc.dev/docs/contract/procedure | Procedure Contract}
    */
-  static create(): ContractBuilder<object> {
+  static create(): ContractBuilder<{}> {
     return new ContractBuilder({
       errorMap: {},
       meta: {},
@@ -82,9 +87,7 @@ export class ContractBuilder<
    *
    * @see {@link https://orpc.dev/docs/contract/procedure#typesafe-errors | Procedure Contract - Typesafe Errors}
    */
-  errors<T extends ErrorMap>(
-    errors: T,
-  ): ContractBuilder<MergedErrorMap<TErrorMap, T>> {
+  errors<T extends ErrorMap>(errors: T): ContractBuilder<MergedErrorMap<TErrorMap, T>> {
     let result = new ContractBuilder({
       ...this['~orpc'],
       errorMap: mergeErrorMap(this['~orpc'].errorMap, errors),
@@ -103,9 +106,7 @@ export class ContractBuilder<
    *
    * @see {@link https://orpc.dev/docs/contract/procedure#inputoutput-validation | Procedure Contract - Input/Output Validation}
    */
-  input<T extends AnySchema>(
-    schema: T,
-  ): ProcedureContractBuilderWithInput<T, TErrorMap> {
+  input<T extends AnySchema>(schema: T): ContractBuilderWithInput<T, TErrorMap> {
     let result = new ContractBuilder({
       ...this['~orpc'],
       inputSchemas: [...toArray(this['~orpc'].inputSchemas), schema],
@@ -124,9 +125,7 @@ export class ContractBuilder<
    *
    * @see {@link https://orpc.dev/docs/contract/procedure#inputoutput-validation | Procedure Contract - Input/Output Validation}
    */
-  output<T extends AnySchema>(
-    schema: T,
-  ): ProcedureContractBuilderWithOutput<T, TErrorMap> {
+  output<T extends AnySchema>(schema: T): ContractBuilderWithOutput<T, TErrorMap> {
     let result = new ContractBuilder({
       ...this['~orpc'],
       outputSchemas: [...toArray(this['~orpc'].outputSchemas), schema],
@@ -146,10 +145,8 @@ export class ContractBuilder<
    *
    * @see {@link https://orpc.dev/docs/contract/router#extending-router | Router Contract - Extending Router}
    */
-  router<T extends RouterContract>(
-    router: T,
-  ): AugmentedContractRouter<T, TErrorMap> {
-    return augmentContractRouter(router, this['~orpc'])
+  router<T extends RouterContract>(router: T): AugmentedRouterContract<T, TErrorMap> {
+    return augmentRouterContract(router, this['~orpc'])
   }
 }
 
@@ -160,4 +157,4 @@ export class ContractBuilder<
  *
  * @see {@link https://orpc.dev/docs/contract/procedure | Procedure Contract}
  */
-export const oc = ContractBuilder.create()
+export const oc: ContractBuilder<{}> = /* @__PURE__ */ ContractBuilder.create()

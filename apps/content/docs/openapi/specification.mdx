@@ -1,6 +1,6 @@
 ---
-title: "OpenAPI Specification"
-description: "Learn how to configure openapi metadata and generate OpenAPI 3.2, 3.1, or 3.0 documents from your oRPC contracts and routers with OpenAPIGenerator."
+title: 'OpenAPI Specification'
+description: 'Learn how to configure openapi metadata and generate OpenAPI 3.2, 3.1, or 3.0 documents from your oRPC contracts and routers, from schemas or TypeScript types.'
 ---
 
 ## Metadata
@@ -13,23 +13,29 @@ import { openapi } from '@orpc/openapi'
 import { z } from 'zod'
 
 const getPlanet = oc
-  .meta(openapi({
-    method: 'GET',
-    path: '/planets/{id}',
-    operationId: 'getPlanet',
-    summary: 'Get a planet',
-    description: 'Returns a single planet.',
-    tags: ['planets'],
-    successStatus: 200,
-    successDescription: 'Planet payload',
-  }))
-  .input(z.object({
-    id: z.string(),
-  }))
-  .output(z.object({
-    id: z.string(),
-    name: z.string(),
-  }))
+  .meta(
+    openapi({
+      method: 'GET',
+      path: '/planets/{id}',
+      operationId: 'getPlanet',
+      summary: 'Get a planet',
+      description: 'Returns a single planet.',
+      tags: ['planets'],
+      successStatus: 200,
+      successDescription: 'Planet payload',
+    }),
+  )
+  .input(
+    z.object({
+      id: z.string(),
+    }),
+  )
+  .output(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+    }),
+  )
 ```
 
 :::info
@@ -42,14 +48,16 @@ Use `spec` to customize the generated operation object. If `spec` is an object, 
 
 ```ts
 const getPlanet = oc
-  .meta(openapi({
-    method: 'GET',
-    path: '/planets/{id}',
-    spec: current => ({
-      ...current,
-      security: [{ bearerAuth: [] }],
+  .meta(
+    openapi({
+      method: 'GET',
+      path: '/planets/{id}',
+      spec: (current) => ({
+        ...current,
+        security: [{ bearerAuth: [] }],
+      }),
     }),
-  }))
+  )
   .input(z.object({ id: z.string() }))
 ```
 
@@ -63,31 +71,48 @@ When `openapi` is applied multiple times, most fields, such as `method`, `path`,
 
 For implementation details, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/openapi/src/meta.ts).
 
+:::warning
+Router-level metadata applies again, even if a procedure already has it:
+
+```ts
+const base = os.meta(openapi({ prefix: '/api' }))
+
+const router = base.router({
+  list: base.handler(() => []), // prefix: '/api/api'
+})
+```
+
+:::
+
 ```ts
 const router = os
-  .meta(openapi({
-    tags: ['planets'],
-    spec: current => ({
-      ...current,
-      security: [{ bearerAuth: [] }],
+  .meta(
+    openapi({
+      tags: ['planets'],
+      spec: (current) => ({
+        ...current,
+        security: [{ bearerAuth: [] }],
+      }),
     }),
-  }))
+  )
   .router({
     list: os
       .meta(openapi({ method: 'GET', summary: 'List planets', tags: ['list'] }))
-      .meta(openapi({
-        spec: {
-          operationId: 'getPlanet',
-          summary: 'List planets',
-          responses: {
-            200: {
-              description: 'List of planets',
+      .meta(
+        openapi({
+          spec: {
+            operationId: 'getPlanet',
+            summary: 'List planets',
+            responses: {
+              200: {
+                description: 'List of planets',
+              },
             },
-          }
-        }
-      }))
+          },
+        }),
+      )
       .input(z.object({ q: z.string().optional() }))
-      .handler(async () => ([])),
+      .handler(async () => []),
   })
 ```
 
@@ -96,23 +121,25 @@ These are equivalent to:
 ```ts
 const router = {
   list: os
-    .meta(openapi({
-      method: 'GET',
-      tags: ['planets', 'list'],
-      summary: 'List planets',
-      spec: {
-        operationId: 'getPlanet',
+    .meta(
+      openapi({
+        method: 'GET',
+        tags: ['planets', 'list'],
         summary: 'List planets',
-        responses: {
-          200: {
-            description: 'List of planets',
+        spec: {
+          operationId: 'getPlanet',
+          summary: 'List planets',
+          responses: {
+            200: {
+              description: 'List of planets',
+            },
           },
+          security: [{ bearerAuth: [] }],
         },
-        security: [{ bearerAuth: [] }],
-      },
-    }))
+      }),
+    )
     .input(z.object({ q: z.string().optional() }))
-    .handler(async () => ([])),
+    .handler(async () => []),
 }
 ```
 
@@ -120,9 +147,7 @@ const router = {
 Metadata resets to its default behavior when set to `undefined` in subsequent calls:
 
 ```ts
-const example = os
-  .meta(openapi({ tags: ['planets'] }))
-  .meta(openapi({ tags: undefined }))
+const example = os.meta(openapi({ tags: ['planets'] })).meta(openapi({ tags: undefined }))
 ```
 
 In this example, the final `tags` is `undefined`, so no tags are applied to `example`.
@@ -147,9 +172,7 @@ const spec = await generator.generate(router, {
       title: 'Planet API',
       version: '1.0.0',
     },
-    servers: [
-      { url: 'https://example.com/api' },
-    ],
+    servers: [{ url: 'https://example.com/api' }],
   },
 })
 ```
@@ -220,11 +243,11 @@ const spec = await generator.generate(router, {
 
 ### Hoisting `$defs`
 
-Root `$defs` generated by your converters are moved into `components.schemas`. Use `customComponentName` to rename them:
+Root `$defs` generated by your converters are moved into `components.schemas`. Use `componentName` to rename them:
 
 ```ts
 const spec = await generator.generate(router, {
-  customComponentName: (defName, defSchema) => `Api${defName}`,
+  componentName: (defName, defSchema) => `Api${defName}`,
 })
 ```
 
@@ -240,7 +263,7 @@ const spec = await generator.generate(router, {
     ...COMMON_ERROR_STATUS_MAP,
     PLANET_GONE: 410,
   },
-  customErrorResponseBodySchema: (definedErrors, status) => {
+  errorResponseBodySchema: (definedErrors, status, defaultSchema) => {
     if (status === 410) {
       return {
         type: 'object',
@@ -252,8 +275,60 @@ const spec = await generator.generate(router, {
       }
     }
 
-    // fallback to default by returning null or undefined
-    return null
+    return defaultSchema()
   },
 })
 ```
+
+If the handler sets [`errorResponseContentType`](/docs/openapi/handler#custom-error-response), pass the same value to the generator so error responses are documented under that media type:
+
+```ts
+const spec = await generator.generate(router, {
+  errorResponseContentType: 'application/problem+json',
+})
+```
+
+## Type Inference
+
+`@orpc/experimental-openapi-inference` provides an `OpenAPIGenerator` that infers from your TypeScript types the schemas your converters cannot handle, so procedures without `.output` are documented too.
+
+:::warning
+This package is experimental. It runs the TypeScript 7 compiler on your source files, so generate the document once and reuse it.
+:::
+
+```package-install
+npm install @orpc/experimental-openapi-inference@beta
+```
+
+```ts
+import { OpenAPIGenerator } from '@orpc/experimental-openapi-inference'
+
+const generator = new OpenAPIGenerator({
+  converters: [new ZodToJsonSchemaConverter()],
+})
+
+const spec = await generator.generate(router, {
+  source: { file: './src/router.ts', export: 'router' },
+})
+```
+
+`source.file` is the file exporting the router, `source.export` its export name (`router` by default), and `source.tsconfig` the tsconfig whose `paths` resolve aliases like `@/` (the nearest one by default). Other options work as in `OpenAPIGenerator`.
+
+Schemas describe values as the [serializer](/docs/openapi/serializer) writes them, and types declared in your project become components named after them.
+
+### JSDoc
+
+A procedure's comment sets its `summary`, `description`, `@deprecated` and `@tags`. A type's or property's comment sets its `description`, and tags like `@format`, `@minimum` or `@type integer` set the matching keyword:
+
+```ts
+interface User {
+  /** @type integer */
+  age: number
+}
+```
+
+### Limitations
+
+- Types carry no runtime validation: JSDoc tags only document constraints, so keep a converter schema to validate input.
+- [Custom serializer handlers](/docs/openapi/serializer#custom-serializers) are not reflected.
+- Generation throws on types the compiler cannot resolve, like an import through a missing path alias or `baseUrl`.

@@ -1,10 +1,29 @@
-import type { WithEffectContext } from './context'
+import { getEventListeners } from 'node:events'
+import { setFlagsFromString } from 'node:v8'
+import { runInNewContext } from 'node:vm'
+
 import { call, ORPCError, os } from '@orpc/server'
-import { Context, Effect } from 'effect'
+import { sleep } from '@orpc/shared'
+import { Cause, Context, Effect, Option, References } from 'effect'
+import { z } from 'zod'
+
+import type { EffectWrapOptions, WithEffectContext } from './context'
+import { handlerGen } from './handler'
 import { middlewareGen } from './middleware'
 import * as EffectModule from './runtime'
 
-const runPromiseSpy = vi.spyOn(EffectModule, 'runPromise')
+setFlagsFromString('--expose-gc')
+const gc = runInNewContext('gc') as () => void
+
+async function collectGarbage(): Promise<void> {
+  for (let i = 0; i < 5; i++) {
+    gc()
+    await sleep(10)
+  }
+}
+
+const untilAborted = (signal: AbortSignal | undefined) =>
+  new Promise((resolve) => signal?.addEventListener('abort', resolve, { once: true }))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -17,28 +36,39 @@ class Service1 extends Context.Service<
   }
 >()('Service1') {}
 
+class Service2 extends Context.Service<
+  Service2,
+  {
+    readonly id: string
+  }
+>()('Service2') {}
+
 describe('middlewareGen', () => {
   it('continues the chain and can extend the context', async () => {
     const procedure = os
       .$context<{ auth: boolean }>()
-      .use(middlewareGen(function* ({ next }) {
-        const random = yield* Effect.sync(() => 42)
-        return yield* next({ context: { random } })
-      }))
+      .use(
+        middlewareGen(function* ({ next }) {
+          const random = yield* Effect.sync(() => 42)
+          return yield* next({ context: { random } })
+        }),
+      )
       .handler(({ context }) => `output:${context.random}`)
 
-    await expect(
-      call(procedure, undefined, { context: { auth: true } }),
-    ).resolves.toEqual('output:42')
+    await expect(call(procedure, undefined, { context: { auth: true } })).resolves.toEqual(
+      'output:42',
+    )
   })
 
   it('can terminate the chain early with done', async () => {
     const handlerFn = vi.fn(() => 'handler')
 
     const procedure = os
-      .use(middlewareGen(function* (_, __, done) {
-        return done({ output: 'early' })
-      }))
+      .use(
+        middlewareGen(function* (_, __, done) {
+          return done({ output: 'early' })
+        }),
+      )
       .handler(handlerFn)
 
     await expect(call(procedure)).resolves.toEqual('early')
@@ -49,11 +79,13 @@ describe('middlewareGen', () => {
     const error = new Error('__DOWNSTREAM__')
 
     const procedure = os
-      .use(middlewareGen(function* ({ next }, _, done) {
-        return yield* next().pipe(
-          Effect.catch(() => Effect.sync(() => done({ output: 'recovered' }))),
-        )
-      }))
+      .use(
+        middlewareGen(function* ({ next }, _, done) {
+          return yield* next().pipe(
+            Effect.catch(() => Effect.sync(() => done({ output: 'recovered' }))),
+          )
+        }),
+      )
       .handler(() => {
         throw error
       })
@@ -65,9 +97,11 @@ describe('middlewareGen', () => {
     const error = new Error('__DOWNSTREAM__')
 
     const procedure = os
-      .use(middlewareGen(function* ({ next }) {
-        return yield* next()
-      }))
+      .use(
+        middlewareGen(function* ({ next }) {
+          return yield* next()
+        }),
+      )
       .handler(() => {
         throw error
       })
@@ -79,87 +113,761 @@ describe('middlewareGen', () => {
     const error = new Error('__MIDDLEWARE__')
 
     const procedure = os
-      .use(middlewareGen(function* ({ next }) {
-        yield* Effect.fail(error)
-        return yield* next()
-      }))
+      .use(
+        middlewareGen(function* ({ next }) {
+          yield* Effect.fail(error)
+          return yield* next()
+        }),
+      )
       .handler(() => 'unreachable')
 
     await expect(call(procedure)).rejects.toBe(error)
   })
 
   it('propagates ORPCError thrown by the generator', async () => {
-    const middleware = os
-      .errors({ UNAUTHORIZED: {} })
-      .middleware(middlewareGen(function* ({ errors }) {
+    const middleware = os.errors({ UNAUTHORIZED: {} }).middleware(
+      middlewareGen(function* ({ errors }) {
         throw errors.UNAUTHORIZED()
-      }))
+      }),
+    )
 
-    const procedure = os
-      .use(middleware)
-      .handler(() => 'unreachable')
+    const procedure = os.use(middleware).handler(() => 'unreachable')
 
     await expect(call(procedure)).rejects.toSatisfy(
-      error => error instanceof ORPCError && error.code === 'UNAUTHORIZED' && error.defined,
+      (error) => error instanceof ORPCError && error.code === 'UNAUTHORIZED' && error.defined,
     )
   })
 
   it('can access effect services from effect/context', async () => {
     const procedure = os
       .$context<WithEffectContext<Service1>>()
-      .use(middlewareGen(function* ({ next }) {
-        const service1 = yield* Service1
-        return yield* next({ context: { fromService: service1.id } })
-      }))
+      .use(
+        middlewareGen(function* ({ next }) {
+          const service1 = yield* Service1
+          return yield* next({ context: { fromService: service1.id } })
+        }),
+      )
       .handler(({ context }) => `output:${context.fromService}`)
 
-    await expect(call(
-      procedure,
-      undefined,
-      { context: { 'effect/context': Context.empty().pipe(Context.add(Service1, { id: 'Service1' })) } },
-    )).resolves.toEqual('output:Service1')
+    await expect(
+      call(procedure, undefined, {
+        context: {
+          'effect/context': Context.empty().pipe(Context.add(Service1, { id: 'Service1' })),
+        },
+      }),
+    ).resolves.toEqual('output:Service1')
   })
 
   it('can wrap effect execution via effect/wrap', async () => {
-    let wrappedCalls = 0
+    const wrap = vi.fn((effect: any, _opts: EffectWrapOptions) => effect)
 
     const procedure = os
       .$context<WithEffectContext<never>>()
-      .use(middlewareGen(function* ({ next }) {
-        return yield* next()
-      }))
+      .input(z.object({ id: z.string().transform(Number) }))
+      .errors({ BASE: {} })
+      .use(
+        middlewareGen(function* ({ next }) {
+          return yield* next()
+        }),
+      )
       .handler(() => 'output')
 
-    await expect(call(
-      procedure,
-      undefined,
-      {
-        context: {
-          'effect/context': Context.empty(),
-          'effect/wrap': effect => effect.pipe(Effect.tap(() => Effect.sync(() => {
-            wrappedCalls += 1
-          }))),
-        },
-      },
-    )).resolves.toEqual('output')
+    const signal = AbortSignal.timeout(100)
+    const context = { 'effect/context': Context.empty(), 'effect/wrap': wrap }
 
-    expect(wrappedCalls).toBe(1)
+    await expect(
+      call(
+        procedure,
+        { id: '1' },
+        { path: ['wrapped', 'procedure'], context, signal, lastEventId: 'id' },
+      ),
+    ).resolves.toEqual('output')
+
+    expect(wrap).toHaveBeenCalledExactlyOnceWith(expect.anything(), {
+      kind: 'middleware',
+      context,
+      // validated input of the middleware rather than the raw procedure input
+      input: { id: 1 },
+      path: ['wrapped', 'procedure'],
+      procedure,
+      signal,
+      lastEventId: 'id',
+      errors: { BASE: expect.any(Function) },
+    })
   })
 
-  it('forwards the provided signal to runPromise', async () => {
-    const controller = new AbortController()
+  it('invokes effect/wrap once per middlewareGen and handlerGen', async () => {
+    const wrap = vi.fn((effect: any, _opts: EffectWrapOptions) => effect)
+    const context = { 'effect/context': Context.empty(), 'effect/wrap': wrap }
 
     const procedure = os
-      .use(middlewareGen(function* ({ next }) {
-        return yield* next()
-      }))
+      .$context<WithEffectContext<never>>()
+      .use(
+        middlewareGen(function* ({ next }) {
+          return yield* next({ context: { first: true } })
+        }),
+      )
+      .use(({ next }) => next({ context: { plain: true } }))
+      .use(
+        middlewareGen(function* ({ next }) {
+          return yield* next({ context: { second: true } })
+        }),
+      )
+      .handler(
+        handlerGen(function* () {
+          return 'output'
+        }),
+      )
+
+    await expect(call(procedure, undefined, { context })).resolves.toEqual('output')
+
+    expect(wrap.mock.calls.map(([, opts]) => [opts.kind, opts.context])).toEqual([
+      ['middleware', context],
+      ['middleware', { ...context, first: true, plain: true }],
+      ['handler', { ...context, first: true, plain: true, second: true }],
+    ])
+  })
+
+  it('passes downstream failures through effect/wrap', async () => {
+    const downstreamError = new Error('__DOWNSTREAM__')
+
+    const procedure = os
+      .$context<WithEffectContext<never>>()
+      .use(
+        middlewareGen(function* ({ next }) {
+          return yield* next()
+        }),
+      )
+      .handler(() => {
+        throw downstreamError
+      })
+
+    await expect(
+      call(procedure, undefined, {
+        context: {
+          'effect/context': Context.empty(),
+          'effect/wrap': (effect, opts) =>
+            effect.pipe(
+              Effect.mapError(
+                (cause) => new ORPCError('BAD_REQUEST', { message: opts.kind, cause }),
+              ),
+            ),
+        },
+      }),
+    ).rejects.toSatisfy(
+      (error) =>
+        error instanceof ORPCError &&
+        error.message === 'middleware' &&
+        error.cause === downstreamError,
+    )
+  })
+
+  describe('interruption', () => {
+    let log: string[] = []
+
+    beforeEach(() => {
+      log = []
+    })
+
+    const tracked = (name: string) =>
+      middlewareGen(function* ({ next }) {
+        return yield* Effect.acquireUseRelease(
+          Effect.sync(() => log.push(`${name}-acquire`)),
+          () => next(),
+          () => Effect.sync(() => log.push(`${name}-release`)),
+        )
+      })
+
+    const passthrough = middlewareGen(function* ({ next }) {
+      return yield* next()
+    })
+
+    const timeoutFallback = middlewareGen(function* ({ next }, _, done) {
+      return yield* next().pipe(
+        Effect.timeout('20 millis'),
+        Effect.catchIf(Cause.isTimeoutError, () =>
+          Effect.sync(() => {
+            log.push('mw-timeout')
+            return done({ output: 'fallback' })
+          }),
+        ),
+      )
+    })
+
+    it('waits for the downstream chain before running finalizers when the request aborts', async () => {
+      const procedure = os.use(tracked('mw')).handler(async ({ signal }) => {
+        await sleep(50)
+        log.push(`handler-done:aborted=${signal?.aborted}`)
+        return 1
+      })
+
+      const signal = AbortSignal.timeout(10)
+      await expect(call(procedure, undefined, { signal })).rejects.toSatisfy(
+        (error) => error === signal.reason,
+      )
+      expect(log).toEqual(['mw-acquire', 'handler-done:aborted=true', 'mw-release'])
+    })
+
+    it('unwinds nested middleware in order when the request aborts', async () => {
+      const procedure = os
+        .use(tracked('outer'))
+        .use(async ({ next }) => {
+          try {
+            return await next()
+          } finally {
+            log.push('plain-finally')
+          }
+        })
+        .use(tracked('inner'))
+        .handler(async ({ signal }) => {
+          await sleep(50)
+          log.push(`handler-done:aborted=${signal?.aborted}`)
+          return 1
+        })
+
+      await expect(
+        call(procedure, undefined, { signal: AbortSignal.timeout(10) }),
+      ).rejects.toThrow()
+      expect(log).toEqual([
+        'outer-acquire',
+        'inner-acquire',
+        'handler-done:aborted=true',
+        'inner-release',
+        'plain-finally',
+        'outer-release',
+      ])
+    })
+
+    it('interrupts a downstream handlerGen when the request aborts', async () => {
+      const procedure = os
+        .use(
+          middlewareGen(function* ({ next }) {
+            return yield* next().pipe(Effect.ensuring(Effect.sync(() => log.push('mw-release'))))
+          }),
+        )
+        .handler(
+          handlerGen(function* () {
+            return yield* Effect.never.pipe(
+              Effect.onInterrupt(() =>
+                Effect.sleep('10 millis').pipe(
+                  Effect.andThen(Effect.sync(() => log.push('handler-interrupted'))),
+                ),
+              ),
+            )
+          }),
+        )
+
+      const signal = AbortSignal.timeout(10)
+      await expect(call(procedure, undefined, { signal })).rejects.toSatisfy(
+        (error) => error === signal.reason,
+      )
+      expect(log).toEqual(['handler-interrupted', 'mw-release'])
+    })
+
+    it('interrupts a downstream handlerGen when Effect.timeout interrupts next', async () => {
+      const procedure = os.use(timeoutFallback).handler(
+        handlerGen(function* () {
+          yield* Effect.sleep('1 second').pipe(
+            Effect.onInterrupt(() => Effect.sync(() => log.push('handler-interrupted'))),
+          )
+          return 'handler'
+        }),
+      )
+
+      await expect(call(procedure)).resolves.toEqual('fallback')
+      expect(log).toEqual(['handler-interrupted', 'mw-timeout'])
+    })
+
+    it('aborts the signal of a plain handler and waits for it when Effect.timeout interrupts next', async () => {
+      const procedure = os.use(timeoutFallback).handler(async ({ signal }) => {
+        await untilAborted(signal)
+        await sleep(10)
+        log.push('handler-aborted')
+        throw new Error('dropped after interruption')
+      })
+
+      await expect(call(procedure)).resolves.toEqual('fallback')
+      expect(log).toEqual(['handler-aborted', 'mw-timeout'])
+    })
+
+    it('uses a signal passed to next, as is when already aborted', async () => {
+      const pending = new AbortController()
+      const aborted = new AbortController()
+      aborted.abort(new Error('aborted'))
+      const signals: (AbortSignal | undefined)[] = []
+
+      const procedure = os
+        .use(
+          middlewareGen(function* ({ next }) {
+            return yield* next({ signal: signals.length ? aborted.signal : pending.signal })
+          }),
+        )
+        .handler(({ signal }) => {
+          signals.push(signal)
+          return 'output'
+        })
+
+      await expect(call(procedure)).resolves.toEqual('output')
+      await expect(call(procedure)).resolves.toEqual('output')
+
+      expect(signals[0]?.aborted).toBe(false)
+      pending.abort()
+      expect(signals[0]?.aborted).toBe(true)
+      expect(signals[1]).toBe(aborted.signal)
+    })
+
+    it.each([
+      { name: 'nested', middleware: passthrough, context: {} },
+      {
+        name: 'uninterruptible',
+        middleware: passthrough,
+        context: { 'effect/wrap': Effect.uninterruptible },
+      },
+      {
+        name: 'suspending before next',
+        middleware: middlewareGen(function* ({ next }) {
+          yield* Effect.sleep('1 millis')
+          return yield* next()
+        }),
+        context: {},
+      },
+    ])('aborts downstream with the request reason ($name)', async ({ middleware, context }) => {
+      const controller = new AbortController()
+      const reason = new Error('request aborted')
+      let handlerReason: unknown
+
+      const procedure = os
+        .$context<Partial<WithEffectContext<never>>>()
+        .use(middleware)
+        .use(passthrough)
+        .handler(async ({ signal }) => {
+          await untilAborted(signal)
+          handlerReason = signal?.reason
+          return 'output'
+        })
+
+      const promise = call(procedure, undefined, { context, signal: controller.signal })
+      await sleep(20)
+      controller.abort(reason)
+
+      await expect(promise).rejects.toBe(reason)
+      expect(handlerReason).toBe(reason)
+    })
+
+    it('aborts only downstream of the middleware whose next is interrupted', async () => {
+      const signals: (AbortSignal | undefined)[] = []
+      const record = os.middleware(({ next, signal }) => {
+        signals.push(signal)
+        return next()
+      })
+
+      const procedure = os
+        .use(passthrough)
+        .use(record)
+        .use(timeoutFallback)
+        .use(record)
+        .handler(async ({ signal }) => {
+          await untilAborted(signal)
+          return 'handler'
+        })
+
+      await expect(call(procedure)).resolves.toEqual('fallback')
+      expect(signals[0]?.aborted).toBe(false)
+      expect(signals[1]?.aborted).toBe(true)
+    })
+
+    it.each([
+      { name: 'passthrough', middleware: passthrough },
+      {
+        name: 'Effect.timeout around next',
+        middleware: middlewareGen(function* ({ next }) {
+          return yield* next().pipe(Effect.timeout('10 millis'))
+        }),
+      },
+    ])(
+      'does not abort a streamed output until the request aborts ($name)',
+      async ({ middleware }) => {
+        const controller = new AbortController()
+        const reason = new Error('request aborted')
+        let handlerSignal: AbortSignal | undefined
+
+        const procedure = os
+          .use(middleware)
+          .use(passthrough)
+          .handler(async function* ({ signal }) {
+            handlerSignal = signal
+            yield 1
+            await untilAborted(signal)
+          })
+
+        const iterator = (await call(procedure, undefined, {
+          signal: controller.signal,
+        })) as AsyncIterator<number>
+
+        await expect(iterator.next()).resolves.toEqual({ value: 1, done: false })
+        await sleep(30)
+        expect(handlerSignal?.aborted).toBe(false)
+
+        controller.abort(reason)
+        expect(handlerSignal?.reason).toBe(reason)
+        await iterator.return?.()
+      },
+    )
+
+    describe('memory', () => {
+      const signals: WeakRef<AbortSignal>[] = []
+      const outputs: WeakRef<object>[] = []
+
+      beforeEach(() => {
+        signals.length = 0
+        outputs.length = 0
+      })
+
+      async function expectCollected(refs: WeakRef<object>[]) {
+        await collectGarbage()
+        expect(refs.map((ref) => ref.deref())).toEqual([undefined, undefined, undefined])
+      }
+
+      const recording = os
+        .use(passthrough)
+        .use(passthrough)
+        .handler(({ signal }) => {
+          const output = { data: 'output' }
+          signals.push(new WeakRef(signal!))
+          outputs.push(new WeakRef(output))
+          return output
+        })
+
+      it('keeps abort listeners on downstream signals after the middlewares returned', async () => {
+        const controller = new AbortController()
+        const reason = new Error('request aborted')
+        let listenerReason: unknown
+
+        const procedure = os
+          .use(passthrough)
+          .use(passthrough)
+          .handler(({ signal }) => {
+            signal?.addEventListener('abort', () => (listenerReason = signal.reason), {
+              once: true,
+            })
+            return 'output'
+          })
+
+        await call(procedure, undefined, { signal: controller.signal })
+        await collectGarbage()
+        controller.abort(reason)
+
+        expect(listenerReason).toBe(reason)
+      })
+
+      it('does not retain the output of a completed next while the request signal is alive', async () => {
+        const controller = new AbortController()
+
+        for (let i = 0; i < 3; i++) {
+          await call(recording, undefined, { signal: controller.signal })
+        }
+
+        await expectCollected(outputs)
+      })
+
+      it.each([
+        { name: 'collected', abort: false },
+        { name: 'aborted', abort: true },
+      ])('releases downstream signals once the request signal is $name', async ({ abort }) => {
+        const controller = new AbortController()
+
+        for (let i = 0; i < 3; i++) {
+          await call(recording, undefined, {
+            signal: abort ? controller.signal : new AbortController().signal,
+          })
+        }
+
+        if (abort) {
+          controller.abort()
+        }
+        await expectCollected(signals)
+      })
+
+      it('releases an interrupted next while the request signal is alive', async () => {
+        const controller = new AbortController()
+
+        const procedure = os.use(timeoutFallback).handler(async ({ signal }) => {
+          signals.push(new WeakRef(signal!))
+          await untilAborted(signal)
+          return 'handler'
+        })
+
+        for (let i = 0; i < 3; i++) {
+          await expect(call(procedure, undefined, { signal: controller.signal })).resolves.toEqual(
+            'fallback',
+          )
+        }
+
+        expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0)
+        await expectCollected(signals)
+      })
+    })
+  })
+
+  describe('effect context propagation', () => {
+    it('propagates services, spans and log annotations around next to downstream effects', async () => {
+      const procedure = os
+        .use(
+          middlewareGen(function* ({ next }) {
+            return yield* next().pipe(
+              Effect.provideService(Service1, { id: 'Service1' }),
+              Effect.withSpan('mw-span'),
+              Effect.annotateLogs({ requestId: 'req-1' }),
+            )
+          }),
+        )
+        .handler(
+          handlerGen(function* () {
+            const service = yield* Effect.serviceOption(Service1)
+            const span = yield* Effect.currentSpan
+            const annotations = yield* References.CurrentLogAnnotations
+
+            return { service: Option.getOrUndefined(service)?.id, span: span.name, annotations }
+          }),
+        )
+
+      await expect(call(procedure)).resolves.toEqual({
+        service: 'Service1',
+        span: 'mw-span',
+        annotations: { requestId: 'req-1' },
+      })
+    })
+
+    it('passes the propagated context through non-effect middleware', async () => {
+      const procedure = os
+        .$context<WithEffectContext<never>>()
+        .use(
+          middlewareGen(function* ({ next }) {
+            return yield* next().pipe(Effect.provideService(Service1, { id: 'Service1' }))
+          }),
+        )
+        .use(({ context, next }) =>
+          next({
+            context: {
+              'effect/context': context['effect/context'].pipe(
+                Context.add(Service2, { id: 'Service2' }),
+              ),
+            },
+          }),
+        )
+        .handler(
+          handlerGen(function* () {
+            const service1 = yield* Effect.serviceOption(Service1)
+            const service2 = yield* Effect.serviceOption(Service2)
+
+            return [Option.getOrUndefined(service1)?.id, Option.getOrUndefined(service2)?.id]
+          }),
+        )
+
+      await expect(
+        call(procedure, undefined, { context: { 'effect/context': Context.empty() } }),
+      ).resolves.toEqual(['Service1', 'Service2'])
+    })
+
+    it('layers services passed to next over the fiber context', async () => {
+      const procedure = os
+        .$context<WithEffectContext<Service1>>()
+        .use(
+          middlewareGen(function* ({ context, next }) {
+            return yield* next({
+              context: {
+                'effect/context': context['effect/context'].pipe(
+                  Context.add(Service2, { id: 'from-next' }),
+                ),
+              },
+            }).pipe(
+              Effect.provideService(Service2, { id: 'from-fiber' }),
+              Effect.annotateLogs({ requestId: 'req-1' }),
+            )
+          }),
+        )
+        .handler(
+          handlerGen(function* () {
+            const service1 = yield* Service1
+            const service2 = yield* Service2
+            const annotations = yield* References.CurrentLogAnnotations
+
+            return { service1: service1.id, service2: service2.id, annotations }
+          }),
+        )
+
+      await expect(
+        call(procedure, undefined, {
+          context: { 'effect/context': Context.make(Service1, { id: 'Service1' }) },
+        }),
+      ).resolves.toEqual({
+        service1: 'Service1',
+        service2: 'from-next',
+        annotations: { requestId: 'req-1' },
+      })
+    })
+
+    it('keeps the inner span and annotations when a nested middleware passes effect/context to next', async () => {
+      const procedure = os
+        .$context<WithEffectContext<Service1>>()
+        .use(
+          middlewareGen(function* ({ next }) {
+            return yield* next().pipe(
+              Effect.withSpan('outer'),
+              Effect.annotateLogs({ who: 'outer' }),
+            )
+          }),
+        )
+        .use(
+          middlewareGen(function* ({ context, next }) {
+            return yield* next({
+              context: {
+                'effect/context': context['effect/context'].pipe(
+                  Context.add(Service2, { id: 'Service2' }),
+                ),
+              },
+            }).pipe(Effect.withSpan('inner'), Effect.annotateLogs({ who: 'inner' }))
+          }),
+        )
+        .handler(
+          handlerGen(function* () {
+            const span = yield* Effect.currentSpan
+            const annotations = yield* References.CurrentLogAnnotations
+
+            return { service2: (yield* Service2).id, span: span.name, annotations }
+          }),
+        )
+
+      await expect(
+        call(procedure, undefined, {
+          context: { 'effect/context': Context.make(Service1, { id: 'Service1' }) },
+        }),
+      ).resolves.toEqual({
+        service2: 'Service2',
+        span: 'inner',
+        annotations: { who: 'inner' },
+      })
+    })
+
+    it('layers a service whose value is undefined', async () => {
+      class Marker extends Context.Service<Marker, undefined>()('Marker') {}
+
+      const procedure = os
+        .$context<WithEffectContext<never>>()
+        .use(
+          middlewareGen(function* ({ context, next }) {
+            return yield* next({
+              context: {
+                'effect/context': context['effect/context'].pipe(Context.add(Marker, undefined)),
+              },
+            })
+          }),
+        )
+        .handler(
+          handlerGen(function* () {
+            return Option.isSome(yield* Effect.serviceOption(Marker))
+          }),
+        )
+
+      await expect(
+        call(procedure, undefined, { context: { 'effect/context': Context.empty() } }),
+      ).resolves.toBe(true)
+    })
+
+    it('lets effect/context passed to next override an incoming service', async () => {
+      const procedure = os
+        .$context<WithEffectContext<Service2>>()
+        .use(
+          middlewareGen(function* ({ context, next }) {
+            return yield* next({
+              context: {
+                'effect/context': context['effect/context'].pipe(
+                  Context.add(Service2, { id: 'overridden' }),
+                ),
+              },
+            })
+          }),
+        )
+        .handler(
+          handlerGen(function* () {
+            return (yield* Service2).id
+          }),
+        )
+
+      await expect(
+        call(procedure, undefined, {
+          context: { 'effect/context': Context.make(Service2, { id: 'incoming' }) },
+        }),
+      ).resolves.toEqual('overridden')
+    })
+
+    it.each([false, true])(
+      'nests effect/wrap spans of downstream effects under the middleware span (adds a service: %s)',
+      async (addsService) => {
+        let index = 0
+
+        const procedure = os
+          .$context<WithEffectContext<never>>()
+          .use(
+            middlewareGen(function* ({ context, next }) {
+              return yield* addsService
+                ? next({
+                    context: {
+                      'effect/context': context['effect/context'].pipe(
+                        Context.add(Service2, { id: 'Service2' }),
+                      ),
+                    },
+                  })
+                : next()
+            }),
+          )
+          .handler(
+            handlerGen(function* () {
+              const span = yield* Effect.currentSpan
+              const parent = Option.getOrUndefined(span.parent)
+
+              return [span.name, parent?._tag === 'Span' ? parent.name : undefined]
+            }),
+          )
+
+        await expect(
+          call(procedure, undefined, {
+            context: {
+              'effect/context': Context.empty(),
+              'effect/wrap': (effect) => effect.pipe(Effect.withSpan(`wrap-${index++}`)),
+            },
+          }),
+        ).resolves.toEqual(['wrap-1', 'wrap-0'])
+      },
+    )
+  })
+
+  it('forwards effect/context and the provided signal to runPromise', async () => {
+    const runPromiseSpy = vi.spyOn(EffectModule, 'runPromise')
+    const controller = new AbortController()
+    const effectContext = Context.empty().pipe(Context.add(Service1, { id: 'Service1' }))
+
+    const procedure = os
+      .$context<WithEffectContext<Service1>>()
+      .use(
+        middlewareGen(function* ({ next }) {
+          return yield* next()
+        }),
+      )
       .handler(() => 'output')
 
     await expect(
-      call(procedure, undefined, { signal: controller.signal }),
+      call(procedure, undefined, {
+        context: { 'effect/context': effectContext },
+        signal: controller.signal,
+      }),
     ).resolves.toEqual('output')
 
     expect(runPromiseSpy).toHaveBeenCalledTimes(1)
-    expect(runPromiseSpy).toHaveBeenNthCalledWith(1, expect.anything(), { signal: controller.signal })
+    expect(runPromiseSpy).toHaveBeenNthCalledWith(1, expect.anything(), {
+      context: effectContext,
+      signal: controller.signal,
+    })
+    runPromiseSpy.mockRestore()
   })
 })

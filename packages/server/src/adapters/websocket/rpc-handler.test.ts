@@ -1,7 +1,9 @@
-import type { AddressInfo } from 'node:net'
 import { once } from 'node:events'
+import type { AddressInfo } from 'node:net'
+
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
-import WebSocket, { WebSocketServer } from 'ws'
+import { WebSocket, WebSocketServer } from 'ws'
+
 import { os } from '../../builder'
 import { RPCHandler } from './rpc-handler'
 
@@ -11,42 +13,53 @@ describe('rpcHandler', () => {
   })
 
   const createHandler = (options: ConstructorParameters<typeof RPCHandler>[1] = {}) => {
-    return new RPCHandler({
-      ping: os.handler(async ({ signal }) => {
-        await new Promise(resolve => setTimeout(resolve, 10))
-        signal?.throwIfAborted()
+    return new RPCHandler(
+      {
+        ping: os.handler(async ({ signal }) => {
+          await new Promise((resolve) => setTimeout(resolve, 10))
+          signal?.throwIfAborted()
 
-        return 'pong'
-      }),
-    }, options)
+          return 'pong'
+        }),
+      },
+      options,
+    )
   }
 
-  const createWs = () => ({
-    addEventListener: vi.fn(),
-    send: vi.fn(() => undefined),
-  })
+  const createWs = () => {
+    const listeners: Record<string, (event?: any) => void> = {}
+
+    return {
+      listeners,
+      addEventListener: vi.fn((event: string, callback: (event?: any) => void) => {
+        listeners[event] = callback
+      }),
+      send: vi.fn(() => undefined),
+    }
+  }
 
   const createRequestMessage = async ({
     prefix,
     url = '/ping',
-  }: { prefix?: string, url?: `/${string}` } = {}) => {
-    return encodePeerMessage({
-      id: '19',
-      kind: 'request',
-      json: {
-        url,
-        body: { json: 'input' },
-        headers: {},
-        method: 'POST',
+  }: { prefix?: string; url?: `/${string}` } = {}) => {
+    return encodePeerMessage(
+      {
+        id: '19',
+        kind: 'request',
+        json: {
+          url,
+          body: { json: 'input' },
+          headers: {},
+          method: 'POST',
+        },
       },
-    }, prefix ? { prefix } : undefined)
+      prefix ? { prefix } : undefined,
+    )
   }
 
   it('accepts context and prefix option in message method', async () => {
     const handler = new RPCHandler({
-      ping: os
-        .$context<{ userId: string }>()
-        .handler(({ context }) => context.userId),
+      ping: os.$context<{ userId: string }>().handler(({ context }) => context.userId),
     })
 
     const ws = createWs()
@@ -70,18 +83,27 @@ describe('rpcHandler', () => {
 
   it.each([
     ['string', () => createRequestMessage()],
-    ['bytes', async () => {
-      const message = await createRequestMessage()
-      return new TextEncoder().encode(message as string)
-    }],
-    ['arrayBuffer', async () => {
-      const message = await createRequestMessage()
-      return new TextEncoder().encode(message as string).buffer
-    }],
-    ['arrayBuffer parts', async () => {
-      const message = await createRequestMessage()
-      return [new TextEncoder().encode(message as string).buffer]
-    }],
+    [
+      'bytes',
+      async () => {
+        const message = await createRequestMessage()
+        return new TextEncoder().encode(message as string)
+      },
+    ],
+    [
+      'arrayBuffer',
+      async () => {
+        const message = await createRequestMessage()
+        return new TextEncoder().encode(message as string).buffer
+      },
+    ],
+    [
+      'arrayBuffer parts',
+      async () => {
+        const message = await createRequestMessage()
+        return [new TextEncoder().encode(message as string).buffer]
+      },
+    ],
   ])('handles %s request', async (_type, createMessage) => {
     const handler = createHandler()
     const ws = createWs()
@@ -117,6 +139,15 @@ describe('rpcHandler', () => {
     const result2 = await handler.message(ws as any, prefixedRequest)
 
     expect(result2.matched).toBe(true)
+    expect(ws.send).toHaveBeenCalledTimes(1)
+
+    // a server message is not for the handler
+    const serverMessage = await encodePeerMessage(
+      { id: '19', kind: 'response', json: { status: 200, headers: {} } } as any,
+      { prefix: 'orpc:' },
+    )
+
+    expect(await handler.message(ws as any, serverMessage)).toEqual({ matched: false })
     expect(ws.send).toHaveBeenCalledTimes(1)
   })
 
@@ -200,14 +231,14 @@ describe('rpcHandler', () => {
     const handler = createHandler()
 
     const wss = new WebSocketServer({ port: 0 })
-    wss.on('connection', ws => handler.upgrade(ws))
+    wss.on('connection', (ws) => handler.upgrade(ws))
     onTestFinished(() => wss.close())
 
     const client = new WebSocket(`ws://localhost:${(wss.address() as AddressInfo).port}`)
     await once(client, 'open')
 
     // `ws` rejects text frames carrying invalid UTF-8 by emitting `error` on the server socket
-    client.send(new Uint8Array([0xFF]), { binary: false })
+    client.send(new Uint8Array([0xff]), { binary: false })
 
     const [code] = await once(client, 'close')
     expect(code).toBe(1007)
@@ -241,5 +272,44 @@ describe('rpcHandler', () => {
     expect(decoded.matched).toBe(true)
     expect(decoded.message.kind).toBe('response')
     expect(decoded.message.json.status).toBe(undefined)
+  })
+
+  it('ignores Blob messages that finish loading after close via upgrade', async () => {
+    const procedure = vi.fn(() => 'pong')
+    const handler = new RPCHandler({
+      ping: os.handler(procedure),
+    })
+    const messageSpy = vi.spyOn(handler, 'message')
+
+    const ws = createWs()
+    handler.upgrade(ws as any)
+
+    const request = await createRequestMessage()
+    ws.listeners.message!({ data: new Blob([request as string]) })
+    ws.listeners.close!() // closes before the Blob finishes loading
+
+    await vi.waitFor(() => {
+      expect(messageSpy).toHaveBeenCalledTimes(1)
+    })
+    await expect(messageSpy.mock.results[0]!.value).resolves.toMatchObject({ matched: true })
+
+    expect(procedure).not.toHaveBeenCalled()
+    expect(ws.send).not.toHaveBeenCalled()
+  })
+
+  it('ignores messages received after close', async () => {
+    const procedure = vi.fn(() => 'pong')
+    const handler = new RPCHandler({
+      ping: os.handler(procedure),
+    })
+
+    const ws = createWs()
+    await handler.close(ws as any)
+
+    const result = await handler.message(ws as any, await createRequestMessage())
+
+    expect(result.matched).toBe(true)
+    expect(procedure).not.toHaveBeenCalled()
+    expect(ws.send).not.toHaveBeenCalled()
   })
 })

@@ -1,8 +1,8 @@
 ---
-title: "Request Limit Plugin"
-description: "Restrict the size of incoming request bodies with RequestLimitHandlerPlugin to protect your server from oversized payloads."
+title: 'Request Limit Plugin'
+description: 'Restrict the size of incoming request bodies with RequestLimitHandlerPlugin to protect your server from oversized payloads.'
 sidebar:
-  label: "Request Limit"
+  label: 'Request Limit'
 ---
 
 ## Setup
@@ -32,13 +32,24 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 When used with [Request Compression](/docs/plugins/request-compression), `maxBodySize` applies to the **decompressed** payload size, not the compressed wire size.
 :::
 
+## Custom Error
+
+By default the plugin throws `PAYLOAD_TOO_LARGE`. Use `error` to throw your own, which is [defined](/docs/error-handling#orpcerror-compatibility) when its `code` and `data` match an error the matched procedure declares. A custom code responds with `400` unless you map it in [`errorStatusMap`](/docs/rpc/handler#custom-error-response).
+
+```ts
+new RequestLimitHandlerPlugin({
+  maxBodySize: 1024 * 1024,
+  error: () => new ORPCError('TOO_BIG'),
+})
+```
+
 ## Peer Adapters
 
 This plugin does not apply to peer-based adapters such as [WebSocket](/docs/adapters/websocket) and [Message Port](/docs/adapters/message-port). Each message reaches the handler fully loaded in memory, so there is no body left to limit. Instead, limit each message at the transport, and the total bytes per connection per minute, since a single call can span many messages (for example, an [AsyncIteratorObject](/docs/async-iterator-object) input). With Bun:
 
 ```ts
 const MAX_BYTES_PER_MINUTE = 10 * 1024 * 1024 // 10MB
-const usage = new WeakMap<object, { bytes: number, resetAt: number }>()
+const usage = new WeakMap<object, { bytes: number; resetAt: number }>()
 
 Bun.serve({
   websocket: {
@@ -46,7 +57,7 @@ Bun.serve({
     async message(ws, message) {
       let entry = usage.get(ws)
       if (!entry || Date.now() >= entry.resetAt) {
-        usage.set(ws, entry = { bytes: 0, resetAt: Date.now() + 60_000 })
+        usage.set(ws, (entry = { bytes: 0, resetAt: Date.now() + 60_000 }))
       }
 
       entry.bytes += Buffer.byteLength(message)

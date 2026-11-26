@@ -6,15 +6,15 @@ export interface RateLimitResult {
   /**
    * Maximum number of requests allowed within a window.
    */
-  limit?: number
+  limit?: number | undefined
   /**
    * How many requests the user has left within the current window.
    */
-  remaining?: number
+  remaining?: number | undefined
   /**
    * Unix timestamp in milliseconds when the limits are reset.
    */
-  reset?: number
+  reset?: number | undefined
 }
 
 export interface RateLimitOptions {
@@ -24,7 +24,7 @@ export interface RateLimitOptions {
    *
    * @default 1
    */
-  weight?: number
+  weight?: number | undefined
 }
 
 /**

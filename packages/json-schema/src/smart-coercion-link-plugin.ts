@@ -1,17 +1,20 @@
 import type { ClientContext } from '@orpc/client'
+import { cloneORPCError, ORPCError } from '@orpc/client'
 import type { StandardLinkOptions, StandardLinkPlugin } from '@orpc/client/standard'
 import type { AnySchema, ErrorMap, RouterContract } from '@orpc/contract'
-import type { JsonSchemaConverter } from './convert'
-import type { JsonSchema } from './types'
-import { cloneORPCError, ORPCError } from '@orpc/client'
 import { getProcedureContractOrThrow } from '@orpc/contract'
+import type { Writable } from '@orpc/shared'
 import { getOwn, toArray } from '@orpc/shared'
+
+import type { JsonSchemaCoercerOptions } from './coercer'
 import { JsonSchemaCoercer } from './coercer'
+import type { JsonSchemaConverter } from './convert'
 import { DelegatingJsonSchemaConverter } from './convert'
 import { StandardJsonSchemaConverter } from './standard-json-schema-converter'
+import type { JsonSchema } from './types'
 
-export interface SmartCoercionLinkPluginOptions {
-  converters?: undefined | JsonSchemaConverter[]
+export interface SmartCoercionLinkPluginOptions extends JsonSchemaCoercerOptions {
+  converters?: JsonSchemaConverter[] | undefined
 }
 
 /**
@@ -21,12 +24,12 @@ export interface SmartCoercionLinkPluginOptions {
  * @see {@link https://orpc.dev/docs/plugins/smart-coercion | Smart Coercion Plugin}
  */
 export class SmartCoercionLinkPlugin<T extends ClientContext> implements StandardLinkPlugin<T> {
-  name = '~smart-coercion'
+  readonly name = '~smart-coercion'
 
   /**
-   * Output and error values should be coerced before validation.
+   * Runs inside response validation, so values are coerced before validation.
    */
-  after = ['~response-validation']
+  readonly after: readonly string[] = ['~response-validation']
 
   private readonly converter: DelegatingJsonSchemaConverter
   private readonly coercer: JsonSchemaCoercer
@@ -40,7 +43,7 @@ export class SmartCoercionLinkPlugin<T extends ClientContext> implements Standar
       ...toArray(options.converters),
       new StandardJsonSchemaConverter(),
     ])
-    this.coercer = new JsonSchemaCoercer()
+    this.coercer = new JsonSchemaCoercer(options)
   }
 
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
@@ -61,8 +64,7 @@ export class SmartCoercionLinkPlugin<T extends ClientContext> implements Standar
 
             const coercedOutput = this.coerceValue(outputSchemas, output)
             return coercedOutput
-          }
-          catch (error) {
+          } catch (error) {
             if (!(error instanceof ORPCError) || !error.defined) {
               throw error
             }
@@ -75,7 +77,10 @@ export class SmartCoercionLinkPlugin<T extends ClientContext> implements Standar
             }
 
             const cloned = cloneORPCError(error)
-            cloned.data = this.coerceValue([dataSchema], cloned.data)
+            ;(cloned.data as Writable<typeof cloned.data>) = this.coerceValue(
+              [dataSchema],
+              cloned.data,
+            )
             throw cloned
           }
         },

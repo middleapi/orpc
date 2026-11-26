@@ -1,30 +1,29 @@
 import type { Segment } from '@orpc/shared'
-import { getOwn, isPlainObject, NullProtoObj, setOwn } from '@orpc/shared'
+import { isPlainObject, NullProtoObj, setOwn } from '@orpc/shared'
 
 export type BracketNotationSerializeResult = [string, unknown][]
 
 export interface BracketNotationSerializerOptions {
   /**
-   * Maximum explicit array index allowed during deserialization (e.g., `arr[0]`, `arr[999]`).
-   * If the index exceeds this limit, the array is deserialized as an object instead.
+   * Maximum number of empty slots that explicit array indexes may leave in total during deserialization
+   * (e.g., `a[0]=x&a[3]=y` leaves 2). An index that would exceed it turns its array into an object
+   * instead (e.g., `?arr[5000]=x` becomes `{ arr: { 5000: 'x' } }`).
    *
-   * This guards against memory exhaustion attacks where malicious input uses extremely large
-   * indices (e.g., `?arr[4294967296]=value`). Although orpc uses sparse arrays handle large indices
-   * efficiently, downstream code may inadvertently densify them - creating millions of
-   * undefined slots and exhausting memory.
+   * Empty slots take memory (a lone `?arr[999]=x` takes ~12KB in V8), and code iterating an array walks
+   * every one of them, so this keeps both in line with the input.
    *
-   * NOTE: Does not apply to append-style notation (e.g., `arr[]`).
+   * NOTE: Append-style notation (e.g., `arr[]`) never leaves empty slots.
    *
-   * @default 999 (array with 1,000 elements)
+   * @default 1_000
    */
-  maxExplicitDeserializingArrayIndex?: number
+  maxDeserializingEmptySlots?: number | undefined
 }
 
 export class BracketNotationSerializer {
-  private readonly maxExplicitDeserializingArrayIndex: number
+  private readonly maxDeserializingEmptySlots: number
 
   constructor(options: BracketNotationSerializerOptions = {}) {
-    this.maxExplicitDeserializingArrayIndex = options.maxExplicitDeserializingArrayIndex ?? 999
+    this.maxDeserializingEmptySlots = options.maxDeserializingEmptySlots ?? 1_000
   }
 
   serialize(data: unknown): BracketNotationSerializeResult {
@@ -33,20 +32,21 @@ export class BracketNotationSerializer {
     return result
   }
 
-  private internalSerialize(data: unknown, path: string, isRoot: boolean, result: BracketNotationSerializeResult): void {
+  private internalSerialize(
+    data: unknown,
+    path: string,
+    isRoot: boolean,
+    result: BracketNotationSerializeResult,
+  ): void {
     if (Array.isArray(data)) {
       data.forEach((item, i) => {
         this.internalSerialize(item, isRoot ? i.toString() : `${path}[${i}]`, false, result)
       })
-    }
-
-    else if (isPlainObject(data)) {
+    } else if (isPlainObject(data)) {
       for (const key of Object.keys(data)) {
         this.internalSerialize(data[key], isRoot ? key : `${path}[${key}]`, false, result)
       }
-    }
-
-    else {
+    } else {
       result.push([path, data])
     }
   }
@@ -54,63 +54,80 @@ export class BracketNotationSerializer {
   deserialize(serialized: BracketNotationSerializeResult): Record<string, unknown> {
     // A caller-supplied object value can become a container for deeper paths, and unlike
     // `NullProtoObj` it carries a real prototype, so accesses below stay own-property only.
-    const arrayPushStyles = new WeakSet()
+    let arrayPushStyles: WeakSet<unknown[]> | undefined
     const root: Record<string, unknown> = new NullProtoObj()
+    let emptySlotsLeft = this.maxDeserializingEmptySlots
 
     for (const [path, value] of serialized) {
       const segments = this.parsePath(path)
 
       let currentRef: any = root
-      let nextSegment: string = segments[0]!
+      // Arrays take keys as numbers, so engines do not parse the same key again on each access
+      let nextSegment: string | number = segments[0]!
 
       for (let i = 1; i < segments.length; i++) {
         const segment = segments[i]!
         const isLast = i === segments.length - 1
 
-        const existing: any = getOwn(currentRef, nextSegment)
+        const hasExisting = Object.hasOwn(currentRef, nextSegment)
+        const existing: any = hasExisting ? currentRef[nextSegment] : undefined
         let child: any = existing
+        let key: string | number = segment
 
-        if (!Array.isArray(child) && !isPlainObject(child)) {
-          child = []
-        }
+        // A missing value is treated like an empty array and a leaf value like a one-item array (as if its key
+        // were repeated), which becomes an object if it cannot stay one
+        if (Array.isArray(child) || !isPlainObject(child)) {
+          if (hasExisting && !Array.isArray(child)) {
+            child = [child]
+          }
 
-        if (Array.isArray(child)) {
-          const isPushStyle = arrayPushStyles.has(child)
+          const isArray = Array.isArray(child)
+          const isPushStyle = isArray && !!arrayPushStyles?.has(child)
+          const length = isArray ? child.length : 0
+          const index = internalToArrayIndex(segment)
+          const emptySlots = index === undefined ? 0 : Math.max(0, index - length)
 
-          const canStayArray = segment === ''
-            ? isLast && (isPushStyle || child.length === 0)
-            : internalIsValidArrayIndex(segment, this.maxExplicitDeserializingArrayIndex) && !(isLast && isPushStyle)
+          const canBeArray =
+            segment === ''
+              ? isLast && (isPushStyle || length === 0)
+              : index !== undefined && !(isLast && isPushStyle) && emptySlots <= emptySlotsLeft
 
-          if (!canStayArray) {
-            arrayPushStyles.delete(child)
-            child = isPushStyle ? internalPushStyleArrayToObject(child) : internalArrayToObject(child)
+          if (canBeArray) {
+            emptySlotsLeft -= emptySlots
+            child = isArray ? child : []
+            key = index ?? segment
+          } else if (isArray) {
+            arrayPushStyles?.delete(child)
+            child = isPushStyle
+              ? internalPushStyleArrayToObject(child)
+              : internalArrayToObject(child)
+          } else {
+            child = new NullProtoObj()
           }
         }
 
         if (child !== existing) {
-          setOwn(currentRef, nextSegment, child)
+          internalSetOwn(currentRef, nextSegment, child)
         }
 
         currentRef = child
-        nextSegment = segment
+        nextSegment = key
       }
 
       if (Array.isArray(currentRef) && nextSegment === '') {
+        arrayPushStyles ??= new WeakSet()
         arrayPushStyles.add(currentRef)
         currentRef.push(value)
-      }
-      else if (Object.hasOwn(currentRef, nextSegment)) {
+      } else if (Object.hasOwn(currentRef, nextSegment)) {
         const current = currentRef[nextSegment]
 
         if (Array.isArray(current)) {
           current.push(value)
+        } else {
+          internalSetOwn(currentRef, nextSegment, [current, value])
         }
-        else {
-          setOwn(currentRef, nextSegment, [current, value])
-        }
-      }
-      else {
-        setOwn(currentRef, nextSegment, value)
+      } else {
+        internalSetOwn(currentRef, nextSegment, value)
       }
     }
 
@@ -132,43 +149,60 @@ export class BracketNotationSerializer {
   }
 
   parsePath(path: string): string[] {
-    const segments: string[] = []
+    const start = path.indexOf('[')
 
-    let inBrackets = false
-    let currentSegment = ''
-
-    for (let i = 0; i < path.length; i++) {
-      const char = path[i]!
-      const nextChar = path[i + 1]
-
-      if (inBrackets && char === ']' && (nextChar === undefined || nextChar === '[')) {
-        if (nextChar === undefined) {
-          inBrackets = false
-        }
-
-        segments.push(currentSegment)
-        currentSegment = ''
-        i++
-      }
-
-      else if (segments.length === 0 && char === '[') {
-        inBrackets = true
-        segments.push(currentSegment)
-        currentSegment = ''
-      }
-
-      else {
-        currentSegment += char
-      }
+    // Brackets must open after the first segment and close at the very end, e.g. `a[b][c]`
+    if (start === -1 || path[path.length - 1] !== ']') {
+      return [path]
     }
 
-    return inBrackets || segments.length === 0 ? [path] : segments
+    const segments = [path.slice(0, start)]
+    let from = start + 1
+    let to = path.indexOf('][', from)
+
+    while (to !== -1) {
+      segments.push(path.slice(from, to))
+      from = to + 2
+      to = path.indexOf('][', from)
+    }
+
+    segments.push(path.slice(from, -1))
+    return segments
   }
 }
 
-const INTEGER_PATTERN = /^0$|^[1-9]\d*$/
-function internalIsValidArrayIndex(value: string, maxIndex: number): boolean {
-  return INTEGER_PATTERN.test(value) && Number(value) <= maxIndex
+/**
+ * The largest array index. Larger integer keys are ordinary properties.
+ */
+const MAX_ARRAY_INDEX = 2 ** 32 - 2
+
+/**
+ * Returns `key` as an array index (no sign, no leading zeros), which is also how engines store the
+ * integer keys of objects, or `undefined` if it is not one.
+ */
+function internalToArrayIndex(key: string): number | undefined {
+  // `MAX_ARRAY_INDEX` has 10 digits
+  if (key.length === 0 || key.length > 10) {
+    return undefined
+  }
+
+  let index = key.charCodeAt(0) - 48 // '0'
+
+  if (index < 0 || index > 9 || (index === 0 && key.length > 1)) {
+    return undefined
+  }
+
+  for (let i = 1; i < key.length; i++) {
+    const digit = key.charCodeAt(i) - 48
+
+    if (digit < 0 || digit > 9) {
+      return undefined
+    }
+
+    index = index * 10 + digit
+  }
+
+  return index <= MAX_ARRAY_INDEX ? index : undefined
 }
 
 function internalArrayToObject(array: readonly unknown[]): Record<string, unknown> {
@@ -187,4 +221,33 @@ function internalPushStyleArrayToObject(array: readonly unknown[]): Record<strin
   obj[''] = array.length === 1 ? array[0] : array
 
   return obj
+}
+
+/**
+ * Like `setOwn`, but first switches an object created during deserialization to sparse storage when an
+ * integer key would leave a gap. Engines keep integer keys in a flat backing store sized by the largest one,
+ * so a lone `{ 999: x }` takes ~12KB in V8. Holding `MAX_ARRAY_INDEX` switches an object to sparse storage
+ * for good (V8 and JSC), so writing and deleting it keeps the object's integer keys cheap without a trace.
+ */
+function internalSetOwn(
+  container: Record<string, unknown>,
+  key: string | number,
+  value: unknown,
+): void {
+  if (typeof key === 'string' && container instanceof NullProtoObj) {
+    const index = internalToArrayIndex(key)
+
+    // `0`, or the key right after an existing one, keeps the flat store filled
+    if (
+      index !== undefined &&
+      index !== 0 &&
+      !Object.hasOwn(container, index - 1) &&
+      !Object.hasOwn(container, MAX_ARRAY_INDEX)
+    ) {
+      container[MAX_ARRAY_INDEX] = undefined
+      delete container[MAX_ARRAY_INDEX]
+    }
+  }
+
+  setOwn(container, key, value)
 }

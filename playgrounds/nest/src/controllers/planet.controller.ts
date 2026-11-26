@@ -1,6 +1,7 @@
 import { Controller } from '@nestjs/common'
 import { Implement } from '@orpc/nest'
 import { call, implement } from '@orpc/server'
+
 import { contract } from '../contracts'
 import { deleteFile, uploadFile } from '../routers/file'
 import { Planet } from '../schemas/planet'
@@ -20,14 +21,13 @@ const DB: Planet[] = [
 
 @Controller()
 export class PlanetController {
-  constructor() {}
-
   @Implement(contract.planet.list)
   list() {
     return implement(contract.planet.list).handler(async (_, { keyword, cursor, limit }) => {
-      const planets = keyword !== undefined
-        ? DB.filter(p => p.name.includes(keyword) || p.description?.includes(keyword))
-        : DB
+      const planets =
+        keyword !== undefined
+          ? DB.filter((p) => p.name.includes(keyword) || p.description?.includes(keyword))
+          : DB
 
       return planets.slice(cursor, cursor + limit)
     })
@@ -36,7 +36,7 @@ export class PlanetController {
   @Implement(contract.planet.find)
   find() {
     return implement(contract.planet.find).handler(({ input, errors }) => {
-      const planet = DB.find(p => p.id === input.id)
+      const planet = DB.find((p) => p.id === input.id)
 
       if (!planet) {
         throw errors.NOT_FOUND()
@@ -69,7 +69,7 @@ export class PlanetController {
   @Implement(contract.planet.update)
   update() {
     return implement(contract.planet.update).handler(async ({ input, errors, context }) => {
-      const planet = DB.find(p => p.id === input.id)
+      const planet = DB.find((p) => p.id === input.id)
 
       if (!planet) {
         throw errors.NOT_FOUND()
@@ -94,7 +94,7 @@ export class PlanetController {
   @Implement(contract.planet.delete)
   delete() {
     return implement(contract.planet.delete).handler(async ({ input, context }) => {
-      const index = DB.findIndex(p => p.id === input.id)
+      const index = DB.findIndex((p) => p.id === input.id)
 
       if (index >= 0) {
         const [planet] = DB.splice(index, 1)

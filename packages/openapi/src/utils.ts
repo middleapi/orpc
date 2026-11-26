@@ -11,23 +11,27 @@ const PARAMETER_NAME_REGEX = /^[\w-]+$/
 /**
  * Dynamic parameters are always returned in path order.
  */
-export function getDynamicPathParams(path: `/${string}`): {
-  segment: string
-  startIndex: number
-  parameterName: string
-  allowsSlash: boolean
-}[] | undefined {
+export function getDynamicPathParams(path: `/${string}`):
+  | {
+      segment: string
+      startIndex: number
+      parameterName: string
+      allowsSlash: boolean
+    }[]
+  | undefined {
   if (!path.includes('{')) {
     return undefined
   }
 
   const len = path.length
-  let params: {
-    segment: string
-    startIndex: number
-    parameterName: string
-    allowsSlash: boolean
-  }[] | undefined
+  let params:
+    | {
+        segment: string
+        startIndex: number
+        parameterName: string
+        allowsSlash: boolean
+      }[]
+    | undefined
 
   let index = 1
 
@@ -36,7 +40,11 @@ export function getDynamicPathParams(path: `/${string}`): {
     const slashPos = path.indexOf('/', index)
     const segmentEnd = slashPos === -1 ? len : slashPos
 
-    if (segmentEnd > segmentStart && path.charCodeAt(segmentStart) === 123 && path.charCodeAt(segmentEnd - 1) === 125) {
+    if (
+      segmentEnd > segmentStart &&
+      path.charCodeAt(segmentStart) === 123 &&
+      path.charCodeAt(segmentEnd - 1) === 125
+    ) {
       let parameterStart = segmentStart + 1
       let allowsSlash = false
 

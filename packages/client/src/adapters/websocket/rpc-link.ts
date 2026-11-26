@@ -1,12 +1,11 @@
 import type { ClientContext } from '../../types'
-import type { RPCLinkCodecOptions, StandardLinkOptions } from '../standard'
+import type { RPCLinkCodecOptions, StandardLinkOptions } from '../standard/index'
+import { RPCLinkCodec, StandardLink } from '../standard/index'
 import type { WebSocketLinkTransportOptions } from './transport'
-import { RPCLinkCodec, StandardLink } from '../standard'
 import { WebSocketLinkTransport } from './transport'
 
 export interface RPCLinkOptions<T extends ClientContext>
-  extends StandardLinkOptions<T>, WebSocketLinkTransportOptions<T>, RPCLinkCodecOptions<T> {
-}
+  extends StandardLinkOptions<T>, WebSocketLinkTransportOptions<T>, RPCLinkCodecOptions<T> {}
 
 /**
  * Client link that communicates with an RPC Handler over a WebSocket connection.

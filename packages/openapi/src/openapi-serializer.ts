@@ -1,10 +1,16 @@
-import type { StandardBody } from '@standard-server/core'
-import type { BracketNotationSerializerOptions } from './bracket-notation'
-import type { OpenAPIJsonSerializerOptions } from './openapi-json-serializer'
-import { createORPCErrorFromJson, isORPCErrorJson, toORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
+import {
+  createORPCErrorFromJson,
+  isORPCErrorJson,
+  toORPCError,
+  wrapAsyncIteratorPreservingEventMeta,
+} from '@orpc/client'
 import { isAsyncIteratorObject } from '@orpc/shared'
-import { ErrorEvent } from '@standard-server/core'
+import type { StandardBody } from '@standard-server/core'
+import { EventStreamErrorEvent } from '@standard-server/core'
+
+import type { BracketNotationSerializerOptions } from './bracket-notation'
 import { BracketNotationSerializer } from './bracket-notation'
+import type { OpenAPIJsonSerializerOptions } from './openapi-json-serializer'
 import { OpenAPIJsonSerializer } from './openapi-json-serializer'
 
 export interface OpenAPISerializerSerializeOptions {
@@ -14,7 +20,7 @@ export interface OpenAPISerializerSerializeOptions {
    *
    * @default true
    */
-  useFormDataForBlobFields?: boolean
+  useFormDataForBlobFields?: boolean | undefined
 
   /**
    * When enabled, the serialized output is always returned as a FormData instance using bracket notation.
@@ -26,7 +32,7 @@ export interface OpenAPISerializerSerializeOptions {
 
 export interface OpenAPISerializerOptions extends OpenAPIJsonSerializerOptions {
   /**
-   * Options for bracket notation serializer, like maxExplicitDeserializingArrayIndex
+   * Options for bracket notation serializer, like maxDeserializingEmptySlots
    */
   bracketNotation?: BracketNotationSerializerOptions | undefined
 
@@ -42,15 +48,12 @@ export interface OpenAPISerializerOptions extends OpenAPIJsonSerializerOptions {
  *
  * @see {@link https://orpc.dev/docs/openapi/serializer | OpenAPI Serializer}
  */
-export class OpenAPISerializer {
-  private readonly jsonSerializer: OpenAPIJsonSerializer
+export class OpenAPISerializer extends OpenAPIJsonSerializer {
   private readonly bracketNotation: BracketNotationSerializer
   private readonly defaultSerializeOptions: OpenAPISerializerSerializeOptions | undefined
 
-  constructor(
-    { bracketNotation, serialize, ...options }: OpenAPISerializerOptions = {},
-  ) {
-    this.jsonSerializer = new OpenAPIJsonSerializer(options)
+  constructor({ bracketNotation, serialize, ...options }: OpenAPISerializerOptions = {}) {
+    super(options)
     this.bracketNotation = new BracketNotationSerializer(bracketNotation)
     this.defaultSerializeOptions = serialize
   }
@@ -70,25 +73,38 @@ export class OpenAPISerializer {
               return result
             }
 
-            return { done: result.done, value: this.serializeValue(result.value, false, false) }
+            return { done: result.done, value: this.serializePayload(result.value, false, false) }
           },
-          mapError: e => new ErrorEvent(
-            this.serializeValue(toORPCError(e).toJSON(), false, false),
-            { cause: e },
-          ),
+          mapError: (e) =>
+            new EventStreamErrorEvent(
+              this.serializePayload(toORPCError(e).toJSON(), false, false),
+              {
+                cause: e,
+              },
+            ),
         })
       }
     }
 
-    const useFormDataForBlobFields = options.useFormDataForBlobFields ?? this.defaultSerializeOptions?.useFormDataForBlobFields ?? true
+    const useFormDataForBlobFields =
+      options.useFormDataForBlobFields ??
+      this.defaultSerializeOptions?.useFormDataForBlobFields ??
+      true
     const asFormData = options.asFormData ?? this.defaultSerializeOptions?.asFormData ?? false
-    return this.serializeValue(data, useFormDataForBlobFields, asFormData)
+    return this.serializePayload(data, useFormDataForBlobFields, asFormData)
   }
 
-  private serializeValue(value: unknown, useFormDataForBlobFields: boolean, asFormData: boolean): unknown {
-    const { json, blobs } = this.jsonSerializer.serialize(value)
+  private serializePayload(
+    value: unknown,
+    useFormDataForBlobFields: boolean,
+    asFormData: boolean,
+  ): unknown {
+    const { json, blobs } = this.serializeJson(value)
 
-    if (!asFormData && (json instanceof Blob || json === undefined || !blobs?.length || !useFormDataForBlobFields)) {
+    if (
+      !asFormData &&
+      (json instanceof Blob || json === undefined || !blobs?.length || !useFormDataForBlobFields)
+    ) {
       return json
     }
 
@@ -97,8 +113,8 @@ export class OpenAPISerializer {
     for (const [path, value] of this.bracketNotation.serialize(json)) {
       if (value instanceof Blob) {
         form.append(path, value)
-      }
-      else if (value !== undefined && value !== null) {
+      } else if (value !== undefined && value !== null) {
+        // oxlint-disable-next-line typescript/no-base-to-string
         form.append(path, String(value))
       }
     }
@@ -118,11 +134,11 @@ export class OpenAPISerializer {
             return result
           }
 
-          return { done: result.done, value: this.jsonSerializer.deserialize({ json: result.value }) }
+          return { done: result.done, value: this.deserializeJson({ json: result.value }) }
         },
         mapError: (e) => {
-          if (e instanceof ErrorEvent) {
-            const deserialized = this.jsonSerializer.deserialize({ json: e.data })
+          if (e instanceof EventStreamErrorEvent) {
+            const deserialized = this.deserializeJson({ json: e.data })
 
             if (isORPCErrorJson(deserialized)) {
               return createORPCErrorFromJson(deserialized, { cause: e })
@@ -138,6 +154,6 @@ export class OpenAPISerializer {
       data = this.bracketNotation.deserialize(Array.from(data.entries()))
     }
 
-    return this.jsonSerializer.deserialize({ json: data })
+    return this.deserializeJson({ json: data })
   }
 }

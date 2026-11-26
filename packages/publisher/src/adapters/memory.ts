@@ -1,38 +1,25 @@
-import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../publisher'
+import type { ThrowableError } from '@orpc/shared'
 import { compareSequentialIds, once, SequentialIdGenerator } from '@orpc/shared'
 import { getEventMeta, unwrapEvent, withEventMeta } from '@standard-server/core'
+
+import type {
+  PublisherOptions,
+  PublisherResumeOptions,
+  PublisherSubscribeListenerOptions,
+} from '../publisher'
 import { Publisher } from '../publisher'
 
 export interface MemoryPublisherOptions extends PublisherOptions {
   /**
-   * Configuration for event resume support.
+   * Event resume support. `true` enables it,
+   * {@link PublisherResumeOptions} enables and customizes it.
    *
    * When enabled, published events are temporarily stored so new
    * subscribers can resume from a previous position using `lastEventId`.
    *
-   * @default { enabled: false }
+   * @default false
    */
-  resume?: {
-    /**
-     * Whether event resume support is enabled.
-     *
-     * When enabled, published events are temporarily stored so new
-     * subscribers can resume from a previous position using `lastEventId`.
-     *
-     * @default false
-     */
-    enabled: boolean
-
-    /**
-     * How long (in seconds) to retain events for resume.
-     *
-     * Expired events are cleaned up lazily for performance reasons, so
-     * some events may remain available slightly longer than this period.
-     *
-     * @default 300 (5 min)
-     */
-    seconds?: number
-  }
+  resume?: boolean | PublisherResumeOptions | undefined
 }
 
 interface StoredEvent<T> {
@@ -51,23 +38,23 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
   private readonly idGenerator = new SequentialIdGenerator()
   private readonly eventsMap: Map<keyof T, Array<StoredEvent<T[keyof T]>>> = new Map()
   private readonly resumeEnabled: boolean
-  private readonly resumeSeconds: number
+  private readonly resumeTtl: number
 
   constructor({ resume, ...options }: MemoryPublisherOptions = {}) {
     super(options)
-    this.resumeEnabled = resume?.enabled ?? false
-    this.resumeSeconds = resume?.seconds ?? 300
+    this.resumeEnabled = resume !== undefined && resume !== false
+    this.resumeTtl = (typeof resume === 'object' ? resume.ttl : undefined) ?? 300_000
   }
 
   async publish<K extends keyof T & string>(event: K, payload: T[K]): Promise<void> {
     this.cleanup()
 
     if (this.resumeEnabled) {
-      const expiresAt = Date.now() + this.resumeSeconds * 1000
+      const expiresAt = Date.now() + this.resumeTtl
 
       let bucket = this.eventsMap.get(event)
       if (!bucket) {
-        this.eventsMap.set(event, bucket = [])
+        this.eventsMap.set(event, (bucket = []))
       }
 
       const [original, meta] = unwrapEvent(payload)
@@ -77,7 +64,7 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
       bucket.push({ expiresAt, payload })
     }
 
-    this.listenersMap.get(event)?.forEach(listener => listener(payload))
+    this.listenersMap.get(event)?.forEach((listener) => listener(payload))
   }
 
   protected async subscribeListener<K extends keyof T & string>(
@@ -97,23 +84,30 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
       }
     }
 
-    let listeners = this.listenersMap.get(event)
-    if (!listeners) {
-      this.listenersMap.set(event, listeners = [])
+    const isolatedListener = (payload: T[K]) => {
+      try {
+        listener(payload)
+      } catch (error) {
+        options?.onError?.(error as ThrowableError)
+      }
     }
 
-    listeners.push(listener)
+    let listeners = this.listenersMap.get(event)
+    if (!listeners) {
+      this.listenersMap.set(event, (listeners = []))
+    }
+
+    listeners.push(isolatedListener)
 
     // Ensure the returned cleanup function is safe to call multiple times.
     return once(async () => {
       const current = this.listenersMap.get(event)!
-      const index = current.indexOf(listener)
+      const index = current.indexOf(isolatedListener)
       const remaining = current.filter((_, i) => i !== index)
 
       if (remaining.length === 0) {
         this.listenersMap.delete(event)
-      }
-      else {
+      } else {
         this.listenersMap.set(event, remaining)
       }
     })
@@ -128,7 +122,7 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
     const now = Date.now()
 
     // Throttle: only run cleanup at most once per retention window.
-    if (now - this.lastCleanupTime < this.resumeSeconds * 1000) {
+    if (now - this.lastCleanupTime < this.resumeTtl) {
       return
     }
 
@@ -144,10 +138,7 @@ export class MemoryPublisher<T extends Record<string, object>> extends Publisher
   }
 }
 
-function findResumeStartIndex<T>(
-  bucket: Array<StoredEvent<T>>,
-  lastEventId: string,
-): number {
+function findResumeStartIndex<T>(bucket: Array<StoredEvent<T>>, lastEventId: string): number {
   let lo = 0
   let hi = bucket.length
 
@@ -157,8 +148,7 @@ function findResumeStartIndex<T>(
 
     if (id !== undefined && compareSequentialIds(id, lastEventId) > 0) {
       hi = mid
-    }
-    else {
+    } else {
       lo = mid + 1
     }
   }
@@ -166,10 +156,7 @@ function findResumeStartIndex<T>(
   return lo
 }
 
-function findFirstUnexpiredIndex<T>(
-  bucket: Array<StoredEvent<T>>,
-  now: number,
-): number {
+function findFirstUnexpiredIndex<T>(bucket: Array<StoredEvent<T>>, now: number): number {
   let lo = 0
   let hi = bucket.length
 
@@ -178,8 +165,7 @@ function findFirstUnexpiredIndex<T>(
 
     if (bucket[mid]!.expiresAt <= now) {
       lo = mid + 1
-    }
-    else {
+    } else {
       hi = mid
     }
   }

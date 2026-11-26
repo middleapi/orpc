@@ -1,11 +1,17 @@
 import { fileURLToPath } from 'node:url'
+
 import { defineConfig } from 'blume'
+import { posthog } from 'blume/analytics'
+import { cloudflare } from 'blume/deploy'
+import { filesystem } from 'blume/sources'
+
+import { serverSourcemapsPlugin } from './dev/server-sourcemaps'
 import { searchCodeIndexPlugin } from './search/code-index'
 import { sponsorAdsInjectPlugin } from './sponsors/inject'
 
 export default defineConfig({
   title: 'oRPC',
-  description: 'Build APIs that are typesafe end to end, with OpenAPI included',
+  description: 'Build end-to-end typesafe APIs and serve them over RPC, OpenAPI, and MCP',
   logo: '/logo.svg',
   banner: {
     content: 'You are reading the v2 docs, currently in beta.',
@@ -14,14 +20,10 @@ export default defineConfig({
   },
   content: {
     sources: [
-      {
-        type: 'filesystem',
+      filesystem({
         root: '.',
-        include: [
-          'docs/**/*.{md,mdx}',
-          'blog/**/*.{md,mdx}',
-        ],
-      },
+        include: ['docs/**/*.{md,mdx}', 'blog/**/*.{md,mdx}'],
+      }),
     ],
   },
   github: {
@@ -42,8 +44,12 @@ export default defineConfig({
       body: 'inter',
     },
   },
-  lastModified: true,
+  lastModified: 'git',
   navigation: {
+    // The owned header (components/blume/Header.astro) links the repository.
+    // Blume would also put it in a site footer below every page, as that
+    // footer's only content, so leave it out and the footer doesn't render.
+    repo: false,
     sidebar: {
       display: 'group',
     },
@@ -67,19 +73,34 @@ export default defineConfig({
       },
     ],
   },
-  analytics: {
-    posthog: {
+  analytics: [
+    posthog({
       /** Reverse proxy on our own domain, so ad blockers don't drop events. */
       host: 'https://poho.orpc.dev',
       key: 'phc_YHeqjC9tR604AHH45kQi63fT4aBvpsS7zAaCxntBzZm',
-    },
-    scripts: [
-      /** A reverse proxy requires `ui_host`, and Blume has no option for it. */
-      { content: 'posthog.set_config({ ui_host: "https://us.posthog.com" })' },
-    ],
-  },
+      /** A reverse proxy requires `ui_host` (forwarded to `posthog.init`). */
+      ui_host: 'https://us.posthog.com',
+    }),
+  ],
 
   seo: {
+    /** The publisher of every page's JSON-LD: the team behind oRPC, not the product itself. */
+    organization: {
+      name: 'middleapi',
+      url: 'https://github.com/middleapi',
+      sameAs: ['https://x.com/middleapi', 'https://opencollective.com/middleapi'],
+    },
+    /** The homepage's SoftwareApplication JSON-LD node, which tells search engines and agents what oRPC is. */
+    software: {
+      license: 'https://github.com/middleapi/orpc/blob/main/LICENSE',
+      operatingSystem: 'Cross-platform',
+      price: 0,
+      sameAs: [
+        'https://github.com/middleapi/orpc',
+        'https://www.npmjs.com/package/@orpc/server',
+        'https://www.npmjs.com/package/@orpc/client',
+      ],
+    },
     x: { creator: '@middleapi', handle: '@middleapi' },
     og: {
       titles: {
@@ -97,11 +118,17 @@ export default defineConfig({
     { from: '/docs/advanced/scaling-large-projects', to: '/docs/contract/client-factory' },
     { from: '/docs/openapi/openapi-to-contract', to: '/docs/contract/generate-from-openapi' },
 
-    { from: '/docs/advanced/exceeds-the-maximum-length-problem', to: '/docs/recipes/exceeds-the-maximum-length-problem' },
+    {
+      from: '/docs/advanced/exceeds-the-maximum-length-problem',
+      to: '/docs/recipes/exceeds-the-maximum-length-problem',
+    },
     { from: '/docs/advanced/publish-client-to-npm', to: '/docs/recipes/publish-client-to-npm' },
     { from: '/docs/advanced/testing-mocking', to: '/docs/recipes/testing-and-mocking' },
     { from: '/docs/advanced/validation-errors', to: '/docs/recipes/validation-customization' },
-    { from: '/docs/openapi/advanced/disabling-output-validation', to: '/docs/recipes/validation-customization' },
+    {
+      from: '/docs/openapi/advanced/disabling-output-validation',
+      to: '/docs/recipes/validation-customization',
+    },
     { from: '/docs/best-practices/dedupe-middleware', to: '/docs/recipes/dedupe-middleware' },
     { from: '/docs/best-practices/monorepo-setup', to: '/docs/recipes/monorepo-setup' },
     { from: '/docs/best-practices/no-throw-literal', to: '/docs/recipes/no-throw-literal' },
@@ -120,8 +147,14 @@ export default defineConfig({
     { from: '/docs/openapi/openapi-specification', to: '/docs/openapi/specification' },
     { from: '/docs/openapi/advanced/openapi-json-serializer', to: '/docs/openapi/serializer' },
     { from: '/docs/openapi/input-output-structure', to: '/docs/openapi/input-and-output-mapping' },
-    { from: '/docs/openapi/advanced/redirect-response', to: '/docs/openapi/input-and-output-mapping#redirect-response' },
-    { from: '/docs/openapi/advanced/expanding-type-support-for-openapi-link', to: '/docs/openapi/expanding-type-support-for-link' },
+    {
+      from: '/docs/openapi/advanced/redirect-response',
+      to: '/docs/openapi/input-and-output-mapping#redirect-response',
+    },
+    {
+      from: '/docs/openapi/advanced/expanding-type-support-for-openapi-link',
+      to: '/docs/openapi/expanding-type-support-for-link',
+    },
 
     { from: '/docs/event-iterator', to: '/docs/async-iterator-object' },
     { from: '/docs/client/event-iterator', to: '/docs/client/async-iterator-object' },
@@ -136,15 +169,33 @@ export default defineConfig({
     { from: '/docs/plugins/body-compression', to: '/docs/plugins/response-compression' },
     { from: '/docs/openapi/plugins/openapi-reference', to: '/docs/plugins/openapi-reference' },
     { from: '/docs/openapi/plugins/smart-coercion', to: '/docs/plugins/smart-coercion' },
+    { from: '/docs/openapi/plugins/zod-smart-coercion', to: '/docs/plugins/smart-coercion' },
     { from: '/docs/plugins/hibernation', to: '/docs/integrations/hibernation' },
 
     { from: '/docs/integrations/react-swr', to: '/docs/integrations/swr' },
-    { from: '/docs/openapi/integrations/implement-contract-in-nest', to: '/docs/integrations/nest' },
+    {
+      from: '/docs/openapi/integrations/implement-contract-in-nest',
+      to: '/docs/integrations/nest',
+    },
     { from: '/docs/openapi/integrations/trpc', to: '/docs/integrations/trpc' },
     { from: '/docs/server-action', to: '/docs/integrations/next' },
+    {
+      from: '/docs/integrations/tanstack-query-old/:slug*',
+      to: '/docs/integrations/tanstack-query',
+    },
   ],
   export: true,
   integrations: [
+    {
+      // Keeps `blume dev` within the default Node heap of an 8 GB machine; see
+      // dev/server-sourcemaps.ts.
+      name: 'server-sourcemaps',
+      hooks: {
+        'astro:config:setup': ({ updateConfig }) => {
+          updateConfig({ vite: { plugins: [serverSourcemapsPlugin()] } })
+        },
+      },
+    },
     {
       // Blume's PageLayout (used by the custom blog pages) imports the built-in
       // Header directly and has no layout-slot support, so the owned header in
@@ -153,7 +204,9 @@ export default defineConfig({
       name: 'header-override',
       hooks: {
         'astro:config:setup': ({ updateConfig }) => {
-          const headerPath = fileURLToPath(new URL('./components/blume/Header.astro', import.meta.url))
+          const headerPath = fileURLToPath(
+            new URL('./components/blume/Header.astro', import.meta.url),
+          )
           updateConfig({
             vite: {
               resolve: {
@@ -170,8 +223,13 @@ export default defineConfig({
       name: 'twoslash-popups',
       hooks: {
         'astro:config:setup': ({ injectScript }) => {
-          const clientPath = fileURLToPath(new URL('./components/blume/twoslash-popups.ts', import.meta.url))
-          injectScript('page', `import '${clientPath.replaceAll('\\', '\\\\').replaceAll('\'', '\\\'')}'`)
+          const clientPath = fileURLToPath(
+            new URL('./components/blume/twoslash-popups.ts', import.meta.url),
+          )
+          injectScript(
+            'page',
+            `import '${clientPath.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`,
+          )
         },
       },
     },
@@ -184,7 +242,10 @@ export default defineConfig({
           updateConfig({ vite: { plugins: [searchCodeIndexPlugin()] } })
           // Render the matched passage in the preview pane the way the page does.
           const clientPath = fileURLToPath(new URL('./search/page-preview.ts', import.meta.url))
-          injectScript('page', `import '${clientPath.replaceAll('\\', '\\\\').replaceAll('\'', '\\\'')}'`)
+          injectScript(
+            'page',
+            `import '${clientPath.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`,
+          )
         },
       },
     },
@@ -197,20 +258,36 @@ export default defineConfig({
           // later two-cell slots with a random pick per view.
           updateConfig({ vite: { plugins: [sponsorAdsInjectPlugin()] } })
           const clientPath = fileURLToPath(new URL('./sponsors/client.ts', import.meta.url))
-          injectScript('page', `import '${clientPath.replaceAll('\\', '\\\\').replaceAll('\'', '\\\'')}'`)
+          injectScript(
+            'page',
+            `import '${clientPath.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`,
+          )
         },
       },
     },
   ],
-  ai: {
+  agents: {
+    llmsTxt: {
+      // The llms.txt "details" block, right after the title and summary: what
+      // oRPC is, when to reach for it, and how to install it. No headings, the
+      // spec reserves them for the page sections that follow.
+      details: [
+        'oRPC is an open-source (MIT) TypeScript library for end-to-end typesafe APIs. You write procedures, plain functions with optional input and output schemas (Zod, Valibot, ArkType, or any Standard Schema library), group them into a router, and serve it over HTTP. From that one router you get a fully typed client with no code generation, a REST API with a generated OpenAPI document, MCP tools for AI agents, and typed realtime streams.',
+        '',
+        'Reach for oRPC when:',
+        '',
+        '- A TypeScript frontend, mobile app, or service calls a TypeScript backend and both sides should share types without a build step.',
+        '- You want tRPC-style RPC but also need a public REST API or an OpenAPI spec from the same code.',
+        '- You want to design the API as a contract first, then implement it and call it from clients that only import the contract.',
+        '- The API runs on Node.js, Bun, Deno, or Cloudflare Workers, inside a framework like Next.js, Nuxt, SvelteKit, or Hono, or feeds TanStack Query.',
+        '',
+        'Install the server and client with `npm install @orpc/server@beta @orpc/client@beta zod`, then follow [Getting Started](https://orpc.dev/docs/getting-started). These docs cover oRPC v2, currently in beta. The v1 docs live at https://v1.orpc.dev, and [Migrating from oRPC v1](https://orpc.dev/docs/migrations/from-v1) lists what changed.',
+      ].join('\n'),
+    },
     mcp: {
       enabled: true,
     },
     skills: '../../skills',
   },
-  deployment: {
-    output: 'server',
-    adapter: 'cloudflare',
-    site: 'https://orpc.dev',
-  },
+  deployment: cloudflare({ site: 'https://orpc.dev' }),
 })

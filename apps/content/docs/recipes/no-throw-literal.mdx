@@ -1,6 +1,6 @@
 ---
-title: "No Throw Literal"
-description: "Learn why oRPC recommends throwing only Error instances and how to customize this behavior with ThrowableError in the Registry."
+title: 'No Throw Literal'
+description: 'Learn why oRPC recommends throwing only Error instances and how to customize this behavior with ThrowableError in the Registry.'
 ---
 
 ```ts
@@ -18,7 +18,8 @@ oRPC treats thrown `Error` instances as best practice by default, as recommended
 Customize oRPC's behavior by setting `ThrowableError` in the `Registry`:
 
 ```ts
-declare module '@orpc/server' { // or '@orpc/contract', or '@orpc/client'
+declare module '@orpc/server' {
+  // or '@orpc/contract', or '@orpc/client'
   interface Registry {
     ThrowableError: Error // [!code highlight]
   }
@@ -41,8 +42,7 @@ if (!isSuccess) {
   }
 
   // handle other errors
-}
-else {
+} else {
   // handle success
 }
 ```

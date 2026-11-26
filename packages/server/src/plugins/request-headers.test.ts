@@ -1,6 +1,7 @@
-import type { RequestHeadersHandlerPluginContext } from './request-headers'
 import { RPCHandler } from '../adapters/fetch/rpc-handler'
 import { os } from '../builder'
+import { BatchHandlerPlugin } from './batch'
+import type { RequestHeadersHandlerPluginContext } from './request-headers'
 import { RequestHeadersHandlerPlugin } from './request-headers'
 
 beforeEach(() => {
@@ -16,16 +17,18 @@ describe('requestHeadersHandlerPlugin', () => {
       plugins: [new RequestHeadersHandlerPlugin()],
     })
 
-    const { response } = await handler.handle(new Request('https://example.com', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-custom-1': 'value1',
-        'x-custom-2': 'value2',
-        'authorization': 'Bearer token123',
-      },
-      body: JSON.stringify({ json: null }),
-    }))
+    const { response } = await handler.handle(
+      new Request('https://example.com', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-custom-1': 'value1',
+          'x-custom-2': 'value2',
+          'authorization': 'Bearer token123',
+        },
+        body: JSON.stringify({ json: null }),
+      }),
+    )
 
     expect(response).toBeDefined()
     expect(procedureHandler).toHaveBeenCalledOnce()
@@ -38,9 +41,7 @@ describe('requestHeadersHandlerPlugin', () => {
   })
 
   it('preserves existing reqHeaders when already provided in context', async () => {
-    const procedure = os
-      .$context<RequestHeadersHandlerPluginContext>()
-      .handler(() => 'pong')
+    const procedure = os.$context<RequestHeadersHandlerPluginContext>().handler(() => 'pong')
 
     const interceptor = vi.fn(({ next }: any) => next())
 
@@ -50,13 +51,60 @@ describe('requestHeadersHandlerPlugin', () => {
     })
 
     const existingHeaders = new Headers({ 'existing-header': 'existing-value' })
-    await handler.handle(new Request('https://example.com', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ json: null }),
-    }), { context: { reqHeaders: existingHeaders } })
+    await handler.handle(
+      new Request('https://example.com', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ json: null }),
+      }),
+      { context: { reqHeaders: existingHeaders } },
+    )
 
     expect(interceptor).toHaveBeenCalledOnce()
     expect(interceptor.mock.calls[0]![0].context.reqHeaders).toBe(existingHeaders)
+  })
+
+  it('leaves out invalid batch subrequest headers instead of failing the subrequest', async () => {
+    const procedureHandler = vi.fn(() => 'pong')
+    const procedure = os.$context<RequestHeadersHandlerPluginContext>().handler(procedureHandler)
+
+    const handler = new RPCHandler(procedure, {
+      plugins: [new RequestHeadersHandlerPlugin(), new BatchHandlerPlugin()],
+    })
+
+    const { response } = await handler.handle(
+      new Request('https://example.com', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'orpc-batch': '1' },
+        body: JSON.stringify([
+          {
+            id: '1',
+            kind: 'request',
+            json: {
+              url: '/',
+              method: 'POST',
+              headers: {
+                'a b': '1',
+                'x-newline': 'a\nb',
+                'x-mixed': ['valid', 'a\nb'],
+                'x-valid': 'value',
+              },
+            },
+          },
+        ]),
+      }),
+    )
+
+    expect(response?.status).toBe(207)
+    await expect(response?.json()).resolves.toEqual([
+      { id: '1', kind: 'response', json: { body: { json: 'pong' } } },
+    ])
+
+    const capturedHeaders: Headers = (procedureHandler as any).mock.calls[0]![0].context.reqHeaders
+    expect(Object.fromEntries(capturedHeaders)).toEqual({
+      'content-type': 'application/json',
+      'x-mixed': 'valid',
+      'x-valid': 'value',
+    })
   })
 })

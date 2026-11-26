@@ -1,0 +1,65 @@
+{
+  "name": "@orpc/experimental-openapi-inference",
+  "version": "2.0.0-beta.53",
+  "description": "Generate OpenAPI specs for oRPC routers from their TypeScript types, no output schemas required",
+  "keywords": [
+    "api",
+    "json-schema",
+    "openapi",
+    "orpc",
+    "rest",
+    "type-inference",
+    "typescript"
+  ],
+  "homepage": "https://orpc.dev",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/middleapi/orpc.git",
+    "directory": "packages/openapi-inference"
+  },
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
+  ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "prepack": "tsdown"
+  },
+  "dependencies": {
+    "@orpc/contract": "workspace:*",
+    "@orpc/json-schema": "workspace:*",
+    "@orpc/openapi": "workspace:*",
+    "@orpc/server": "workspace:*",
+    "@orpc/shared": "workspace:*",
+    "typescript": "~7.0.2"
+  },
+  "devDependencies": {
+    "@orpc/zod": "workspace:*",
+    "@scalar/openapi-parser": "^0.29.11",
+    "ajv": "^8.20.0",
+    "arktype": "^2.2.9",
+    "effect": "^4.1.2",
+    "type-fest": "^5.10.0",
+    "valibot": "^1.5.0",
+    "zod": "^4.6.7"
+  }
+}

@@ -1,12 +1,13 @@
 import type { RateLimiter, RateLimitOptions, RateLimitResult } from '../types'
-import { sleep } from '@orpc/shared'
+import { blockUntilReady, resolveWeight } from '../utils'
 
 /**
- * Consumes `ARGV[1]` points from the counter at `KEYS[1]`, starts a window of
- * `ARGV[2]` milliseconds when the counter is new, and replies with `[used, ttl]`.
+ * Consumes `ARGV[1]` points from the counter at `KEYS[1]` if it stays within the
+ * limit `ARGV[3]`, starts a window of `ARGV[2]` milliseconds when the counter is
+ * new, and replies with `[success, used, ttl]`.
  * Kept on one line because `EVAL` sends it with every call.
  */
-const FIXED_WINDOW_SCRIPT = `local c=redis.call('INCRBY',KEYS[1],ARGV[1]) if c==tonumber(ARGV[1]) then redis.call('PEXPIRE',KEYS[1],ARGV[2]) end return {c,redis.call('PTTL',KEYS[1])}`
+const FIXED_WINDOW_SCRIPT = `local w=tonumber(ARGV[1]) local c=tonumber(redis.call('GET',KEYS[1]) or 0) local t=redis.call('PTTL',KEYS[1]) local s=0 if c+w<=tonumber(ARGV[3]) then c=redis.call('INCRBY',KEYS[1],w) s=1 end if t<0 then t=tonumber(ARGV[2]) if c>0 then redis.call('PEXPIRE',KEYS[1],t) end end return {s,c,t}`
 
 /**
  * Options shared by every Redis-backed rate limiter adapter.
@@ -19,7 +20,7 @@ export interface BaseRedisRateLimiterOptions {
    *
    * @default ''
    */
-  prefix?: string
+  prefix?: string | undefined
 
   /**
    * Maximum number of requests allowed within the window.
@@ -32,23 +33,12 @@ export interface BaseRedisRateLimiterOptions {
   window: number
 
   /**
-   * Block until the request may pass or timeout is reached.
+   * How long to wait for capacity to become available, in milliseconds.
+   * Gives up right away when the window will not reset before the timeout elapses.
    *
-   * @default { enabled: false }
+   * @default 0
    */
-  blockingUntilReady?: {
-    /**
-     * Block until the request may pass or timeout is reached.
-     *
-     * @default false
-     */
-    enabled: boolean
-
-    /**
-     * milliseconds
-     */
-    timeout: number
-  }
+  timeout?: number | undefined
 }
 
 /**
@@ -56,21 +46,23 @@ export interface BaseRedisRateLimiterOptions {
  * the fixed-window script, and the blocking logic, so every adapter built on
  * it shares counters with the others regardless of the Redis client in use.
  *
+ * Windows are per key, and rejected requests do not consume quota.
+ *
  * Extend it and implement `evalScript` to support another Redis client.
  *
  * @see {@link https://orpc.dev/docs/helpers/ratelimit#adapters | Rate Limit Helpers - Adapters}
  */
 export abstract class BaseRedisRateLimiter implements RateLimiter {
-  protected readonly prefix: string
+  protected readonly keyPrefix: string
   protected readonly maxRequests: number
   protected readonly window: number
-  protected readonly blockingUntilReady: BaseRedisRateLimiterOptions['blockingUntilReady']
+  protected readonly timeout: number
 
   constructor(options: BaseRedisRateLimiterOptions) {
-    this.prefix = options.prefix ?? ''
+    this.keyPrefix = options.prefix ?? ''
     this.maxRequests = options.maxRequests
     this.window = options.window
-    this.blockingUntilReady = options.blockingUntilReady
+    this.timeout = options.timeout ?? 0
   }
 
   /**
@@ -79,50 +71,24 @@ export abstract class BaseRedisRateLimiter implements RateLimiter {
   protected abstract evalScript(script: string, keys: string[], args: string[]): Promise<unknown>
 
   async limit(key: string, options?: RateLimitOptions): Promise<Required<RateLimitResult>> {
-    key = `${this.prefix}${key}`
-    const weight = this.resolveWeight(options)
+    key = `${this.keyPrefix}${key}`
+    const weight = resolveWeight(options)
 
-    return this.blockingUntilReady?.enabled
-      ? this.blockUntilReady(key, this.blockingUntilReady.timeout, weight)
-      : this.checkLimit(key, weight)
+    return blockUntilReady(() => this.checkLimit(key, weight), this.timeout)
   }
 
   private async checkLimit(key: string, weight: number): Promise<Required<RateLimitResult>> {
-    const [used, ttl] = await this.evalScript(
+    const [success, used, ttl] = (await this.evalScript(
       FIXED_WINDOW_SCRIPT,
       [key],
-      [String(weight), String(this.window)],
-    ) as [used: number, ttl: number]
+      [String(weight), String(this.window), String(this.maxRequests)],
+    )) as [success: number, used: number, ttl: number]
 
     return {
-      success: used <= this.maxRequests,
+      success: success === 1,
       limit: this.maxRequests,
       remaining: Math.max(0, this.maxRequests - used),
       reset: Date.now() + ttl,
     }
-  }
-
-  private async blockUntilReady(key: string, timeoutMs: number, weight: number): Promise<Required<RateLimitResult>> {
-    const deadlineAtMs = Date.now() + timeoutMs
-
-    while (true) {
-      const result = await this.checkLimit(key, weight)
-
-      if (result.success || result.reset > deadlineAtMs) {
-        return result
-      }
-
-      await sleep(result.reset - Date.now())
-    }
-  }
-
-  private resolveWeight(options?: RateLimitOptions): number {
-    const weight = options?.weight ?? 1
-
-    if (!Number.isInteger(weight) || weight <= 0) {
-      throw new TypeError('Rate limit weight must be an integer greater than 0')
-    }
-
-    return weight
   }
 }

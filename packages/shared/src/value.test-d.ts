@@ -1,4 +1,4 @@
-import type { Promisable } from 'type-fest'
+import type { Promisable } from './types'
 import type { Value } from './value'
 import { value } from './value'
 
@@ -17,9 +17,10 @@ describe('value', () => {
   })
 
   it('function', () => {
-    expectTypeOf(value(Number(42))).toEqualTypeOf<number>()
-    expectTypeOf(value(() => Number(42))).toEqualTypeOf<number>()
-    expectTypeOf(value(async () => Number(42))).toEqualTypeOf<Promise<number>>()
+    const n: number = 42
+    expectTypeOf(value(n)).toEqualTypeOf<number>()
+    expectTypeOf(value(() => n)).toEqualTypeOf<number>()
+    expectTypeOf(value(async () => n)).toEqualTypeOf<Promise<number>>()
   })
 
   it('args', () => {

@@ -1,13 +1,14 @@
+import { describe, expectTypeOf, it } from 'vitest'
+import { z } from 'zod'
+
 import type { ContractBuilder } from './builder'
-import type { ProcedureContractBuilderWithInput, ProcedureContractBuilderWithOutput } from './builder-variants'
+import { oc } from './builder'
+import type { ContractBuilderWithInput, ContractBuilderWithOutput } from './builder-variants'
 import type { MergedErrorMap } from './error-utils'
 import type { Meta, MetaPlugin } from './meta'
 import type { ProcedureContract } from './procedure'
-import type { AugmentedContractRouter } from './router-utils'
+import type { AugmentedRouterContract } from './router-utils'
 import type { Schema } from './schema'
-import { describe, expectTypeOf, it } from 'vitest'
-import { z } from 'zod'
-import { oc } from './builder'
 
 const errorMap = {
   BASE: {
@@ -19,24 +20,25 @@ const errorMap = {
 const builder = {} as ContractBuilder<typeof errorMap>
 
 // Schemas should have distinct TInput and TOutput types to ensure correct inference.
-const schema1 = z.object({ schema1: z.number().transform(n => `${n}`) })
-const schema2 = z.object({ schema2: z.number().transform(n => `${n}`) })
+const schema1 = z.object({ schema1: z.number().transform((n) => `${n}`) })
+const schema2 = z.object({ schema2: z.number().transform((n) => `${n}`) })
 
 describe('ContractBuilder', () => {
   it('is a contract procedure', () => {
     expectTypeOf(builder).toExtend<
-      ProcedureContract<
-        Schema<void, unknown>,
-        Schema<unknown, unknown>,
-        Record<never, never>
-      >
+      ProcedureContract<Schema<void, unknown>, Schema<unknown, unknown>, {}>
     >()
   })
 
   it('.errors', () => {
-    expectTypeOf(builder.errors({ INVALID: { message: 'invalid' }, OVERRIDE: { message: 'override' } })).toEqualTypeOf<
+    expectTypeOf(
+      builder.errors({ INVALID: { message: 'invalid' }, OVERRIDE: { message: 'override' } }),
+    ).toEqualTypeOf<
       ContractBuilder<
-        MergedErrorMap<typeof errorMap, { INVALID: { message: string }, OVERRIDE: { message: string } }>
+        MergedErrorMap<
+          typeof errorMap,
+          { INVALID: { message: string }; OVERRIDE: { message: string } }
+        >
       >
     >()
 
@@ -49,15 +51,12 @@ describe('ContractBuilder', () => {
     expectTypeOf(builder.meta(plugin)).toEqualTypeOf<typeof builder>()
 
     // @ts-expect-error - invalid meta
-    builder.meta({ } as MetaPlugin<Schema<'invalid'>, any, any>)
+    builder.meta({} as MetaPlugin<Schema<'invalid'>, any, any>)
   })
 
   it('.input', () => {
     expectTypeOf(builder.input(schema1)).toEqualTypeOf<
-      ProcedureContractBuilderWithInput<
-        typeof schema1,
-        typeof errorMap
-      >
+      ContractBuilderWithInput<typeof schema1, typeof errorMap>
     >()
 
     // @ts-expect-error - schema is invalid
@@ -66,10 +65,7 @@ describe('ContractBuilder', () => {
 
   it('.output', () => {
     expectTypeOf(builder.output(schema2)).toEqualTypeOf<
-      ProcedureContractBuilderWithOutput<
-        typeof schema2,
-        typeof errorMap
-      >
+      ContractBuilderWithOutput<typeof schema2, typeof errorMap>
     >()
 
     // @ts-expect-error - schema is invalid
@@ -82,7 +78,7 @@ describe('ContractBuilder', () => {
     }
 
     expectTypeOf(builder.router(router)).toEqualTypeOf<
-      AugmentedContractRouter<typeof router, typeof errorMap>
+      AugmentedRouterContract<typeof router, typeof errorMap>
     >()
 
     // @ts-expect-error - invalid router
@@ -92,6 +88,6 @@ describe('ContractBuilder', () => {
 
 describe('oc', () => {
   it('is a contract builder', () => {
-    expectTypeOf(oc).toEqualTypeOf<ContractBuilder<object>>()
+    expectTypeOf(oc).toEqualTypeOf<ContractBuilder<{}>>()
   })
 })

@@ -1,9 +1,14 @@
-import type { AnySchema, ErrorMap, ORPCErrorConstructorMap, ProcedureContractDefinition } from '@orpc/contract'
+import type {
+  AnySchema,
+  ErrorMap,
+  ORPCErrorConstructorMap,
+  ProcedureContractDefinition,
+} from '@orpc/contract'
+import { ProcedureContract } from '@orpc/contract'
 import type { Promisable } from '@orpc/shared'
+
 import type { Context } from './context'
 import type { AnyMiddleware } from './middleware'
-import { ProcedureContract } from '@orpc/contract'
-import { getConstructor } from '@orpc/shared'
 
 export interface ProcedureHandlerOptions<
   TCurrentContext extends Context,
@@ -12,8 +17,8 @@ export interface ProcedureHandlerOptions<
 > {
   context: TCurrentContext
   input: TInput
-  path: string[]
-  procedure: Procedure<Context, Context, AnySchema, AnySchema, ErrorMap>
+  path: readonly string[]
+  procedure: AnyProcedure
   signal?: AbortSignal | undefined
   lastEventId?: string | undefined
   errors: TErrorConstructorMap
@@ -81,9 +86,10 @@ export interface ProcedureDefinition<
   TInputSchema extends AnySchema,
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
-> extends ProcedureContractDefinition<TInputSchema, TOutputSchema, TErrorMap>, ProcedureConfig {
+>
+  extends ProcedureContractDefinition<TInputSchema, TOutputSchema, TErrorMap>, ProcedureConfig {
   __TInitialContext?: (type: TInitialContext) => unknown
-  __TInjectedContext?: (type: TInjectedContext) => unknown
+  __TInjectedContext?: { type: TInjectedContext }
 
   orderedMiddlewares: OrderedMiddleware[]
   handler: ProcedureHandler<any, any, any, any>
@@ -96,9 +102,23 @@ export class Procedure<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
 > {
-  '~orpc': ProcedureDefinition<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>
+  '~orpc': ProcedureDefinition<
+    TInitialContext,
+    TInjectedContext,
+    TInputSchema,
+    TOutputSchema,
+    TErrorMap
+  >
 
-  constructor(def: ProcedureDefinition<TInitialContext, TInjectedContext, TInputSchema, TOutputSchema, TErrorMap>) {
+  'constructor'(
+    def: ProcedureDefinition<
+      TInitialContext,
+      TInjectedContext,
+      TInputSchema,
+      TOutputSchema,
+      TErrorMap
+    >,
+  ) {
     this['~orpc'] = def
   }
 
@@ -106,20 +126,18 @@ export class Procedure<
    * Checks if the given instance satisfies the {@link Procedure} class/interface.
    */
   static [Symbol.hasInstance](instance: unknown): boolean {
-    if (this !== Procedure) {
-      // fallback to default instanceof check if this is extended class
-      return Function.prototype[Symbol.hasInstance].call(this, instance)
-    }
-
-    const constructor = getConstructor(instance)
-    if (constructor === Procedure) {
+    if (Function.prototype[Symbol.hasInstance].call(this, instance)) {
       return true
     }
 
+    if (this !== Procedure) {
+      return false
+    }
+
     return (
-      instance instanceof ProcedureContract
-      && Array.isArray((instance['~orpc'] as any).orderedMiddlewares)
-      && typeof (instance['~orpc'] as any).handler === 'function'
+      instance instanceof ProcedureContract &&
+      Array.isArray((instance['~orpc'] as any)?.orderedMiddlewares) &&
+      typeof (instance['~orpc'] as any)?.handler === 'function'
     )
   }
 }

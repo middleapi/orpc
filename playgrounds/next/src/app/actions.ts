@@ -1,8 +1,10 @@
 'use server'
 
-import { publicOS } from '@/orpc'
-import * as z from 'zod'
 import { createServerFunctionable } from '@orpc/next'
+import * as z from 'zod'
+
+import { publicOS } from '@/orpc'
+
 import { messagePublisher } from '../context'
 
 const actionable = createServerFunctionable({
@@ -11,9 +13,11 @@ const actionable = createServerFunctionable({
 
 export const ping = actionable(
   publicOS
-    .input(z.object({
-      name: z.string().min(6),
-    }))
+    .input(
+      z.object({
+        name: z.string().min(6),
+      }),
+    )
     .output(z.string())
     .handler(async ({ input }) => {
       return `Hello ${input.name}!`

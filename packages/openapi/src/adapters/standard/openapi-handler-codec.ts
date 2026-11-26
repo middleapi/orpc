@@ -1,21 +1,30 @@
 import type { AnyORPCError } from '@orpc/client'
-import type { AnyProcedure, AnyRouter, Context } from '@orpc/server'
-import type { ResolvedStandardHandlerHandleOptions, StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '@orpc/server/standard'
-import type { Promisable, Public } from '@orpc/shared'
-import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
-import type { OpenAPIMeta } from '../../meta'
-import type { OpenAPIMatcherOptions } from './openapi-matcher'
 import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
+import type { AnyProcedure, AnyRouter, Context } from '@orpc/server'
 import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '@orpc/server'
-import { getOwn, isPlainObject, isTypescriptObject, NullProtoObj, parseEmptyableJSON, stringifyJSON } from '@orpc/shared'
-import { parseStandardUrl } from '@standard-server/core'
+import type {
+  ResolvedStandardHandlerHandleOptions,
+  StandardHandlerCodec,
+  StandardHandlerCodecResolvedProcedure,
+} from '@orpc/server/standard'
+import type { Promisable, Public } from '@orpc/shared'
 import {
-  DEFAULT_OPENAPI_INPUT_STRUCTURE,
-  DEFAULT_OPENAPI_OUTPUT_STRUCTURE,
-} from '../../constants'
+  getOwn,
+  isPlainObject,
+  isNonPrimitive,
+  NullProtoObj,
+  parseEmptyableJSON,
+  stringifyJSON,
+} from '@orpc/shared'
+import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
+import { parseStandardUrl } from '@standard-server/core'
+
+import { DEFAULT_OPENAPI_INPUT_STRUCTURE, DEFAULT_OPENAPI_OUTPUT_STRUCTURE } from '../../constants'
+import type { OpenAPIMeta } from '../../meta'
 import { getOpenAPIMeta } from '../../meta'
 import { OpenAPISerializer } from '../../openapi-serializer'
 import { isBodylessMethod } from '../../utils'
+import type { OpenAPIMatcherOptions } from './openapi-matcher'
 import { OpenAPIMatcher } from './openapi-matcher'
 import { serializeHeaders } from './utils'
 
@@ -23,11 +32,12 @@ export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
   /**
    * Override the default OpenAPI serializer.
    */
-  serializer?: Public<OpenAPISerializer>
+  serializer?: Public<OpenAPISerializer> | undefined
 
   /**
    * Mapping ORPCError Code -> HTTP Status Code
    * The status code should be in the `4xx` or `5xx` range (must be greater than or equal to `400`).
+   * Codes missing from the map fall back to `DEFAULT_ERROR_STATUS` (400).
    *
    * @default COMMON_ERROR_STATUS_MAP
    */
@@ -38,26 +48,41 @@ export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
    * Use this if your API needs a different error output structure.
    *
    * @remarks
-   * - Return `null | undefined` to fallback to default behavior
+   * - Return `error.toJSON()` to keep the default body, or `undefined` to send an empty body
    *
    * @default ((e) => e.toJSON())
    */
-  customErrorResponseBodyEncoder?: (error: AnyORPCError) => unknown
+  errorResponseBodyEncoder?: ((error: AnyORPCError) => unknown) | undefined
+
+  /**
+   * The `content-type` of error responses, e.g. `application/problem+json` for RFC 9457 Problem Details.
+   *
+   * @default 'application/json'
+   */
+  errorResponseContentType?: string | undefined
 }
 
 export class OpenAPIHandlerCodecCore<T extends Context> {
   private readonly serializer: Public<OpenAPISerializer>
-  private readonly errorStatusMap: Exclude<OpenAPIHandlerCodecOptions<T>['errorStatusMap'], undefined>
-  private readonly customErrorResponseBodySerializer: OpenAPIHandlerCodecOptions<T>['customErrorResponseBodyEncoder']
+  private readonly errorStatusMap: Exclude<
+    OpenAPIHandlerCodecOptions<T>['errorStatusMap'],
+    undefined
+  >
+  private readonly errorResponseBodyEncoder: Exclude<
+    OpenAPIHandlerCodecOptions<T>['errorResponseBodyEncoder'],
+    undefined
+  >
+  private readonly errorResponseContentType: OpenAPIHandlerCodecOptions<T>['errorResponseContentType']
 
   constructor(options: OpenAPIHandlerCodecCoreOptions<T> = {}) {
     this.serializer = options.serializer ?? new OpenAPISerializer()
     this.errorStatusMap = options.errorStatusMap ?? COMMON_ERROR_STATUS_MAP
-    this.customErrorResponseBodySerializer = options.customErrorResponseBodyEncoder
+    this.errorResponseBodyEncoder = options.errorResponseBodyEncoder ?? ((e) => e.toJSON())
+    this.errorResponseContentType = options.errorResponseContentType
   }
 
   async decodeInput(
-    matched: { procedure: AnyProcedure, params?: undefined | Record<string, string> },
+    matched: { procedure: AnyProcedure; params?: Record<string, string> | undefined },
     request: StandardLazyRequest,
   ): Promise<unknown> {
     const meta = getOpenAPIMeta(matched.procedure)
@@ -100,7 +125,11 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
   /**
    * @throws {TypeError} If `outputStructure` is "detailed" and the output doesn't match the expected structure.
    */
-  encodeOutput(output: unknown, procedure: AnyProcedure, path: string[]): Promisable<StandardResponse> {
+  encodeOutput(
+    output: unknown,
+    procedure: AnyProcedure,
+    path: string[],
+  ): Promisable<StandardResponse> {
     const meta = getOpenAPIMeta(procedure)
     const successStatus = meta?.successStatus ?? DEFAULT_SUCCESS_STATUS
     const outputStructure = meta?.outputStructure ?? DEFAULT_OPENAPI_OUTPUT_STRUCTURE
@@ -129,7 +158,8 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
 
     return {
       status: output.status ?? successStatus,
-      headers: output.headers !== undefined ? serializeHeaders(output.headers, this.serializer) : {},
+      headers:
+        output.headers !== undefined ? serializeHeaders(output.headers, this.serializer) : {},
       body: this.serializer.serialize(output.body),
     }
   }
@@ -139,8 +169,11 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
 
     return {
       status,
-      headers: {},
-      body: this.serializer.serialize(this.customErrorResponseBodySerializer?.(error) ?? error.toJSON()),
+      headers:
+        this.errorResponseContentType !== undefined
+          ? { 'content-type': this.errorResponseContentType }
+          : {},
+      body: this.serializer.serialize(this.errorResponseBodyEncoder(error)),
     }
   }
 
@@ -166,45 +199,28 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
 
       if (hint === 'primitive') {
         parsedValue = values.at(-1)
-      }
-
-      else if (hint === 'array') {
+      } else if (hint === 'array') {
         parsedValue = values
-      }
-
-      else if (hint === 'comma-delimited-array') {
+      } else if (hint === 'comma-delimited-array') {
         parsedValue = decodeDelimitedArray(values.at(-1), ',')
-      }
-
-      else if (hint === 'comma-delimited-object') {
+      } else if (hint === 'comma-delimited-object') {
         parsedValue = decodeDelimitedObject(values.at(-1), ',')
-      }
-
-      else if (hint === 'space-delimited-array') {
+      } else if (hint === 'space-delimited-array') {
         parsedValue = decodeDelimitedArray(values.at(-1), ' ')
-      }
-
-      else if (hint === 'space-delimited-object') {
+      } else if (hint === 'space-delimited-object') {
         parsedValue = decodeDelimitedObject(values.at(-1), ' ')
-      }
-
-      else if (hint === 'pipe-delimited-array') {
+      } else if (hint === 'pipe-delimited-array') {
         parsedValue = decodeDelimitedArray(values.at(-1), '|')
-      }
-
-      else if (hint === 'pipe-delimited-object') {
+      } else if (hint === 'pipe-delimited-object') {
         parsedValue = decodeDelimitedObject(values.at(-1), '|')
-      }
-
-      else {
+      } else {
         const _expect: 'json' = hint
 
         const last = values.at(-1)
 
         try {
           parsedValue = parseEmptyableJSON(last)
-        }
-        catch {
+        } catch {
           parsedValue = last
         }
       }
@@ -234,8 +250,7 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
 
       if (hint === 'comma-delimited-array') {
         parsed[key] = decodeDelimitedArray(value, ',')
-      }
-      else {
+      } else {
         const _expect: 'comma-delimited-object' = hint
 
         parsed[key] = decodeDelimitedObject(value, ',')
@@ -249,7 +264,10 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
 export interface OpenAPIHandlerCodecOptions<T extends Context>
   extends OpenAPIHandlerCodecCoreOptions<T>, OpenAPIMatcherOptions {}
 
-export class OpenAPIHandlerCodec<T extends Context> extends OpenAPIHandlerCodecCore<T> implements StandardHandlerCodec<T> {
+export class OpenAPIHandlerCodec<T extends Context>
+  extends OpenAPIHandlerCodecCore<T>
+  implements StandardHandlerCodec<T>
+{
   private readonly matcher: OpenAPIMatcher
 
   constructor(router: AnyRouter, options: OpenAPIHandlerCodecOptions<T> = {}) {
@@ -257,7 +275,10 @@ export class OpenAPIHandlerCodec<T extends Context> extends OpenAPIHandlerCodecC
     this.matcher = new OpenAPIMatcher(router, options)
   }
 
-  async resolveProcedure(request: StandardLazyRequest, options: ResolvedStandardHandlerHandleOptions<T>): Promise<StandardHandlerCodecResolvedProcedure | undefined> {
+  async resolveProcedure(
+    request: StandardLazyRequest,
+    options: ResolvedStandardHandlerHandleOptions<T>,
+  ): Promise<StandardHandlerCodecResolvedProcedure | undefined> {
     const [pathname] = parseStandardUrl(request.url)
 
     const matched = await this.matcher.match(request.method, pathname, options.prefix)
@@ -274,44 +295,49 @@ export class OpenAPIHandlerCodec<T extends Context> extends OpenAPIHandlerCodecC
   }
 }
 
-function isValidDetailedOutput(output: unknown): output is { status?: number, body?: unknown, headers?: object } {
-  if (!isTypescriptObject(output)) {
+function isValidDetailedOutput(
+  output: unknown,
+): output is { status?: number; body?: unknown; headers?: object } {
+  if (!isNonPrimitive(output)) {
     return false
   }
 
-  if (Object.keys(output).some(key => key !== 'status' && key !== 'headers' && key !== 'body')) {
+  if (Object.keys(output).some((key) => key !== 'status' && key !== 'headers' && key !== 'body')) {
     return false
   }
 
-  if (output.status !== undefined && (
-    typeof output.status !== 'number'
-    || !Number.isInteger(output.status)
-    || output.status > 399
-  )) {
+  if (
+    output.status !== undefined &&
+    (typeof output.status !== 'number' || !Number.isInteger(output.status) || output.status > 399)
+  ) {
     return false
   }
 
-  if (output.headers !== undefined && !isTypescriptObject(output.headers)) {
+  if (output.headers !== undefined && !isNonPrimitive(output.headers)) {
     return false
   }
 
   return true
 }
 
-function decodeDelimitedArray(value: string | undefined, delimiter: string): undefined | string[] {
-  if (value === undefined) {
-    return undefined
+function decodeDelimitedArray(value: string | undefined, delimiter: string): string[] {
+  if (value === undefined || value === '') {
+    return []
   }
 
   return value.split(delimiter)
 }
 
-function decodeDelimitedObject(value: string | undefined, delimiter: string): undefined | Record<string, unknown> {
-  if (value === undefined) {
-    return undefined
+function decodeDelimitedObject(
+  value: string | undefined,
+  delimiter: string,
+): Record<string, unknown> {
+  const obj = new NullProtoObj() // Prevent Prototype Pollution with NullProtoObj
+
+  if (value === undefined || value === '') {
+    return obj
   }
 
-  const obj = new NullProtoObj() // Prevent Prototype Pollution with NullProtoObj
   const parts = value.split(delimiter)
 
   for (let i = 0; i < parts.length; i += 2) {

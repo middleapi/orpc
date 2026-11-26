@@ -1,8 +1,8 @@
 ---
-title: "Optimizing Server-Side Rendering (SSR) for Fullstack Frameworks"
-description: "Optimize server-side rendering with oRPC in Next.js, Nuxt, and SvelteKit by calling API logic directly and avoiding extra HTTP requests."
+title: 'Optimizing Server-Side Rendering (SSR) for Fullstack Frameworks'
+description: 'Optimize server-side rendering with oRPC in Next.js, Nuxt, and SvelteKit by calling API logic directly and avoiding extra HTTP requests.'
 sidebar:
-  label: "Optimizing SSR"
+  label: 'Optimizing SSR'
 ---
 
 ## The Problem with Standard SSR Data Fetching
@@ -74,16 +74,17 @@ export const client: RouterClient<typeof router> = globalThis.$client ?? createO
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import type { RouterClient } from '@orpc/server'
-import { headers } from 'next/headers'
 
 const internalLink = new RPCLink({
   origin: 'http://localhost',
   fetch: async (url, init) => {
     const request = new Request(url, init)
+    const { headers } = await import('next/headers')
 
     // Use a fetch handler here
     const { response } = await handler.handle(request, {
-      context: { // provide initial context if needed
+      context: {
+        // provide initial context if needed
         headers: await headers(),
       },
     })
@@ -113,7 +114,6 @@ Both a [fetch-based internal link](#implementation) and the [server-side client]
 
 ```ts
 import { createRouterClient } from '@orpc/server'
-import { headers } from 'next/headers'
 
 globalThis.$client = createRouterClient(router, {
   /**
@@ -123,9 +123,13 @@ globalThis.$client = createRouterClient(router, {
    * only include context that's safe to reuse globally.
    * For per-request context, use middleware context or pass a function as the initial context.
    */
-  context: async () => ({
-    headers: await headers(), // provide headers if initial context required
-  }),
+  context: async () => {
+    const { headers } = await import('next/headers')
+
+    return {
+      headers: await headers(), // provide headers if initial context required
+    }
+  },
 })
 ```
 
@@ -139,7 +143,7 @@ export default async function PlanetListPage() {
 
   return (
     <div>
-      {planets.map(planet => (
+      {planets.map((planet) => (
         <div key={planet.id}>{planet.name}</div>
       ))}
     </div>

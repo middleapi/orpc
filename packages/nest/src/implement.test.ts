@@ -1,25 +1,44 @@
-import type { CallHandler, CanActivate, ExecutionContext, NestInterceptor } from '@nestjs/common'
-import type { Request as ExpressRequest } from 'express'
-import type { FastifyReply } from 'fastify'
-import type { NestStandardLazyRequest } from './module'
 import { Buffer } from 'node:buffer'
 import { once } from 'node:events'
 import { request as httpRequest } from 'node:http'
+
 import FastifyCookie from '@fastify/cookie'
-import { Controller, HttpException, Req, Res, SetMetadata, StreamableFile, UseGuards, UseInterceptors } from '@nestjs/common'
-import { Reflector } from '@nestjs/core'
+import type {
+  ArgumentsHost,
+  CallHandler,
+  CanActivate,
+  ExecutionContext,
+  NestInterceptor,
+} from '@nestjs/common'
+import {
+  Catch,
+  Controller,
+  HttpException,
+  Req,
+  Res,
+  SetMetadata,
+  StreamableFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common'
+import { BaseExceptionFilter, Reflector } from '@nestjs/core'
 import { FastifyAdapter } from '@nestjs/platform-fastify'
+import { NodeAdapter } from '@nestjs/platform-node'
 import { Test } from '@nestjs/testing'
 import { meta, oc } from '@orpc/contract'
 import { openapi } from '@orpc/openapi'
 import { implement, ORPCError, os, Procedure } from '@orpc/server'
 import { RequestLimitHandlerPlugin } from '@orpc/server/plugins'
 import { AsyncIteratorClass, getOrBind } from '@orpc/shared'
+import type { Request as ExpressRequest } from 'express'
+import type { FastifyReply } from 'fastify'
 import { catchError, tap } from 'rxjs'
 import supertest from 'supertest'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as z from 'zod'
-import { Implement } from './implement'
+
+import { Implement, ORPCHttpException } from './implement'
+import type { NestStandardLazyRequest } from './module'
 import { ORPCModule } from './module'
 
 beforeEach(() => {
@@ -28,9 +47,11 @@ beforeEach(() => {
 
 describe('requirements', () => {
   it('should throw if @Implement is used on a non-path contract', () => {
-    const contract = oc.meta(openapi({
-      method: 'GET',
-    }))
+    const contract = oc.meta(
+      openapi({
+        method: 'GET',
+      }),
+    )
 
     expect(() => {
       @Controller()
@@ -59,10 +80,12 @@ describe('requirements', () => {
     try {
       const { Implement: ImplementWithoutQueryMethod } = await import('./implement')
 
-      const contract = oc.meta(openapi({
-        path: '/procedure',
-        method: 'QUERY',
-      }))
+      const contract = oc.meta(
+        openapi({
+          path: '/procedure',
+          method: 'QUERY',
+        }),
+      )
 
       expect(() => {
         @Controller()
@@ -75,79 +98,92 @@ describe('requirements', () => {
 
         void ImplController
       }).toThrow(/does not support the 'QUERY' HTTP method/)
-    }
-    finally {
+    } finally {
       vi.doUnmock('@nestjs/common')
       vi.resetModules()
     }
   })
 
-  it('should support the QUERY HTTP method when QueryMethod is available (NestJS 11.2+)', async () => {
-    const contract = oc
-      .meta(openapi({
-        path: '/query-route',
-        method: 'QUERY',
-      }))
-      .input(z.object({ search: z.string() }))
+  it.each([
+    ['express adapter', undefined],
+    ['node adapter', new NodeAdapter()],
+  ] as const)(
+    'should support the QUERY HTTP method when QueryMethod is available (NestJS 11.2+) with %s',
+    async (_, adapter) => {
+      const contract = oc
+        .meta(
+          openapi({
+            path: '/query-route',
+            method: 'QUERY',
+          }),
+        )
+        .input(z.object({ search: z.string() }))
 
-    @Controller()
-    class QueryController {
-      @Implement(contract)
-      queryRoute() {
-        return implement(contract).handler(({ input }) => `query: ${input.search}`)
+      @Controller()
+      class QueryController {
+        @Implement(contract)
+        queryRoute() {
+          return implement(contract).handler(({ input }) => `query: ${input.search}`)
+        }
       }
-    }
 
-    const moduleRef = await Test.createTestingModule({
-      controllers: [QueryController],
-    }).compile()
+      const moduleRef = await Test.createTestingModule({
+        controllers: [QueryController],
+      }).compile()
 
-    const app = moduleRef.createNestApplication()
-    await app.init()
-    await app.listen(0)
+      const app = moduleRef.createNestApplication(adapter as any)
+      await app.init()
+      await app.listen(0)
 
-    try {
-      const server = app.getHttpServer()
-      const port = (server.address() as { port: number }).port
-      const payload = JSON.stringify({ search: 'earth' })
+      try {
+        const server = app.getHttpServer()
+        const port = (server.address() as { port: number }).port
+        const payload = JSON.stringify({ search: 'earth' })
 
-      const res = await new Promise<{ statusCode: number, body: unknown }>((resolve, reject) => {
-        const req = httpRequest({
-          hostname: '127.0.0.1',
-          port,
-          path: '/query-route',
-          method: 'QUERY',
-          headers: {
-            'content-type': 'application/json',
-            'content-length': Buffer.byteLength(payload),
-          },
-        }, (response) => {
-          let data = ''
-          response.on('data', (chunk: Buffer) => {
-            data += chunk
-          })
-          response.on('end', () => resolve({ statusCode: response.statusCode!, body: JSON.parse(data) }))
+        const res = await new Promise<{ statusCode: number; body: unknown }>((resolve, reject) => {
+          const req = httpRequest(
+            {
+              hostname: '127.0.0.1',
+              port,
+              path: '/query-route',
+              method: 'QUERY',
+              headers: {
+                'content-type': 'application/json',
+                'content-length': Buffer.byteLength(payload),
+              },
+            },
+            (response) => {
+              let data = ''
+              response.on('data', (chunk: Buffer) => {
+                data += chunk
+              })
+              response.on('end', () =>
+                resolve({ statusCode: response.statusCode!, body: JSON.parse(data) }),
+              )
+            },
+          )
+
+          req.on('error', reject)
+          req.write(payload)
+          req.end()
         })
 
-        req.on('error', reject)
-        req.write(payload)
-        req.end()
-      })
-
-      expect(res.statusCode).toEqual(200)
-      expect(res.body).toEqual('query: earth')
-    }
-    finally {
-      await app.close()
-    }
-  })
+        expect(res.statusCode).toEqual(200)
+        expect(res.body).toEqual('query: earth')
+      } finally {
+        await app.close()
+      }
+    },
+  )
 
   it('should support the QUERY HTTP method with the Fastify adapter', async () => {
     const contract = oc
-      .meta(openapi({
-        path: '/query-route',
-        method: 'QUERY',
-      }))
+      .meta(
+        openapi({
+          path: '/query-route',
+          method: 'QUERY',
+        }),
+      )
       .input(z.object({ search: z.string() }))
 
     @Controller()
@@ -167,25 +203,29 @@ describe('requirements', () => {
     await app.getHttpAdapter().getInstance().ready()
 
     try {
-      const res = await app.getHttpAdapter().getInstance().inject({
-        method: 'QUERY',
-        url: '/query-route',
-        headers: { 'content-type': 'application/json' },
-        payload: { search: 'earth' },
-      })
+      const res = await app
+        .getHttpAdapter()
+        .getInstance()
+        .inject({
+          method: 'QUERY',
+          url: '/query-route',
+          headers: { 'content-type': 'application/json' },
+          payload: { search: 'earth' },
+        })
 
       expect(res.statusCode).toEqual(200)
       expect(JSON.parse(res.body)).toEqual('query: earth')
-    }
-    finally {
+    } finally {
       await app.close()
     }
   })
 
   it('should error if implemented method return invalid procedure', async () => {
-    const contract = oc.meta(openapi({
-      path: '/procedure',
-    }))
+    const contract = oc.meta(
+      openapi({
+        path: '/procedure',
+      }),
+    )
 
     @Controller()
     class ImplController {
@@ -208,9 +248,11 @@ describe('requirements', () => {
 
   it('should error if nestjs handler return mismatch result', async () => {
     const routingInterceptor = vi.fn(({ next }) => next())
-    const contract = oc.meta(openapi({
-      path: '/procedure',
-    }))
+    const contract = oc.meta(
+      openapi({
+        path: '/procedure',
+      }),
+    )
 
     @Controller()
     class ImplController {
@@ -236,50 +278,107 @@ describe('requirements', () => {
     const res = await supertest(app.getHttpServer()).post('/procedure')
     expect(res.status).toBe(500)
   })
+
+  it('should error if a routing interceptor replaces the context without spreading it', async () => {
+    const handler = vi.fn()
+    const contract = oc.meta(
+      openapi({
+        path: '/procedure',
+      }),
+    )
+
+    @Controller()
+    class ImplController {
+      @Implement(contract)
+      procedure() {
+        return implement(contract).handler(handler)
+      }
+    }
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ImplController],
+      imports: [
+        ORPCModule.forRoot({
+          routingInterceptors: [({ next, ...options }) => next({ ...options, context: {} })],
+        }),
+      ],
+    }).compile()
+
+    const app = moduleRef.createNestApplication()
+    await app.init()
+
+    const res = await supertest(app.getHttpServer()).post('/procedure')
+    expect(res.status).toBe(500)
+    expect(handler).not.toHaveBeenCalled()
+  })
 })
 
 describe('routing', () => {
   const contract = {
-    staticPath: oc.meta(openapi({
-      path: '/static/path',
-      method: 'GET',
-    })),
+    staticPath: oc.meta(
+      openapi({
+        path: '/static/path',
+        method: 'GET',
+      }),
+    ),
 
-    dynamicPath: oc.meta(openapi({
-      path: '/dynamic/{param}',
-      method: 'GET',
-    })).input(z.object({ param: z.string() })),
+    dynamicPath: oc
+      .meta(
+        openapi({
+          path: '/dynamic/{param}',
+          method: 'GET',
+        }),
+      )
+      .input(z.object({ param: z.string() })),
 
-    restPath: oc.meta(openapi({
-      path: '/rest/{+rest}',
-      method: 'GET',
-    })).input(z.object({ rest: z.string() })),
+    restPath: oc
+      .meta(
+        openapi({
+          path: '/rest/{+rest}',
+          method: 'GET',
+        }),
+      )
+      .input(z.object({ rest: z.string() })),
 
-    prefixedPath: oc.meta(openapi({
-      path: '/static',
-      prefix: '/prefix',
-    })),
+    prefixedPath: oc.meta(
+      openapi({
+        path: '/static',
+        prefix: '/prefix',
+      }),
+    ),
 
-    dynamicPrefix: oc.meta(openapi({
-      path: '/static',
-      prefix: '/dynamic-prefix/{prefix}',
-    })).input(z.object({ prefix: z.string() })),
+    dynamicPrefix: oc
+      .meta(
+        openapi({
+          path: '/static',
+          prefix: '/dynamic-prefix/{prefix}',
+        }),
+      )
+      .input(z.object({ prefix: z.string() })),
 
-    styledParams: oc.meta(openapi({
-      path: '/{params}',
-      paramsStyles: {
-        params: 'comma-delimited-array',
-      },
-    })).input(z.object({ params: z.array(z.string()) })),
+    styledParams: oc
+      .meta(
+        openapi({
+          path: '/{params}',
+          paramsStyles: {
+            params: 'comma-delimited-array',
+          },
+        }),
+      )
+      .input(z.object({ params: z.array(z.string()) })),
 
-    mixed201Path: oc.meta(openapi({
-      path: '/{param}/{+rest}',
-      prefix: '/mixed/{prefixes}',
-      successStatus: 201,
-      paramsStyles: {
-        prefixes: 'comma-delimited-array',
-      },
-    })).input(z.object({ prefixes: z.array(z.string()), param: z.string(), rest: z.string() })),
+    mixed201Path: oc
+      .meta(
+        openapi({
+          path: '/{param}/{+rest}',
+          prefix: '/mixed/{prefixes}',
+          successStatus: 201,
+          paramsStyles: {
+            prefixes: 'comma-delimited-array',
+          },
+        }),
+      )
+      .input(z.object({ prefixes: z.array(z.string()), param: z.string(), rest: z.string() })),
   }
 
   @Controller()
@@ -311,12 +410,17 @@ describe('routing', () => {
 
     @Implement(contract.styledParams)
     styledParams() {
-      return implement(contract.styledParams).handler(({ input }) => `params: ${input.params}`)
+      return implement(contract.styledParams).handler(
+        ({ input }) => `params: ${String(input.params)}`,
+      )
     }
 
     @Implement(contract.mixed201Path)
     mixed201Path() {
-      return implement(contract.mixed201Path).handler(({ input }) => `prefixes: ${input.prefixes} param: ${input.param}, rest: ${input.rest}`)
+      return implement(contract.mixed201Path).handler(
+        ({ input }) =>
+          `prefixes: ${String(input.prefixes)} param: ${input.param}, rest: ${input.rest}`,
+      )
     }
   }
 
@@ -326,12 +430,21 @@ describe('routing', () => {
     router() {
       return {
         staticPath: implement(contract.staticPath).handler(() => 'static'),
-        dynamicPath: implement(contract.dynamicPath).handler(({ input }) => `param: ${input.param}`),
+        dynamicPath: implement(contract.dynamicPath).handler(
+          ({ input }) => `param: ${input.param}`,
+        ),
         restPath: implement(contract.restPath).handler(({ input }) => `rest: ${input.rest}`),
         prefixedPath: implement(contract.prefixedPath).handler(() => `prefixed path`),
-        dynamicPrefix: implement(contract.dynamicPrefix).handler(({ input }) => `prefix: ${input.prefix}`),
-        styledParams: implement(contract.styledParams).handler(({ input }) => `params: ${input.params}`),
-        mixed201Path: implement(contract.mixed201Path).handler(({ input }) => `prefixes: ${input.prefixes} param: ${input.param}, rest: ${input.rest}`),
+        dynamicPrefix: implement(contract.dynamicPrefix).handler(
+          ({ input }) => `prefix: ${input.prefix}`,
+        ),
+        styledParams: implement(contract.styledParams).handler(
+          ({ input }) => `params: ${String(input.params)}`,
+        ),
+        mixed201Path: implement(contract.mixed201Path).handler(
+          ({ input }) =>
+            `prefixes: ${String(input.prefixes)} param: ${input.param}, rest: ${input.rest}`,
+        ),
       }
     }
   }
@@ -343,6 +456,7 @@ describe('routing', () => {
     describe.each([
       ['express adapter', undefined],
       ['fastify adapter', new FastifyAdapter()],
+      ['node adapter', new NodeAdapter()],
     ] as const)('with %s', async (_, adapter) => {
       const moduleRef = await Test.createTestingModule({
         controllers: [Controller],
@@ -351,7 +465,7 @@ describe('routing', () => {
       const app = moduleRef.createNestApplication(adapter as any)
       await app.init()
 
-      if (adapter) {
+      if (adapter instanceof FastifyAdapter) {
         await app.getHttpAdapter().getInstance().ready()
       }
 
@@ -424,27 +538,44 @@ describe('routing', () => {
   describe.each([
     ['express adapter', undefined],
     ['fastify adapter', new FastifyAdapter()],
+    ['node adapter', new NodeAdapter()],
   ] as const)('params edge cases with %s', async (_, adapter) => {
     const contract = {
-      staticPath: oc.meta(openapi({
-        path: '/static',
-        method: 'GET',
-      })).input(z.object({ tenant: z.string() })),
+      staticPath: oc
+        .meta(
+          openapi({
+            path: '/static',
+            method: 'GET',
+          }),
+        )
+        .input(z.object({ tenant: z.string() })),
 
-      dynamicPath: oc.meta(openapi({
-        path: '/dynamic/{id}',
-        method: 'GET',
-      })).input(z.object({ tenant: z.string(), id: z.string() })),
+      dynamicPath: oc
+        .meta(
+          openapi({
+            path: '/dynamic/{id}',
+            method: 'GET',
+          }),
+        )
+        .input(z.object({ tenant: z.string(), id: z.string() })),
 
-      restPath: oc.meta(openapi({
-        path: '/rest/{+rest}',
-        method: 'GET',
-      })).input(z.object({ tenant: z.string(), rest: z.string() })),
+      restPath: oc
+        .meta(
+          openapi({
+            path: '/rest/{+rest}',
+            method: 'GET',
+          }),
+        )
+        .input(z.object({ tenant: z.string(), rest: z.string() })),
 
-      pathNamedParam: oc.meta(openapi({
-        path: '/files/{path}',
-        method: 'GET',
-      })).input(z.object({ tenant: z.string(), path: z.string() })),
+      pathNamedParam: oc
+        .meta(
+          openapi({
+            path: '/files/{path}',
+            method: 'GET',
+          }),
+        )
+        .input(z.object({ tenant: z.string(), path: z.string() })),
     }
 
     @Controller('/:tenant')
@@ -470,10 +601,12 @@ describe('routing', () => {
       }
     }
 
-    const protoContract = oc.meta(openapi({
-      path: '/proto/{+__proto__}',
-      inputStructure: 'detailed',
-    }))
+    const protoContract = oc.meta(
+      openapi({
+        path: '/proto/{+__proto__}',
+        inputStructure: 'detailed',
+      }),
+    )
 
     @Controller()
     class ProtoController {
@@ -497,7 +630,7 @@ describe('routing', () => {
     const app = moduleRef.createNestApplication(adapter as any)
     await app.init()
 
-    if (adapter) {
+    if (adapter instanceof FastifyAdapter) {
       await app.getHttpAdapter().getInstance().ready()
     }
 
@@ -573,24 +706,23 @@ describe('response status, headers and body should follow standard-server', () =
   describe.each([
     ['express adapter', undefined],
     ['fastify adapter', new FastifyAdapter()],
+    ['node adapter', new NodeAdapter()],
   ] as const)('with %s', async (_, adapter) => {
     const routingInterceptor = vi.fn(({ next }) => next())
     const moduleRef = await Test.createTestingModule({
       controllers: [ImplController],
-      imports: [
-        ORPCModule.forRoot({ routingInterceptors: [routingInterceptor] }),
-      ],
+      imports: [ORPCModule.forRoot({ routingInterceptors: [routingInterceptor] })],
     }).compile()
 
     const returnedValueSPy = vi.fn()
     const app = moduleRef.createNestApplication(adapter as any)
-    app.useGlobalInterceptors(new class implements NestInterceptor {
-      intercept(ctx: ExecutionContext, next: CallHandler) {
-        return next.handle().pipe(
-          tap(value => returnedValueSPy(value)),
-        )
-      }
-    }())
+    app.useGlobalInterceptors(
+      new (class implements NestInterceptor {
+        intercept(ctx: ExecutionContext, next: CallHandler) {
+          return next.handle().pipe(tap((value) => returnedValueSPy(value)))
+        }
+      })(),
+    )
     await app.listen(0, '127.0.0.1')
 
     afterAll(async () => {
@@ -599,10 +731,11 @@ describe('response status, headers and body should follow standard-server', () =
 
     const httpServer = app.getHttpServer()
 
+    // express and fastify append a charset to a content-type set by the response, the node adapter sends it as is
+    const charset = adapter instanceof NodeAdapter ? '' : '; charset=utf-8'
+
     it('should response with output status', async () => {
-      handler
-        .mockResolvedValueOnce({ status: 202 })
-        .mockResolvedValueOnce({ status: 203 })
+      handler.mockResolvedValueOnce({ status: 202 }).mockResolvedValueOnce({ status: 203 })
 
       await expect(supertest(httpServer).post('/response')).resolves.toSatisfy((res) => {
         expect(res.statusCode).toEqual(202)
@@ -616,11 +749,13 @@ describe('response status, headers and body should follow standard-server', () =
     })
 
     it('should response with output headers', async () => {
-      handler.mockResolvedValueOnce({ headers: {
-        'x-custom': 'value',
-        'set-cookie': ['cookie1=value1', 'cookie2=value2'],
-        'x-undefined': undefined,
-      } })
+      handler.mockResolvedValueOnce({
+        headers: {
+          'x-custom': 'value',
+          'set-cookie': ['cookie1=value1', 'cookie2=value2'],
+          'x-undefined': undefined,
+        },
+      })
 
       await expect(supertest(httpServer).post('/response')).resolves.toSatisfy((res) => {
         expect(res.statusCode).toEqual(200)
@@ -654,7 +789,7 @@ describe('response status, headers and body should follow standard-server', () =
         await expect(supertest(httpServer).post('/response')).resolves.toSatisfy((res) => {
           expect(res.statusCode).toEqual(200)
           expect(res.headers['standard-server']).toBeUndefined()
-          expect(res.headers['content-type']).toEqual('application/json; charset=utf-8')
+          expect(res.headers['content-type']).toEqual(`application/json${charset}`)
           expect(res.text).toEqual('"string"')
 
           return true
@@ -664,7 +799,7 @@ describe('response status, headers and body should follow standard-server', () =
         await expect(supertest(httpServer).post('/response')).resolves.toSatisfy((res) => {
           expect(res.statusCode).toEqual(200)
           expect(res.headers['standard-server']).toBeUndefined()
-          expect(res.headers['content-type']).toEqual('application/json; charset=utf-8')
+          expect(res.headers['content-type']).toEqual(`application/json${charset}`)
           expect(res.text).toEqual('null')
 
           return true
@@ -674,7 +809,7 @@ describe('response status, headers and body should follow standard-server', () =
         await expect(supertest(httpServer).post('/response')).resolves.toSatisfy((res) => {
           expect(res.statusCode).toEqual(200)
           expect(res.headers['standard-server']).toBeUndefined()
-          expect(res.headers['content-type']).toEqual('application/json; charset=utf-8')
+          expect(res.headers['content-type']).toEqual(`application/json${charset}`)
           expect(res.text).toEqual('true')
 
           // do not stringify if possible
@@ -687,7 +822,7 @@ describe('response status, headers and body should follow standard-server', () =
         await expect(supertest(httpServer).post('/response')).resolves.toSatisfy((res) => {
           expect(res.statusCode).toEqual(200)
           expect(res.headers['standard-server']).toBeUndefined()
-          expect(res.headers['content-type']).toEqual('application/json; charset=utf-8')
+          expect(res.headers['content-type']).toEqual(`application/json${charset}`)
           expect(res.text).toEqual('123')
 
           // do not stringify if possible
@@ -700,7 +835,7 @@ describe('response status, headers and body should follow standard-server', () =
         await expect(supertest(httpServer).post('/response')).resolves.toSatisfy((res) => {
           expect(res.statusCode).toEqual(200)
           expect(res.headers['standard-server']).toBeUndefined()
-          expect(res.headers['content-type']).toEqual('application/json; charset=utf-8')
+          expect(res.headers['content-type']).toEqual(`application/json${charset}`)
           expect(res.text).toEqual('[1,2,3]')
 
           // do not stringify if possible
@@ -713,7 +848,7 @@ describe('response status, headers and body should follow standard-server', () =
         await expect(supertest(httpServer).post('/response')).resolves.toSatisfy((res) => {
           expect(res.statusCode).toEqual(200)
           expect(res.headers['standard-server']).toBeUndefined()
-          expect(res.headers['content-type']).toEqual('application/json; charset=utf-8')
+          expect(res.headers['content-type']).toEqual(`application/json${charset}`)
           expect(res.text).toEqual('{"a":1,"b":2}')
 
           // do not stringify if possible
@@ -817,31 +952,16 @@ describe('response status, headers and body should follow standard-server', () =
       it('should handle FormData as StreamableFile multipart/form-data', async () => {
         handler.mockResolvedValueOnce({ body: { number: 1, blob: new Blob(['blob']) } })
 
-        const res = await supertest(httpServer)
-          .post('/response')
-          .buffer(true)
-          .parse((res, callback) => {
-            const chunks: Buffer[] = []
-
-            res.on('data', (chunk) => {
-              chunks.push(Buffer.from(chunk))
-            })
-
-            res.on('end', () => {
-              callback(null, Buffer.concat(chunks))
-            })
-
-            res.on('error', (err) => {
-              callback(err, undefined)
-            })
-          })
+        const res = await supertest(httpServer).post('/response').responseType('blob')
 
         expect(res.statusCode).toEqual(200)
         expect(res.headers['standard-server']).toBeUndefined()
         expect(res.headers['content-type']).toMatch(/^multipart\/form-data; /)
         expect(res.body).toSatisfy(Buffer.isBuffer)
 
-        const _res = new Response(res.body, { headers: { 'Content-Type': res.headers['content-type'] } })
+        const _res = new Response(res.body, {
+          headers: { 'Content-Type': res.headers['content-type'] },
+        })
         const form = await _res.formData()
 
         expect(form.get('number')).toEqual('1')
@@ -851,14 +971,16 @@ describe('response status, headers and body should follow standard-server', () =
       })
 
       it('should stream ReadableStream and can override content-type', async () => {
-        handler.mockResolvedValueOnce({ body: new ReadableStream({
-          async start(controller) {
-            controller.enqueue(new TextEncoder().encode('chunk1'))
-            controller.enqueue(new TextEncoder().encode(' chunk2'))
-            controller.enqueue(new TextEncoder().encode(' chunk3'))
-            controller.close()
-          },
-        }) })
+        handler.mockResolvedValueOnce({
+          body: new ReadableStream({
+            async start(controller) {
+              controller.enqueue(new TextEncoder().encode('chunk1'))
+              controller.enqueue(new TextEncoder().encode(' chunk2'))
+              controller.enqueue(new TextEncoder().encode(' chunk3'))
+              controller.close()
+            },
+          }),
+        })
 
         await expect(supertest(httpServer).post('/response')).resolves.toSatisfy((res) => {
           expect(res.statusCode).toEqual(200)
@@ -900,30 +1022,15 @@ describe('response status, headers and body should follow standard-server', () =
       })
 
       it('should stream event stream', async () => {
-        handler.mockResolvedValueOnce({ body: (async function* () {
-          yield 'chunk1'
-          yield 'chunk2'
-          yield 'chunk3'
-        }()) })
+        handler.mockResolvedValueOnce({
+          body: (async function* () {
+            yield 'chunk1'
+            yield 'chunk2'
+            yield 'chunk3'
+          })(),
+        })
 
-        const res = await supertest(httpServer)
-          .post('/response')
-          .buffer(true)
-          .parse((res, callback) => {
-            const chunks: Buffer[] = []
-
-            res.on('data', (chunk) => {
-              chunks.push(Buffer.from(chunk))
-            })
-
-            res.on('end', () => {
-              callback(null, Buffer.concat(chunks))
-            })
-
-            res.on('error', (err) => {
-              callback(err, undefined)
-            })
-          })
+        const res = await supertest(httpServer).post('/response').responseType('blob')
 
         expect(res.statusCode).toEqual(200)
         expect(res.headers['standard-server']).toBeUndefined()
@@ -936,6 +1043,132 @@ describe('response status, headers and body should follow standard-server', () =
         expect(res.body.toString()).toContain('chunk3')
 
         expect(returnedValueSPy).toHaveBeenCalledWith(expect.any(StreamableFile))
+      })
+    })
+
+    describe('respects or overrides headers the same way standard-server does', () => {
+      const headers = {
+        'standard-server': 'json',
+        'content-type': 'text/plain',
+        'content-length': '999',
+        'content-disposition': 'inline',
+      }
+
+      it.each([
+        {
+          name: 'ReadableStream',
+          response: () => ({
+            headers: { ...headers, 'content-length': '6' },
+            body: new Blob(['chunk1']).stream(),
+          }),
+          expected: {
+            'standard-server': 'json',
+            'content-type': 'text/plain',
+            'content-length': '6',
+          },
+          text: 'chunk1',
+        },
+        {
+          name: 'Blob',
+          response: () => ({
+            headers,
+            body: new Blob(['blob content'], { type: 'application/pdf' }),
+          }),
+          expected: {
+            'standard-server': 'json',
+            'content-type': 'text/plain',
+            'content-length': '12',
+          },
+          text: 'blob content',
+        },
+        {
+          name: 'undefined',
+          response: () => ({ headers, body: undefined }),
+          expected: {
+            'standard-server': undefined,
+            'content-type': undefined,
+            'content-length': '0',
+          },
+          text: '',
+        },
+        {
+          name: 'JSON',
+          response: () => ({ headers, body: { a: 1 } }),
+          expected: {
+            'standard-server': 'json',
+            'content-type': expect.stringMatching(/^text\/plain/),
+            'content-length': '7',
+          },
+          text: '{"a":1}',
+        },
+        {
+          name: 'JSON with a JSON content-type',
+          response: () => ({
+            headers: { ...headers, 'content-type': 'application/json' },
+            body: { a: 1 },
+          }),
+          expected: {
+            'standard-server': undefined,
+            'content-type': `application/json${charset}`,
+            'content-length': '7',
+          },
+          text: '{"a":1}',
+        },
+        {
+          name: 'URLSearchParams',
+          response: () => ({ headers, body: new URLSearchParams('a=4') }),
+          expected: {
+            'standard-server': 'url-search-params',
+            'content-type': expect.stringMatching(/^text\/plain/),
+            'content-length': '3',
+          },
+          text: 'a=4',
+        },
+        {
+          name: 'FormData',
+          response: () => {
+            const form = new FormData()
+            form.set('number', '1')
+            return { headers, body: form }
+          },
+          expected: {
+            'standard-server': undefined,
+            'content-type': expect.stringMatching(/^multipart\/form-data; /),
+            'content-length': undefined,
+          },
+          text: expect.stringContaining('name="number"'),
+        },
+        {
+          name: 'event stream',
+          response: () => ({
+            headers,
+            body: (async function* () {
+              yield 'chunk1'
+            })(),
+          }),
+          expected: {
+            'standard-server': 'event-stream',
+            'content-type': 'text/plain',
+            'content-length': undefined,
+          },
+          text: expect.stringContaining('chunk1'),
+        },
+      ])('for $name body', async ({ response, expected, text }) => {
+        routingInterceptor.mockResolvedValueOnce({
+          matched: true,
+          response: { status: 200, ...response() },
+        })
+
+        const res = await supertest(httpServer).post('/response').responseType('blob')
+
+        expect(res.statusCode).toEqual(200)
+        expect({
+          'standard-server': res.headers['standard-server'],
+          'content-type': res.headers['content-type'],
+          'content-length': res.headers['content-length'],
+          'content-disposition': res.headers['content-disposition'],
+        }).toEqual({ ...expected, 'content-disposition': 'inline' })
+        expect(res.body.toString()).toEqual(text)
       })
     })
 
@@ -975,7 +1208,7 @@ describe('response status, headers and body should follow standard-server', () =
       it('when the client disconnects before the handler returns', async () => {
         const cleanup = vi.fn()
         handler.mockImplementationOnce(async ({ signal }) => {
-          await new Promise(resolve => signal?.addEventListener('abort', resolve, { once: true }))
+          await new Promise((resolve) => signal?.addEventListener('abort', resolve, { once: true }))
           return { body: createPendingIterator(cleanup) }
         })
 
@@ -990,9 +1223,11 @@ describe('response status, headers and body should follow standard-server', () =
 })
 
 describe('error handling', () => {
-  const contract = oc.meta(openapi({
-    path: '/error',
-  }))
+  const contract = oc.meta(
+    openapi({
+      path: '/error',
+    }),
+  )
 
   const handler = vi.fn()
 
@@ -1007,6 +1242,7 @@ describe('error handling', () => {
   describe.each([
     ['express adapter', undefined],
     ['fastify adapter', new FastifyAdapter()],
+    ['node adapter', new NodeAdapter()],
   ] as const)('with %s', async (_, adapter) => {
     const routingInterceptor = vi.fn(({ next }) => next())
     const moduleRef = await Test.createTestingModule({
@@ -1022,22 +1258,25 @@ describe('error handling', () => {
       throw error
     })
     const app = moduleRef.createNestApplication(adapter as any)
-    app.useGlobalInterceptors(new class implements NestInterceptor {
-      intercept(ctx: ExecutionContext, next: CallHandler<any>) {
-        return next.handle().pipe(
-          catchError(error => catchErrorSpy(error)),
-        )
-      }
-    }())
+    app.useGlobalInterceptors(
+      new (class implements NestInterceptor {
+        intercept(ctx: ExecutionContext, next: CallHandler) {
+          return next.handle().pipe(catchError((error) => catchErrorSpy(error)))
+        }
+      })(),
+    )
     await app.init()
 
-    if (adapter) {
+    if (adapter instanceof FastifyAdapter) {
       await app.getHttpAdapter().getInstance().ready()
     }
 
     const httpServer = app.getHttpServer()
 
-    it('should throw HttpException for regular errors', async () => {
+    // express and fastify append a charset to a content-type set by the response, the node adapter sends it as is
+    const charset = adapter instanceof NodeAdapter ? '' : '; charset=utf-8'
+
+    it('should throw ORPCHttpException for regular errors', async () => {
       const error = new ORPCError('NOT_FOUND', { data: 'test data' })
       handler.mockRejectedValueOnce(error)
 
@@ -1047,7 +1286,9 @@ describe('error handling', () => {
       expect(res.body).toEqual(error.toJSON())
 
       expect(catchErrorSpy).toHaveBeenCalledTimes(1)
-      expect(catchErrorSpy).toHaveBeenCalledWith(new HttpException(error.toJSON(), 404))
+      expect(catchErrorSpy).toHaveBeenCalledWith(new ORPCHttpException(error.toJSON(), 404))
+      expect(catchErrorSpy.mock.calls[0]![0]).toBeInstanceOf(ORPCHttpException)
+      expect(catchErrorSpy.mock.calls[0]![0]).toBeInstanceOf(HttpException)
     })
 
     it('should throw INTERNAL_SERVER_ERROR for non-ORPCError', async () => {
@@ -1061,25 +1302,76 @@ describe('error handling', () => {
       expect(res.body).toEqual(expectedError.toJSON())
 
       expect(catchErrorSpy).toHaveBeenCalledTimes(1)
-      expect(catchErrorSpy).toHaveBeenCalledWith(new HttpException(expectedError.toJSON(), 500))
+      expect(catchErrorSpy).toHaveBeenCalledWith(new ORPCHttpException(expectedError.toJSON(), 500))
     })
 
+    it.each([
+      {
+        name: 'without',
+        headers: {},
+        expected: {
+          'standard-server': undefined,
+          'content-type': 'application/json; charset=utf-8',
+        },
+      },
+      {
+        name: 'with',
+        headers: { 'content-type': 'application/problem+json' },
+        expected: {
+          'standard-server': 'json',
+          'content-type': `application/problem+json${charset}`,
+        },
+      },
+    ])(
+      'should respect or override response headers of ORPCHttpException $name a content-type',
+      async ({ headers, expected }) => {
+        routingInterceptor.mockResolvedValueOnce({
+          matched: true,
+          response: {
+            status: 400,
+            headers: {
+              'x-custom': 'value',
+              'standard-server': 'file',
+              'content-length': '999',
+              ...headers,
+            },
+            body: { code: 'BAD_REQUEST' },
+          },
+        })
+
+        const res = await supertest(httpServer).post('/error')
+
+        expect(res.statusCode).toEqual(400)
+        expect(res.headers['x-custom']).toEqual('value')
+        expect(res.headers['standard-server']).toEqual(expected['standard-server'])
+        expect(res.headers['content-type']).toEqual(expected['content-type'])
+        expect(res.headers['content-length']).toEqual('22')
+        expect(res.body).toEqual({ code: 'BAD_REQUEST' })
+
+        expect(catchErrorSpy).toHaveBeenCalledWith(
+          new ORPCHttpException({ code: 'BAD_REQUEST' }, 400),
+        )
+      },
+    )
+
     it('should not throw for special responses because HttpException only accepts JSON objects', async () => {
-      routingInterceptor.mockResolvedValueOnce({
-        matched: true,
-        response: {
-          status: 502,
-          headers: {},
-          body: new Blob(['test'], { type: 'text/plain' }),
-        },
-      }).mockResolvedValueOnce({
-        matched: true,
-        response: {
-          status: 502,
-          headers: {},
-          body: 'text',
-        },
-      })
+      routingInterceptor
+        .mockResolvedValueOnce({
+          matched: true,
+          response: {
+            status: 502,
+            headers: {},
+            body: new Blob(['test'], { type: 'text/plain' }),
+          },
+        })
+        .mockResolvedValueOnce({
+          matched: true,
+          response: {
+            status: 502,
+            headers: {},
+            body: 'text',
+          },
+        })
 
       await expect(supertest(httpServer).post('/error')).resolves.toSatisfy((res) => {
         expect(res.statusCode).toEqual(502)
@@ -1092,7 +1384,7 @@ describe('error handling', () => {
       await expect(supertest(httpServer).post('/error')).resolves.toSatisfy((res) => {
         expect(res.statusCode).toEqual(502)
         expect(res.text).toEqual('"text"')
-        expect(res.headers['content-type']).toEqual('application/json; charset=utf-8')
+        expect(res.headers['content-type']).toEqual(`application/json${charset}`)
 
         return true
       })
@@ -1104,9 +1396,11 @@ describe('error handling', () => {
 
 describe('compatibility', () => {
   it('procedure-based implementation controller can access injected dependencies', async () => {
-    const contract = oc.meta(openapi({
-      path: '/injection',
-    }))
+    const contract = oc.meta(
+      openapi({
+        path: '/injection',
+      }),
+    )
 
     let req: ExpressRequest
 
@@ -1135,9 +1429,11 @@ describe('compatibility', () => {
   })
 
   it('router-based implementation controller can access injected dependencies', async () => {
-    const contract = oc.meta(openapi({
-      path: '/injection',
-    }))
+    const contract = oc.meta(
+      openapi({
+        path: '/injection',
+      }),
+    )
 
     let req: ExpressRequest
 
@@ -1167,6 +1463,47 @@ describe('compatibility', () => {
     expect(req!.url).toBe('/injection')
   })
 
+  it('router-based implementation skips null and undefined contract entries', async () => {
+    const ping = oc.meta(openapi({ path: '/ping' }))
+    const nestedPing = oc.meta(openapi({ path: '/nested/ping' }))
+    const contract: any = {
+      ping,
+      missing: undefined,
+      empty: null,
+      nested: { ping: nestedPing, missing: undefined, empty: null },
+    }
+
+    @Controller()
+    class ImplController {
+      @Implement(contract)
+      sparse() {
+        return {
+          ping: implement(ping).handler(() => 'pong'),
+          nested: { ping: implement(nestedPing).handler(() => 'nested pong') },
+        }
+      }
+    }
+
+    expect(Object.getOwnPropertyNames(ImplController.prototype)).not.toEqual(
+      expect.arrayContaining([expect.stringMatching(/_(missing|empty)/)]),
+    )
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ImplController],
+    }).compile()
+
+    const app = moduleRef.createNestApplication()
+    await app.init()
+
+    const res = await supertest(app.getHttpServer()).post('/ping')
+    expect(res.status).toBe(200)
+    expect(res.text).toContain('pong')
+
+    const nestedRes = await supertest(app.getHttpServer()).post('/nested/ping')
+    expect(nestedRes.status).toBe(200)
+    expect(nestedRes.text).toContain('nested pong')
+  })
+
   it('router-based implementation controller can handle conflict method names and reflect all metadata on new methods regardless of decorator order', async () => {
     const contract = {
       ping: oc.meta(openapi({ path: '/ping' })),
@@ -1174,16 +1511,21 @@ describe('compatibility', () => {
     }
 
     // custom decorator metadata keyed by method name, like some third-party decorators use
-    const Meta = (key: string): MethodDecorator => (target, propertyKey) => {
-      Reflect.defineMetadata(key, 'value', target, propertyKey)
-    }
+    const Meta =
+      (key: string): MethodDecorator =>
+      (target, propertyKey) => {
+        Reflect.defineMetadata(key, 'value', target, propertyKey)
+      }
 
     const handlerMeta = vi.fn()
 
     class MetaGuard implements CanActivate {
       canActivate(ctx: ExecutionContext) {
         const reflector = new Reflector()
-        handlerMeta(reflector.get('above', ctx.getHandler()), reflector.get('below', ctx.getHandler()))
+        handlerMeta(
+          reflector.get('above', ctx.getHandler()),
+          reflector.get('below', ctx.getHandler()),
+        )
         return true
       }
     }
@@ -1293,11 +1635,235 @@ describe('compatibility', () => {
         expect((await supertest(app.getHttpServer()).post('/guarded/ping')).status).toBe(403)
         expect((await supertest(app.getHttpServer()).post('/guarded/pong')).status).toBe(403)
 
-        expect((await supertest(app.getHttpServer()).post('/guarded/ping').set('authorization', 'valid-token')).status).toBe(200)
-        expect((await supertest(app.getHttpServer()).post('/guarded/pong').set('authorization', 'valid-token')).status).toBe(200)
+        expect(
+          (
+            await supertest(app.getHttpServer())
+              .post('/guarded/ping')
+              .set('authorization', 'valid-token')
+          ).status,
+        ).toBe(200)
+        expect(
+          (
+            await supertest(app.getHttpServer())
+              .post('/guarded/pong')
+              .set('authorization', 'valid-token')
+          ).status,
+        ).toBe(200)
 
         expect(canActivate).toHaveBeenCalledTimes(4)
       })
+    })
+  })
+
+  describe('@Implement keeps decorators around a method-replacing decorator', () => {
+    const contract = {
+      ping: oc.meta(openapi({ path: '/wrapped/ping' })),
+      nested: {
+        pong: oc.meta(openapi({ path: '/wrapped/pong' })),
+      },
+    }
+
+    const router = () => ({
+      ping: implement(contract.ping).handler(() => 'ping'),
+      nested: {
+        pong: implement(contract.nested.pong).handler(() => 'pong'),
+      },
+    })
+
+    const paths = ['/wrapped/ping', '/wrapped/pong']
+
+    const wrapperCalled = vi.fn()
+
+    const wrapMethod = (original: any, copyMetadata: boolean): any => {
+      const wrapped = function (this: unknown, ...args: unknown[]) {
+        wrapperCalled()
+        return original.apply(this, args)
+      }
+
+      if (copyMetadata) {
+        for (const key of Reflect.getOwnMetadataKeys(original)) {
+          Reflect.defineMetadata(key, Reflect.getOwnMetadata(key, original), wrapped)
+        }
+      }
+
+      return wrapped
+    }
+
+    const InPlaceWrap = (): MethodDecorator => (_target, _key, descriptor) => {
+      descriptor.value = wrapMethod(descriptor.value, true)
+    }
+
+    const NewDescriptorWrap = (): MethodDecorator => (_target, _key, descriptor) => {
+      return { ...descriptor, value: wrapMethod(descriptor.value, true) }
+    }
+
+    const NonCopyingWrap = (): MethodDecorator => (_target, _key, descriptor) => {
+      descriptor.value = wrapMethod(descriptor.value, false)
+    }
+
+    const guardCalls = vi.fn()
+
+    const recordingGuard = (name: string): CanActivate => ({
+      canActivate() {
+        guardCalls(name)
+        return true
+      },
+    })
+
+    class DenyGuard implements CanActivate {
+      canActivate() {
+        return false
+      }
+    }
+
+    const handlerMeta = vi.fn()
+
+    class MetaGuard implements CanActivate {
+      canActivate(ctx: ExecutionContext) {
+        const reflector = new Reflector()
+        handlerMeta(
+          reflector.get('above', ctx.getHandler()),
+          reflector.get('below', ctx.getHandler()),
+          reflector.get('roles', ctx.getHandler()),
+          reflector.get('cleared', ctx.getHandler()),
+        )
+        return true
+      }
+    }
+
+    const createServer = async (controller: new () => unknown) => {
+      const moduleRef = await Test.createTestingModule({
+        controllers: [controller],
+      }).compile()
+
+      const app = moduleRef.createNestApplication()
+      await app.init()
+
+      return app.getHttpServer()
+    }
+
+    describe.each([
+      ['a wrapper mutating the descriptor', InPlaceWrap],
+      ['a wrapper returning a new descriptor', NewDescriptorWrap],
+      ['a wrapper that does not copy metadata', NonCopyingWrap],
+    ] as const)('with %s', (_, Wrap) => {
+      it('runs guards from both sides of the wrapper in decorator order', async () => {
+        @Controller()
+        class ImplController {
+          @UseGuards(recordingGuard('above'))
+          @Wrap()
+          @UseGuards(recordingGuard('below'))
+          @Implement(contract)
+          router() {
+            return router()
+          }
+        }
+
+        const server = await createServer(ImplController)
+
+        for (const path of paths) {
+          guardCalls.mockClear()
+
+          expect((await supertest(server).post(path)).status).toBe(200)
+          expect(guardCalls.mock.calls).toEqual([['below'], ['above']])
+        }
+      })
+
+      it('exposes @SetMetadata from both sides of the wrapper and lets the outermost value win', async () => {
+        @Controller()
+        @UseGuards(MetaGuard)
+        class ImplController {
+          @SetMetadata('above', 'above-value')
+          @SetMetadata('roles', ['admin'])
+          @SetMetadata('cleared', undefined)
+          @Wrap()
+          @SetMetadata('cleared', 'below-value')
+          @SetMetadata('roles', ['user'])
+          @SetMetadata('below', 'below-value')
+          @Implement(contract)
+          router() {
+            return router()
+          }
+        }
+
+        const server = await createServer(ImplController)
+
+        for (const path of paths) {
+          handlerMeta.mockClear()
+
+          expect((await supertest(server).post(path)).status).toBe(200)
+          expect(handlerMeta).toHaveBeenCalledExactlyOnceWith(
+            'above-value',
+            'below-value',
+            ['admin'],
+            undefined,
+          )
+        }
+      })
+
+      it('keeps guards when their metadata key is set to undefined on the other side of the wrapper', async () => {
+        @Controller()
+        class ImplController {
+          @SetMetadata('__guards__', undefined)
+          @Wrap()
+          @UseGuards(recordingGuard('below'))
+          @Implement(contract)
+          router() {
+            return router()
+          }
+        }
+
+        const server = await createServer(ImplController)
+
+        for (const path of paths) {
+          guardCalls.mockClear()
+
+          expect((await supertest(server).post(path)).status).toBe(200)
+          expect(guardCalls.mock.calls).toEqual([['below']])
+        }
+      })
+
+      it('calls the wrapper and returns the procedure output on every route', async () => {
+        @Controller()
+        class ImplController {
+          @Wrap()
+          @Implement(contract)
+          router() {
+            return router()
+          }
+        }
+
+        const server = await createServer(ImplController)
+
+        const pingRes = await supertest(server).post('/wrapped/ping')
+        expect(pingRes.status).toBe(200)
+        expect(pingRes.body).toEqual('ping')
+        expect(wrapperCalled).toHaveBeenCalledTimes(1)
+
+        const pongRes = await supertest(server).post('/wrapped/pong')
+        expect(pongRes.status).toBe(200)
+        expect(pongRes.body).toEqual('pong')
+        expect(wrapperCalled).toHaveBeenCalledTimes(2)
+      })
+    })
+
+    it.each([
+      ['a wrapper mutating the descriptor', InPlaceWrap],
+      ['a wrapper returning a new descriptor', NewDescriptorWrap],
+    ] as const)('procedure-based implementation applies a guard above %s', async (_, Wrap) => {
+      @Controller()
+      class ImplController {
+        @UseGuards(DenyGuard)
+        @Wrap()
+        @Implement(contract.ping)
+        ping() {
+          return router().ping
+        }
+      }
+
+      const server = await createServer(ImplController)
+
+      expect((await supertest(server).post('/wrapped/ping')).status).toBe(403)
     })
   })
 
@@ -1316,7 +1882,7 @@ describe('compatibility', () => {
     })
 
     const intercept = vi.fn((ctx: ExecutionContext, next: CallHandler) => {
-      return next.handle().pipe(tap(value => intercepted.push(value)))
+      return next.handle().pipe(tap((value) => intercepted.push(value)))
     })
 
     class SpyInterceptor implements NestInterceptor {
@@ -1373,9 +1939,8 @@ describe('compatibility', () => {
         if (order === '@UseInterceptors above @Implement') {
           // evaluates after @Implement, so it runs inside ImplementInterceptor and observes the raw procedures
           expect(intercepted).toHaveLength(2)
-          intercepted.forEach(value => expect(value).toBeInstanceOf(Procedure))
-        }
-        else {
+          intercepted.forEach((value) => expect(value).toBeInstanceOf(Procedure))
+        } else {
           // evaluates before @Implement, so it runs outside ImplementInterceptor and observes the encoded responses
           expect(intercepted).toEqual(['"pong"', '"peng"'])
         }
@@ -1393,7 +1958,7 @@ describe('compatibility', () => {
     })
 
     const intercept = vi.fn((ctx: ExecutionContext, next: CallHandler) => {
-      return next.handle().pipe(tap(value => intercepted.push(value)))
+      return next.handle().pipe(tap((value) => intercepted.push(value)))
     })
 
     class SpyInterceptor implements NestInterceptor {
@@ -1440,8 +2005,7 @@ describe('compatibility', () => {
           // evaluates after @Implement, so it runs inside ImplementInterceptor and observes the raw procedure
           expect(intercepted).toHaveLength(1)
           expect(intercepted[0]).toBeInstanceOf(Procedure)
-        }
-        else {
+        } else {
           // evaluates before @Implement, so it runs outside ImplementInterceptor and observes the encoded response
           expect(intercepted).toEqual(['"pong"'])
         }
@@ -1450,9 +2014,11 @@ describe('compatibility', () => {
   })
 
   it('should support lazy router/procedure in router-based implementation controller', async () => {
-    const contract = oc.meta(openapi({
-      path: '/lazy',
-    }))
+    const contract = oc.meta(
+      openapi({
+        path: '/lazy',
+      }),
+    )
 
     @Controller()
     class ImplController {
@@ -1461,9 +2027,11 @@ describe('compatibility', () => {
         return {
           lazy: os.lazy(async () => ({
             default: {
-              contract: os.lazy(() => Promise.resolve({
-                default: implement(contract).handler(() => { }),
-              })),
+              contract: os.lazy(() =>
+                Promise.resolve({
+                  default: implement(contract).handler(() => {}),
+                }),
+              ),
             },
           })),
         }
@@ -1482,10 +2050,12 @@ describe('compatibility', () => {
   })
 
   it('can custom request parser with toNestStandardLazyRequest option', async () => {
-    const contract = oc.meta(openapi({
-      path: '/parser/{param}',
-      inputStructure: 'detailed',
-    }))
+    const contract = oc.meta(
+      openapi({
+        path: '/parser/{param}',
+        inputStructure: 'detailed',
+      }),
+    )
 
     const handler = vi.fn(({ input }) => input)
 
@@ -1497,13 +2067,16 @@ describe('compatibility', () => {
       }
     }
 
-    const toNestStandardLazyRequest = vi.fn(() => ({
-      url: '/test',
-      method: 'POST',
-      headers: {},
-      resolveBody: async () => '__OVERRIDED__',
-      params: { param: '__PARAM__' },
-    } satisfies NestStandardLazyRequest))
+    const toNestStandardLazyRequest = vi.fn(
+      () =>
+        ({
+          url: '/test',
+          method: 'POST',
+          headers: {},
+          resolveBody: async () => '__OVERRIDED__',
+          params: { param: '__PARAM__' },
+        }) satisfies NestStandardLazyRequest,
+    )
 
     const moduleRef = await Test.createTestingModule({
       controllers: [ImplController],
@@ -1535,10 +2108,12 @@ describe('compatibility', () => {
   })
 
   it('ignores contract rest params when custom request parser provides no wildcard param', async () => {
-    const contract = oc.meta(openapi({
-      path: '/parser-rest/{+rest}',
-      inputStructure: 'detailed',
-    }))
+    const contract = oc.meta(
+      openapi({
+        path: '/parser-rest/{+rest}',
+        inputStructure: 'detailed',
+      }),
+    )
 
     @Controller()
     class ImplController {
@@ -1552,13 +2127,14 @@ describe('compatibility', () => {
       controllers: [ImplController],
       imports: [
         ORPCModule.forRoot({
-          toNestStandardLazyRequest: () => ({
-            url: '/parser-rest/value',
-            method: 'POST',
-            headers: {},
-            resolveBody: async () => undefined,
-            params: { other: '__OTHER__' },
-          } satisfies NestStandardLazyRequest),
+          toNestStandardLazyRequest: () =>
+            ({
+              url: '/parser-rest/value',
+              method: 'POST',
+              headers: {},
+              resolveBody: async () => undefined,
+              params: { other: '__OTHER__' },
+            }) satisfies NestStandardLazyRequest,
         }),
       ],
     }).compile()
@@ -1574,12 +2150,18 @@ describe('compatibility', () => {
 
   it('procedure path[] should use meta.path or fall back to empty', async () => {
     const contract = {
-      without: oc.meta(openapi({
-        path: '/path/without',
-      })),
-      with: oc.meta(openapi({
-        path: '/path/with',
-      })).meta(meta.path(['use', 'this', 'path'])),
+      without: oc.meta(
+        openapi({
+          path: '/path/without',
+        }),
+      ),
+      with: oc
+        .meta(
+          openapi({
+            path: '/path/with',
+          }),
+        )
+        .meta(meta.path(['use', 'this', 'path'])),
     }
 
     @Controller()
@@ -1617,14 +2199,21 @@ describe('compatibility', () => {
 
     expect(interceptor).toHaveBeenCalledTimes(2)
     expect(interceptor).toHaveBeenNthCalledWith(1, expect.objectContaining({ path: [] }))
-    expect(interceptor).toHaveBeenNthCalledWith(2, expect.objectContaining({ path: ['use', 'this', 'path'] }))
+    expect(interceptor).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ path: ['use', 'this', 'path'] }),
+    )
   })
 
   it('should work with Fastify cookie plugin', async () => {
-    const contract = oc.meta(openapi({
-      path: '/cookie',
-      outputStructure: 'detailed',
-    })).input(z.object({ cookie: z.string() }))
+    const contract = oc
+      .meta(
+        openapi({
+          path: '/cookie',
+          outputStructure: 'detailed',
+        }),
+      )
+      .input(z.object({ cookie: z.string() }))
 
     @Controller()
     class ImplController {
@@ -1677,6 +2266,7 @@ describe('compatibility', () => {
     describe.each([
       ['express adapter', undefined],
       ['fastify adapter', new FastifyAdapter()],
+      ['node adapter', new NodeAdapter()],
     ] as const)('with %s', async (_, adapter) => {
       const moduleRef = await Test.createTestingModule({
         controllers: [ImplController],
@@ -1690,7 +2280,7 @@ describe('compatibility', () => {
       const app = moduleRef.createNestApplication(adapter as any)
       await app.init()
 
-      if (adapter) {
+      if (adapter instanceof FastifyAdapter) {
         await app.getHttpAdapter().getInstance().ready()
       }
 
@@ -1702,6 +2292,74 @@ describe('compatibility', () => {
         expect(res.statusCode).toEqual(413)
         expect(res.body).toMatchObject({ code: 'PAYLOAD_TOO_LARGE' })
       })
+    })
+  })
+})
+
+describe('catch-all exception filter', () => {
+  const contract = oc.meta(openapi({ path: '/catch-all' }))
+
+  const handler = vi.fn()
+
+  @Controller()
+  class ImplController {
+    @Implement(contract)
+    error() {
+      return implement(contract).handler(handler)
+    }
+  }
+
+  @Catch()
+  class CatchEverythingFilter extends BaseExceptionFilter {
+    override catch(exception: unknown, host: ArgumentsHost) {
+      if (exception instanceof ORPCHttpException) {
+        return super.catch(exception, host)
+      }
+
+      this.applicationRef!.reply(host.switchToHttp().getResponse(), { custom: true }, 500)
+    }
+  }
+
+  describe.each([
+    ['express adapter', undefined],
+    ['fastify adapter', new FastifyAdapter()],
+    ['node adapter', new NodeAdapter()],
+  ] as const)('with %s', async (_, adapter) => {
+    const routingInterceptor = vi.fn(({ next }) => next())
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ImplController],
+      imports: [ORPCModule.forRoot({ routingInterceptors: [routingInterceptor] })],
+    }).compile()
+
+    const app = moduleRef.createNestApplication(adapter as any)
+    app.useGlobalFilters(new CatchEverythingFilter(app.getHttpAdapter()))
+    await app.init()
+
+    if (adapter instanceof FastifyAdapter) {
+      await app.getHttpAdapter().getInstance().ready()
+    }
+
+    afterAll(async () => {
+      await app.close()
+    })
+
+    it('can pass ORPCHttpException through to keep the oRPC error response', async () => {
+      const error = new ORPCError('NOT_FOUND', { data: 'test data' })
+      handler.mockRejectedValueOnce(error)
+
+      const res = await supertest(app.getHttpServer()).post('/catch-all')
+
+      expect(res.statusCode).toEqual(404)
+      expect(res.body).toEqual(error.toJSON())
+    })
+
+    it('still handles other exceptions', async () => {
+      routingInterceptor.mockRejectedValueOnce(new Error('not an oRPC error response'))
+
+      const res = await supertest(app.getHttpServer()).post('/catch-all')
+
+      expect(res.statusCode).toEqual(500)
+      expect(res.body).toEqual({ custom: true })
     })
   })
 })

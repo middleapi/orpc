@@ -4,14 +4,20 @@ export * from './constants'
 export * from './context'
 export * from './implementer'
 export * from './implementer-procedure'
-export * from './implementer-router'
+export { SharedRouterImplementer } from './implementer-router'
+export type {
+  RouterImplementer,
+  RouterImplementerWithMiddlewares,
+  SharedRouterImplementerWithMiddlewares,
+} from './implementer-router'
 export * from './lazy'
 export * from './middleware'
-export * from './middleware-decorated'
+export type { DecoratedMiddleware, DecoratedMiddlewareMethods } from './middleware-decorated'
 export * from './procedure'
 export * from './procedure-client'
 export * from './procedure-decorated'
-export * from './procedure-utils'
+export { call } from './procedure-utils'
+export type { CallOptions, CallRest } from './procedure-utils'
 export * from './router'
 export type {
   /**
@@ -20,8 +26,22 @@ export type {
   InferRouterFinalContexts as InferRouterCurrentContexts,
 } from './router'
 export * from './router-client'
-export * from './router-hidden'
-export * from './router-utils'
+export {
+  getRouter,
+  resolveContractedProcedure,
+  unlazyRouter,
+  walkProcedureContractsAsync,
+  walkProcedureContractsSync,
+} from './router-utils'
+export type {
+  AugmentedRouter,
+  AugmentedRouterInternal,
+  AugmentedRouterWithMiddlewares,
+  AugmentedRouterWithMiddlewaresInternal,
+  UnlaziedRouter,
+  UnlaziedRouterInternal,
+  WalkProcedureContractsLazyResult,
+} from './router-utils'
 
 export type {
   AnyORPCError,
@@ -44,7 +64,6 @@ export type {
 } from '@orpc/client'
 
 export {
-  cloneORPCError,
   COMMON_ERROR_STATUS_MAP,
   isDefinedError,
   ORPCError,
@@ -64,6 +83,7 @@ export type {
   InitialInputSchema,
   InitialOutputSchema,
   MergedErrorMap,
+  MergedSchema,
   Meta,
   MetaPlugin,
   MetaPluginDefinition,
@@ -84,7 +104,6 @@ export {
   defineMeta,
   error,
   eventIterator,
-  reconcileORPCError,
   type,
   ValidationError,
 } from '@orpc/contract'
@@ -92,8 +111,11 @@ export {
 export type {
   AsyncCleanupFn,
   AsyncIteratorClassNextFn,
+  DistributiveOmit,
+  IntersectPick,
   MaybeOptionalOptions,
   PromiseWithError,
+  Public,
   Registry,
   ThrowableError,
 } from '@orpc/shared'
@@ -121,6 +143,7 @@ export {
    * @deprecated Use `streamToAsyncIteratorObject` instead.
    */
   streamToAsyncIteratorObject as streamToEventIterator,
+  TimeoutError,
 } from '@orpc/shared'
 
 export type {
@@ -137,7 +160,11 @@ export type {
 } from '@standard-server/core'
 
 export {
-  ErrorEvent,
+  /**
+   * @deprecated Use `EventStreamErrorEvent` instead.
+   */
+  EventStreamErrorEvent as ErrorEvent,
+  EventStreamErrorEvent,
   /**
    * Retrieves metadata attached to a single iterator event value.
    *

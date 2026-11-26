@@ -117,8 +117,7 @@ function evict(cache: Map<string, unknown>, limit: number): void {
 function whenIdle(work: () => void): void {
   if (typeof requestIdleCallback === 'function') {
     requestIdleCallback(work)
-  }
-  else {
+  } else {
     setTimeout(work)
   }
 }
@@ -139,7 +138,7 @@ function loadPage(url: string): Page {
 
   const page: Page = {
     article: fetch(url, { headers: { Accept: 'text/html' } })
-      .then(response => (response.ok ? response.text() : ''))
+      .then((response) => (response.ok ? response.text() : ''))
       .then((html) => {
         const found = html
           ? new DOMParser().parseFromString(html, 'text/html').querySelector('article')
@@ -227,8 +226,7 @@ function markMatches(root: Element, words: string[]): boolean {
         mark.textContent = part
         replacement.append(mark)
         marked = true
-      }
-      else {
+      } else {
         replacement.append(part)
       }
     }
@@ -251,7 +249,7 @@ function markQuery(root: Element, words: string[]): void {
     return
   }
   const parts = [
-    ...new Set(words.flatMap(word => word.split(NON_WORD)).filter(part => part.length > 1)),
+    ...new Set(words.flatMap((word) => word.split(NON_WORD)).filter((part) => part.length > 1)),
   ]
   if (parts.length > 0) {
     markMatches(root, parts)
@@ -296,10 +294,10 @@ function isolate(root: Element): void {
 function buildSection(article: Element, words: string[]): HTMLElement {
   const section = document.createElement('div')
   section.setAttribute(OWN, '')
-  section.className
-    = 'prose max-w-none [&_mark]:rounded-sm [&_mark]:bg-accent/25 [&_mark]:text-inherit'
+  section.className =
+    'prose max-w-none [&_mark]:rounded-sm [&_mark]:bg-accent/25 [&_mark]:text-inherit'
   section.style.zoom = ZOOM
-  section.append(...[...article.children].map(block => block.cloneNode(true)))
+  section.append(...[...article.children].map((block) => block.cloneNode(true)))
 
   isolate(section)
   markQuery(section, words)
@@ -355,7 +353,7 @@ function revealTab(mark: Element): void {
     return
   }
   const panels = [...content.children]
-  const index = panels.findIndex(panel => panel.contains(mark))
+  const index = panels.findIndex((panel) => panel.contains(mark))
   if (index < 0) {
     return
   }
@@ -417,9 +415,7 @@ function locate(preview: HTMLElement, section: HTMLElement): number | null {
   const top = section.getBoundingClientRect().top
   const heading = blocks[start]!.getBoundingClientRect().top - top - SCROLL_PADDING
   const match = mark ? mark.getBoundingClientRect().top - top : heading
-  return match - heading > preview.clientHeight
-    ? match - preview.clientHeight / 2
-    : heading
+  return match - heading > preview.clientHeight ? match - preview.clientHeight / 2 : heading
 }
 
 /**
@@ -453,7 +449,7 @@ function measure(preview: HTMLElement, built: Built): void {
   // invalidates the layout that the next read then forces again — a page's worth
   // of layouts instead of one, which costs more than this saves.
   const blocks = [...built.section.children] as HTMLElement[]
-  const heights = blocks.map(block => block.offsetHeight)
+  const heights = blocks.map((block) => block.offsetHeight)
   for (const [index, block] of blocks.entries()) {
     const height = heights[index]!
     if (height > 0) {
@@ -473,18 +469,14 @@ function openAt(preview: HTMLElement, built: Built): void {
   if (built.offset === null) {
     return
   }
-  const top
-    = built.section.getBoundingClientRect().top
-      - preview.getBoundingClientRect().top
-      + preview.scrollTop
+  const top =
+    built.section.getBoundingClientRect().top -
+    preview.getBoundingClientRect().top +
+    preview.scrollTop
   preview.scrollTop = top + built.offset
 }
 
-function start(
-  preview: HTMLElement,
-  results: HTMLElement,
-  input: HTMLInputElement,
-): void {
+function start(preview: HTMLElement, results: HTMLElement, input: HTMLInputElement): void {
   // Every selection change supersedes the pending one: the fetch it awaits can
   // land after the reader has arrowed on, and appending then would attach a
   // stale page to a different result's preview.
@@ -576,10 +568,8 @@ function start(
 
   const observer = new MutationObserver((records) => {
     // Ignore our own append, which is itself a childList mutation here.
-    const ours = records.every(record =>
-      [...record.addedNodes].every(
-        node => node instanceof Element && node.hasAttribute(OWN),
-      ),
+    const ours = records.every((record) =>
+      [...record.addedNodes].every((node) => node instanceof Element && node.hasAttribute(OWN)),
     )
     if (ours) {
       return
@@ -591,8 +581,7 @@ function start(
     const selected = selectedRow()
     if (selected && pages.get(selected.href)?.settled) {
       enrich()
-    }
-    else {
+    } else {
       timer = window.setTimeout(enrich, DEBOUNCE)
     }
   })

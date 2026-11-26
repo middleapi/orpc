@@ -1,7 +1,11 @@
 import type { Tracer } from '@orpc/shared'
 import { getTracer, setTracer } from '@orpc/shared'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { experimental_CloudflareSpan as CloudflareSpan, experimental_CloudflareTracer as CloudflareTracer } from './tracer'
+
+import {
+  experimental_CloudflareSpan as CloudflareSpan,
+  experimental_CloudflareTracer as CloudflareTracer,
+} from './tracer'
 
 function createFakeSpan() {
   return {
@@ -11,6 +15,11 @@ function createFakeSpan() {
     recordException: vi.fn(),
     updateName: vi.fn().mockReturnThis(),
     setStatus: vi.fn().mockReturnThis(),
+    spanContext: vi.fn(() => ({
+      traceId: '4bf92f3577b34da6a3ce929d0e0e4736',
+      spanId: '00f067aa0ba902b7',
+      traceFlags: 0,
+    })),
     end: vi.fn(),
   }
 }
@@ -85,9 +94,59 @@ describe('cloudflareTracer', () => {
     expect(tracer.withActiveSpan(span, () => 'out')).toBe('out')
   })
 
-  it('has no propagation methods', () => {
-    const tracer: Tracer = new CloudflareTracer({ tracing: createFakeTracing() as any })
+  it('injects a sampled traceparent from the span context', () => {
+    const tracer = new CloudflareTracer({ tracing: createFakeTracing() as any })
+    const headers = { existing: 'value' }
+
+    tracer.inject!(tracer.startSpan('name'), headers)
+
+    expect(headers).toEqual({
+      existing: 'value',
+      traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
+    })
+  })
+
+  it('injects nothing when the span context is invalid', () => {
+    const fake = createFakeTracing()
+    fake.span.spanContext.mockReturnValue({
+      traceId: '00000000000000000000000000000000',
+      spanId: '0000000000000000',
+      traceFlags: 0,
+    })
+    const tracer = new CloudflareTracer({ tracing: fake as any })
+    const headers = {}
+
+    tracer.inject!(tracer.startSpan('name'), headers)
+
+    expect(headers).toEqual({})
+  })
+
+  it('has no inject method when propagation is disabled', () => {
+    const tracer: Tracer = new CloudflareTracer({
+      tracing: createFakeTracing() as any,
+      propagation: false,
+    })
     expect(tracer.inject).toBeUndefined()
+  })
+
+  it('has no inject method when inject is disabled', () => {
+    const tracer: Tracer = new CloudflareTracer({
+      tracing: createFakeTracing() as any,
+      propagation: { inject: false },
+    })
+    expect(tracer.inject).toBeUndefined()
+  })
+
+  it('has an inject method when propagation is an empty object', () => {
+    const tracer: Tracer = new CloudflareTracer({
+      tracing: createFakeTracing() as any,
+      propagation: {},
+    })
+    expect(tracer.inject).toBeTypeOf('function')
+  })
+
+  it('has no extract method', () => {
+    const tracer: Tracer = new CloudflareTracer({ tracing: createFakeTracing() as any })
     expect(tracer.extract).toBeUndefined()
   })
 
@@ -129,30 +188,54 @@ describe('cloudflareTracer', () => {
     it('records error level exceptions natively and marks the span as failed', () => {
       const fake = createFakeSpan()
       const span = new CloudflareSpan(fake as any)
-      const exception = { name: 'TypeError', message: 'boom', stack: 'stack', code: 'CODE' }
+      const error = new TypeError('boom')
 
-      span.recordException('error', exception)
+      span.recordException('error', error)
 
-      expect(fake.recordException).toHaveBeenCalledWith(exception)
+      expect(fake.recordException).toHaveBeenCalledExactlyOnceWith(error)
       expect(fake.setStatus).toHaveBeenCalledWith({ code: 'error', message: 'boom' })
     })
 
     it('records info level exceptions natively without marking the span as failed', () => {
       const fake = createFakeSpan()
       const span = new CloudflareSpan(fake as any)
-      const exception = { name: 'AbortError', message: 'aborted', stack: 'stack' }
+      const error = Object.assign(new Error('aborted'), { name: 'AbortError' })
 
-      span.recordException('info', exception)
+      span.recordException('info', error)
 
-      expect(fake.recordException).toHaveBeenCalledWith(exception)
+      expect(fake.recordException).toHaveBeenCalledExactlyOnceWith(error)
       expect(fake.setStatus).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['thrown', 'thrown'],
+      [123, '123'],
+    ])('records %j, which is not an error, as its string form', (thrown, message) => {
+      const fake = createFakeSpan()
+      const span = new CloudflareSpan(fake as any)
+
+      span.recordException('error', thrown)
+
+      expect(fake.recordException).toHaveBeenCalledExactlyOnceWith(message)
+      expect(fake.setStatus).toHaveBeenCalledWith({ code: 'error', message })
+    })
+
+    it('records the string form of an error Workers fail to read', () => {
+      const fake = createFakeSpan()
+      const span = new CloudflareSpan(fake as any)
+      const error = Object.assign(new Error('boom'), { code: Symbol('code') })
+
+      fake.recordException.mockImplementationOnce(() => {
+        throw new TypeError('Cannot convert a Symbol value to a string')
+      })
+      span.recordException('error', error)
+
+      expect(fake.recordException).toHaveBeenNthCalledWith(1, error)
+      expect(fake.recordException).toHaveBeenNthCalledWith(2, 'Error: boom')
+      expect(fake.setStatus).toHaveBeenCalledWith({ code: 'error', message: 'boom' })
     })
   })
 
-  /**
-   * The vitest workers pool still bundles a workerd without getActiveSpan, recordException,
-   * updateName, and setStatus, so only the older methods run against the real runtime here.
-   */
   describe('with the runtime tracing api', () => {
     it('defaults to the tracing export of cloudflare:workers', () => {
       const tracer = new CloudflareTracer()
@@ -168,6 +251,11 @@ describe('cloudflareTracer', () => {
         span.setAttribute('key', 'value')
         span.setAttribute('path', ['a', 'b'])
         span.addEvent('event')
+        span.updateName('renamed')
+        span.recordException('info', Object.assign(new Error('aborted'), { name: 'AbortError' }))
+        span.recordException('error', Object.assign(new TypeError('boom'), { code: 'CODE' }))
+
+        expect((tracer.getActiveSpan() as CloudflareSpan).span).toBe((span as CloudflareSpan).span)
 
         const detached = tracer.startSpan('detached')
         detached.end()
@@ -179,14 +267,29 @@ describe('cloudflareTracer', () => {
       })
 
       expect(result).toBe('out')
+      expect(tracer.getActiveSpan()).toBeUndefined()
+    })
+
+    it('injects nothing while the worker records no traces', async () => {
+      const tracer = new CloudflareTracer()
+      const headers = {}
+
+      await tracer.startActiveSpan('active', undefined, async (span) => {
+        tracer.inject!(span, headers)
+        span.end()
+      })
+
+      expect(headers).toEqual({})
     })
 
     it('rethrows errors from active spans', async () => {
       const tracer = new CloudflareTracer()
 
-      await expect(tracer.startActiveSpan('failing', undefined, async () => {
-        throw new Error('boom')
-      })).rejects.toThrow('boom')
+      await expect(
+        tracer.startActiveSpan('failing', undefined, async () => {
+          throw new Error('boom')
+        }),
+      ).rejects.toThrow('boom')
     })
   })
 })

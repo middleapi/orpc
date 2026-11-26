@@ -1,5 +1,5 @@
 it('exports somethings', async () => {
-  await expect(import('.')).resolves.toMatchObject({
-    allAbortSignal: expect.any(Function),
+  await expect(import('./index')).resolves.toMatchObject({
+    disposableAllAbortSignal: expect.any(Function),
   })
 })

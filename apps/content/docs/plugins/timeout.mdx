@@ -1,13 +1,13 @@
 ---
-title: "Timeout Plugin"
-description: "Abort requests that exceed a timeout on the client or the server, using a static value or a per-request dynamic timeout."
+title: 'Timeout Plugin'
+description: 'Abort requests that exceed a timeout on the client or the server, using a static value or a per-request dynamic timeout.'
 sidebar:
-  label: "Timeout"
+  label: 'Timeout'
 ---
 
 ## Client
 
-Use `TimeoutLinkPlugin` to abort requests that exceed the timeout with an `AbortError`:
+Use `TimeoutLinkPlugin` to abort requests that exceed the timeout with a `TimeoutError`:
 
 ```ts
 import { TimeoutLinkPlugin } from '@orpc/client/plugins'
@@ -27,7 +27,7 @@ The `link` can be any supported oRPC link, such as [RPCLink](/docs/rpc/link), [O
 
 ## Server
 
-Use `TimeoutHandlerPlugin` to abort the request signal with an `AbortError` when handling exceeds the timeout:
+Use `TimeoutHandlerPlugin` to abort the request signal with a `TimeoutError` when handling exceeds the timeout:
 
 ```ts handler
 import { TimeoutHandlerPlugin } from '@orpc/server/plugins'
@@ -60,6 +60,10 @@ const handler = new RPCHandler(router, {
 })
 ```
 
+:::tip
+Add the [Signal Sync Plugin](/docs/plugins/signal-sync) to end streaming responses as soon as the timeout exceeds, even if the procedure ignores the signal.
+:::
+
 :::info
 The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/handler), [OpenAPIHandler](/docs/openapi/handler), or a custom one.
 :::
@@ -84,7 +88,7 @@ const link = new RPCLink({
 const handler = new RPCHandler(router, {
   plugins: [
     new TimeoutHandlerPlugin({
-      timeout: ({ path }) => path[0] === 'reports' ? 60_000 : 10_000,
+      timeout: ({ path }) => (path[0] === 'reports' ? 60_000 : 10_000),
     }),
   ],
 })

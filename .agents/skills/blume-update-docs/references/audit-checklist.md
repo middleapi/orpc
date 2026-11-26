@@ -32,7 +32,7 @@ Skip the edit when the only available change is subjective polish, wording prefe
 - Preserve existing page order and `defineMeta` style; update `pages` arrays when adding, renaming, or removing pages.
 - Use the Blume components already present in the docs (callout directives, steps, cards) instead of inventing new markup patterns.
 - Match nearby code fences: filenames, language tags, and line numbers where the surrounding docs use them.
-- Keep internal links root-relative (`/docs/...`).
+- Keep internal links root-relative (`/guides/setup`), in the form nearby pages already use.
 - Do not edit generated `.blume/` or `dist/` output.
 
 ## PR notes

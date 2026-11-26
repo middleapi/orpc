@@ -1,8 +1,8 @@
 ---
-title: "Request Headers Plugin"
-description: "Expose incoming request headers as context.reqHeaders with RequestHeadersHandlerPlugin for easy access in procedures."
+title: 'Request Headers Plugin'
+description: 'Expose incoming request headers as context.reqHeaders with RequestHeadersHandlerPlugin for easy access in procedures.'
 sidebar:
-  label: "Request Headers"
+  label: 'Request Headers'
 ---
 
 ## Context Access
@@ -32,6 +32,10 @@ const example = base
 This allows procedures to run safely even without `RequestHeadersHandlerPlugin`, such as in direct calls.
 :::
 
+:::info[Why can a header be missing from `reqHeaders`?]
+Header names and values that `Headers` rejects are left out. Batch subrequests can carry them because their headers come from the request body.
+:::
+
 :::tip
 Combine with [Cookie Helpers](/docs/helpers/cookie) for streamlined cookie management.
 :::
@@ -42,9 +46,7 @@ Combine with [Cookie Helpers](/docs/helpers/cookie) for streamlined cookie manag
 import { RequestHeadersHandlerPlugin } from '@orpc/server/plugins'
 
 const handler = new RPCHandler(router, {
-  plugins: [
-    new RequestHeadersHandlerPlugin(),
-  ],
+  plugins: [new RequestHeadersHandlerPlugin()],
 })
 ```
 

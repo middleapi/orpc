@@ -1,4 +1,4 @@
-// eslint-disable-next-line no-restricted-imports
+// oxlint-disable-next-line no-restricted-imports
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 
 /**
@@ -20,17 +20,25 @@ export type SchemaIssue = StandardSchemaV1.Issue
  *
  * @see {@link https://orpc.dev/docs/metadata | Metadata}
  */
-export type InferSchemaInput<T extends AnySchema> = T extends StandardSchemaV1<infer UInput, any> ? UInput : never
+export type InferSchemaInput<T extends AnySchema> = T extends unknown
+  ? 0 extends 1 & T
+    ? unknown
+    : NonNullable<T['~standard']['types']>['input']
+  : never
 
 /**
  * Infers the output type of a schema.
  *
  * @see {@link https://orpc.dev/docs/metadata | Metadata}
  */
-export type InferSchemaOutput<T extends AnySchema> = T extends StandardSchemaV1<any, infer UOutput> ? UOutput : never
+export type InferSchemaOutput<T extends AnySchema> = T extends unknown
+  ? 0 extends 1 & T
+    ? unknown
+    : NonNullable<T['~standard']['types']>['output']
+  : never
 
-export type MergedSchema<T extends AnySchema, U extends AnySchema>
-  = T extends Schema<infer TInput, infer TOutput>
+export type MergedSchema<T extends AnySchema, U extends AnySchema> =
+  T extends Schema<infer TInput, infer TOutput>
     ? U extends Schema<infer UInput, infer UOutput>
       ? Schema<TInput & UInput, TOutput & UOutput>
       : never

@@ -1,26 +1,28 @@
-import type { AddressInfo } from 'node:net'
-import type { CreateBatchClientServerTest } from './client-server'
 import * as http from 'node:http'
+import type { AddressInfo } from 'node:net'
+
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import { BatchLinkPlugin } from '@orpc/client/plugins'
 import { BatchResponseCompressionHandlerPlugin } from '@orpc/node'
 import { RPCHandler } from '@orpc/server/node'
 import { BatchHandlerPlugin } from '@orpc/server/plugins'
+
+import type { CreateBatchClientServerTest } from './client-server'
 import { defaultBatchClientServerOptions, defaultBatchGroup } from './client-server'
 
 /**
  * The same suite as the plain node-http one, with batch responses compressed on the wire.
- * Its streaming test is what proves the compressor flushes: a buffering one would hold every
- * subresponse until the slowest of them resolved, which that test only allows after reading.
+ * Its stream test is what proves the compressor flushes: a buffering one would hold every
+ * stream message until the stream ended, which that test only allows after reading.
  */
 export const createCompressionNodeHttpBatchClientServerTest: CreateBatchClientServerTest = (
   router,
   {
     context = defaultBatchClientServerOptions.context,
     method = 'POST',
-    mode = defaultBatchClientServerOptions.mode,
     serializer = defaultBatchClientServerOptions.serializer,
+    mode,
   } = {},
 ) => {
   const handler = new RPCHandler(router, {
@@ -51,7 +53,8 @@ export const createCompressionNodeHttpBatchClientServerTest: CreateBatchClientSe
   const fetchSpy = vi.fn(async (url: string, init: RequestInit) => {
     const response = await fetch(url, init)
 
-    if (response.status === 207) { // every batch response, framed or json, travels compressed here
+    if (response.status === 207) {
+      // every batch response, framed or json, travels compressed here
       expect(response.headers.get('content-encoding')).toBe('gzip')
     }
 
@@ -65,7 +68,7 @@ export const createCompressionNodeHttpBatchClientServerTest: CreateBatchClientSe
     serializer,
     fetch: fetchSpy,
     // fetch already automatically decompresses the response
-    plugins: [new BatchLinkPlugin({ groups: [defaultBatchGroup], mode })],
+    plugins: [new BatchLinkPlugin({ mode, groups: [defaultBatchGroup] })],
   })
 
   return {

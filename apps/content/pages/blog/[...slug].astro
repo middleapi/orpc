@@ -70,7 +70,12 @@ const minutes = Math.max(1, Math.round(words / 200))
 const dateFormat = new Intl.DateTimeFormat('en-US', { dateStyle: 'long' })
 
 // schema.org JSON-LD, matching what Blume emits for generated blog pages.
+// PageLayout's own graph would describe the post as a second, TechArticle
+// node, so it is turned off below.
 const siteBase = (config.site ?? '').replace(/\/$/, '')
+// PageLayout only derives the generated OG card for static routes, not for a
+// dynamic one like this, though Blume renders a card for every blog entry.
+const ogImage = siteBase && config.og.enabled ? `${siteBase}/og${route.path}.png` : undefined
 const postJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'BlogPosting',
@@ -80,7 +85,7 @@ const postJsonLd = {
   'mainEntityOfPage': `${siteBase}${route.path}`,
   ...(date ? { datePublished: date.toISOString() } : {}),
   ...(tags.length > 0 ? { keywords: tags.join(', ') } : {}),
-  ...(siteBase ? { image: `${siteBase}/og${route.path}.png` } : {}),
+  ...(ogImage ? { image: ogImage } : {}),
   ...(authors.length > 0
     ? {
         author: authors.map(author => ({
@@ -105,7 +110,11 @@ const postJsonLd = {
   searchEnabled={config.search.enabled}
   siteUrl={config.site}
   ogEnabled={config.og.enabled}
+  ogImage={ogImage}
+  ogImageAlt={entry.data.title}
+  ogImageSize={{ width: 1200, height: 630 }}
   page={{ title: `${entry.data.title} - ${config.title}`, description: entry.data.description, route: route.path }}
+  structuredDataEnabled={false}
   x={config.x}
 >
   <script
@@ -198,9 +207,12 @@ const postJsonLd = {
       <hr class="my-8 border-border" />
 
       {/* The collapsible is sized for the docs prose column; widen it to this
-          article's own measure. */}
+          article's own measure. Below `xl` the page actions move from the rail
+          into its mount, as they do on docs pages. */}
       <div class="[&>details]:max-w-none">
-        <TableOfContents headings={tocHeadings} title={ui.toc.title} variant="mobile" />
+        <TableOfContents headings={tocHeadings} title={ui.toc.title} variant="mobile">
+          <div data-blume-page-actions-mount />
+        </TableOfContents>
       </div>
 
       <div class="prose max-w-none">

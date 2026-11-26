@@ -1,5 +1,6 @@
 export * from './args'
 export * from './array'
+export * from './bigint'
 export * from './buffer'
 export * from './compare'
 export * from './consts'
@@ -14,6 +15,7 @@ export * from './plugin'
 export * from './promise'
 export * from './proxy'
 export * from './queue'
+export * from './regex'
 export * from './signal'
 export * from './stream'
 export * from './tracing'
@@ -21,11 +23,22 @@ export * from './types'
 export * from './value'
 
 export {
+  /**
+   * @deprecated Use `isPlainObject` instead.
+   */
+  isPlainObject as isObject,
+} from './object'
+
+export {
   AbortError,
   AsyncIteratorClass,
   getOrBind,
   isAsyncIteratorObject,
-  isTypescriptObject,
+  isNonPrimitive,
+  /**
+   * @deprecated Use `isNonPrimitive` instead.
+   */
+  isNonPrimitive as isTypescriptObject,
   parseEmptyableJSON,
   safeDecodeURIComponent,
   safeEncodeURIComponent,
@@ -37,15 +50,6 @@ export {
   toArray,
 } from '@standard-server/shared'
 
-export type {
-  AsyncCleanupFn,
-  AsyncIteratorClassNextFn,
-} from '@standard-server/shared'
+export type { AsyncCleanupFn, AsyncIteratorClassNextFn } from '@standard-server/shared'
 
-export type {
-  Arrayable,
-  IsEqual,
-  PartialDeep,
-  Promisable,
-  Writable,
-} from 'type-fest'
+export type { Arrayable, IsEqual, PartialDeep, Writable } from 'type-fest'

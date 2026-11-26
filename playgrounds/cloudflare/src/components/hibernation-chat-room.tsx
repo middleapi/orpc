@@ -1,5 +1,6 @@
 import { parseFormData } from '@orpc/openapi/helpers'
 import { useEffect, useState } from 'react'
+
 import { chatRoomClient } from '../lib/chat-room'
 
 type Status = 'connecting' | 'listening' | 'error'
@@ -18,10 +19,9 @@ export function HibernationChatRoom() {
         setStatus('listening')
 
         for await (const { message } of iterator) {
-          setMessages(messages => [...messages, message])
+          setMessages((messages) => [...messages, message])
         }
-      }
-      catch (error) {
+      } catch (error) {
         if (!controller.signal.aborted) {
           console.error(error)
           setStatus('error')
@@ -38,13 +38,13 @@ export function HibernationChatRoom() {
     setIsSending(true)
     try {
       await chatRoomClient.send(parseFormData(form) as { message: string })
-    }
-    finally {
+    } finally {
       setIsSending(false)
     }
   }
 
-  const statusLabel = status === 'connecting' ? 'Joining' : status === 'error' ? 'Error' : 'Listening'
+  const statusLabel =
+    status === 'connecting' ? 'Joining' : status === 'error' ? 'Error' : 'Listening'
 
   return (
     <section className="module module--cyan" aria-labelledby="hibernation-chat-room-title">
@@ -60,8 +60,8 @@ export function HibernationChatRoom() {
             oRPC over WebSocket | Hibernation Example
           </h2>
           <p className="module-desc">
-            A chat room backed by a Durable Object using the WebSocket Hibernation API via @orpc/hibernation.
-            Open this page in two tabs to chat.
+            A chat room backed by a Durable Object using the WebSocket Hibernation API via
+            @orpc/hibernation. Open this page in two tabs to chat.
           </p>
         </div>
         <span className="status-pill">
@@ -72,24 +72,23 @@ export function HibernationChatRoom() {
 
       <div className="channel-log">
         {status === 'connecting' && <p className="channel-empty">joining...</p>}
-        {status === 'error' && <p className="module-error">Connection failed, check the console for details.</p>}
-        {status === 'listening' && (
-          messages.length === 0
-            ? (
-                <p className="channel-empty">
-                  waiting for new messages..., please open in multiple tabs for chatting together
-                </p>
-              )
-            : (
-                <ul className="msg-list">
-                  {messages.map((message, i) => (
-                    <li key={i} className="msg">
-                      <span className="msg-text">{message}</span>
-                    </li>
-                  ))}
-                </ul>
-              )
+        {status === 'error' && (
+          <p className="module-error">Connection failed, check the console for details.</p>
         )}
+        {status === 'listening' &&
+          (messages.length === 0 ? (
+            <p className="channel-empty">
+              waiting for new messages..., please open in multiple tabs for chatting together
+            </p>
+          ) : (
+            <ul className="msg-list">
+              {messages.map((message, i) => (
+                <li key={i} className="msg">
+                  <span className="msg-text">{message}</span>
+                </li>
+              ))}
+            </ul>
+          ))}
       </div>
 
       <form className="channel-form" action={sendMessage}>

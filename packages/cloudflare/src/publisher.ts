@@ -1,8 +1,8 @@
-import type { PublisherOptions, PublisherSubscribeListenerOptions } from '@orpc/publisher'
-import type { Public } from '@orpc/shared'
 import { RPCJsonSerializer } from '@orpc/client'
+import type { PublisherOptions, PublisherSubscribeListenerOptions } from '@orpc/publisher'
 import { Publisher } from '@orpc/publisher'
-import { isTypescriptObject, promiseWithResolvers, stringifyJSON } from '@orpc/shared'
+import type { Public } from '@orpc/shared'
+import { isNonPrimitive, promiseWithResolvers, stringifyJSON } from '@orpc/shared'
 import { unwrapEvent, withEventMeta } from '@standard-server/core'
 
 export interface DurablePublisherOptions extends PublisherOptions {
@@ -11,21 +11,23 @@ export interface DurablePublisherOptions extends PublisherOptions {
    *
    * @default ''
    */
-  prefix?: string
+  prefix?: string | undefined
 
   /**
    * Serializer for serialize and deserialize payloads.
    *
    * @default RPCJsonSerializer
    */
-  serializer?: undefined | Public<RPCJsonSerializer>
+  serializer?: Public<RPCJsonSerializer> | undefined
 
   /**
    * Custom function to get the Durable Object stub for publishing.
    *
    * @default ((namespace, event) => namespace.getByName(event))
    */
-  getStubByName?: (namespace: DurableObjectNamespace, event: string) => DurableObjectStub
+  getStubByName?:
+    | ((namespace: DurableObjectNamespace, event: string) => DurableObjectStub)
+    | undefined
 }
 
 /**
@@ -35,25 +37,37 @@ export interface DurablePublisherOptions extends PublisherOptions {
  * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
  */
 export class DurablePublisher<T extends Record<string, object>> extends Publisher<T> {
-  private readonly prefix: string
+  private readonly eventPrefix: string
   private readonly serializer: Public<RPCJsonSerializer>
   private readonly getStubByName: Exclude<DurablePublisherOptions['getStubByName'], undefined>
 
   constructor(
     private readonly namespace: DurableObjectNamespace<any>,
-    { prefix, getStubByName, ...options }: DurablePublisherOptions = {},
+    private readonly options: DurablePublisherOptions = {},
   ) {
     super(options)
-    this.prefix = prefix ?? ''
+    this.eventPrefix = options.prefix ?? ''
     this.serializer = options.serializer ?? new RPCJsonSerializer()
-    this.getStubByName = getStubByName ?? ((namespace, event) => namespace.getByName(event))
+    this.getStubByName = options.getStubByName ?? ((namespace, event) => namespace.getByName(event))
+  }
+
+  /**
+   * Creates a publisher with `prefix` appended to this publisher's prefix, sharing its namespace.
+   *
+   * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
+   */
+  prefix(prefix: string): DurablePublisher<T> {
+    return new DurablePublisher(this.namespace, {
+      ...this.options,
+      prefix: `${this.eventPrefix}${prefix}`,
+    })
   }
 
   async publish<K extends keyof T & string>(event: K, payload: T[K]): Promise<void> {
-    const stub = this.getStubByName(this.namespace, this.prefix + event)
+    const stub = this.getStubByName(this.namespace, this.eventPrefix + event)
 
     const [data, meta] = unwrapEvent(payload)
-    const { json, meta: jsonMeta } = this.serializer.serialize(data)
+    const { json, meta: jsonMeta } = this.serializer.serializeJson(data)
 
     const response = await stub.fetch('http://localhost/publish', {
       method: 'POST',
@@ -68,14 +82,21 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
 
     if (!response.ok) {
       const reason = await response.text()
-      throw new Error(`Failed to publish event: ${response.status} ${reason || response.statusText}`, {
-        cause: response,
-      })
+      throw new Error(
+        `Failed to publish event: ${response.status} ${reason || response.statusText}`,
+        {
+          cause: response,
+        },
+      )
     }
   }
 
-  protected async subscribeListener<K extends keyof T & string>(event: K, listener: (payload: T[K]) => void, options?: PublisherSubscribeListenerOptions): Promise<() => Promise<void>> {
-    const stub = this.getStubByName(this.namespace, this.prefix + event)
+  protected async subscribeListener<K extends keyof T & string>(
+    event: K,
+    listener: (payload: T[K]) => void,
+    options?: PublisherSubscribeListenerOptions,
+  ): Promise<() => Promise<void>> {
+    const stub = this.getStubByName(this.namespace, this.eventPrefix + event)
 
     const headers = new Headers({ upgrade: 'websocket' })
     if (options?.lastEventId !== undefined) {
@@ -93,10 +114,11 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
       })
     }
 
-    // The Durable Object sends missed events first and their count in this header, and
-    // `Publisher.subscribe` expects them all to reach the listener before this resolves
+    // The Durable Object sends missed events first and their count in this header,
+    // so wait for them all to reach the listener before this resolves
     const replayedEvents = Number(response.headers.get('orpc-replayed-events'))
-    let pendingReplayedEvents = Number.isInteger(replayedEvents) && replayedEvents > 0 ? replayedEvents : 0
+    let pendingReplayedEvents =
+      Number.isInteger(replayedEvents) && replayedEvents > 0 ? replayedEvents : 0
     const replayed = promiseWithResolvers<void>()
 
     if (pendingReplayedEvents === 0) {
@@ -106,8 +128,7 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
     const reportError = (error: Error) => {
       if (pendingReplayedEvents > 0) {
         replayed.reject(error) // no-op once the subscription already rejected
-      }
-      else {
+      } else {
         options?.onError?.(error)
       }
     }
@@ -115,14 +136,13 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
     websocket.addEventListener('message', (event) => {
       try {
         const serialized = JSON.parse(event.data)
-        let payload = this.serializer.deserialize(serialized.data)
-        if (isTypescriptObject(payload) && serialized.meta) {
+        let payload = this.serializer.deserializeJson(serialized.data)
+        if (isNonPrimitive(payload) && serialized.meta) {
           payload = withEventMeta(payload, serialized.meta)
         }
 
         listener(payload as T[K])
-      }
-      catch (error) {
+      } catch (error) {
         options?.onError?.(
           new Error('Failed to deserialize message from publisher durable object', {
             cause: error,

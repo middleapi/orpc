@@ -1,7 +1,21 @@
 import type { Value } from '@orpc/shared'
-import type { StandardHandlerInterceptor, StandardHandlerInterceptorOptions, StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard'
+import {
+  TimeoutError,
+  anyAbortSignal,
+  isAsyncIteratorObject,
+  toArray,
+  value,
+  wrapAsyncIterator,
+  wrapReadableStream,
+} from '@orpc/shared'
+
+import type {
+  StandardHandlerInterceptor,
+  StandardHandlerInterceptorOptions,
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+} from '../adapters/standard/index'
 import type { Context } from '../context'
-import { AbortError, anyAbortSignal, isAsyncIteratorObject, override, toArray, value, wrapAsyncIterator, wrapReadableStream } from '@orpc/shared'
 
 export interface TimeoutHandlerPluginOptions<T extends Context> {
   /**
@@ -22,11 +36,13 @@ export interface TimeoutHandlerPluginOptions<T extends Context> {
    *
    * @default undefined (streaming responses run without limit)
    */
-  streamingTimeout?: Value<number | null | undefined, [options: StandardHandlerInterceptorOptions<T>]>
+  streamingTimeout?:
+    | Value<number | null | undefined, [options: StandardHandlerInterceptorOptions<T>]>
+    | undefined
 }
 
 /**
- * The Timeout Handler Plugin aborts the request signal with an `AbortError`
+ * The Timeout Handler Plugin aborts the request signal with a `TimeoutError`
  * when handling exceeds a configured timeout. It only aborts the signal,
  * the procedure must honor it to stop early and produce the response.
  *
@@ -36,7 +52,7 @@ export class TimeoutHandlerPlugin<T extends Context> implements StandardHandlerP
   private readonly timeout: TimeoutHandlerPluginOptions<T>['timeout']
   private readonly streamingTimeout: TimeoutHandlerPluginOptions<T>['streamingTimeout']
 
-  name = '~timeout'
+  readonly name = '~timeout'
 
   constructor(options: NoInfer<TimeoutHandlerPluginOptions<T>>) {
     this.timeout = options.timeout
@@ -58,7 +74,7 @@ export class TimeoutHandlerPlugin<T extends Context> implements StandardHandlerP
       const controller = new AbortController()
 
       const abortWithTimeout = (ms: number) => {
-        controller.abort(new AbortError(`Request timed out after ${ms}ms`))
+        controller.abort(new TimeoutError(`Request timed out after ${ms}ms`))
       }
 
       const timeoutId = hasTimeout ? setTimeout(abortWithTimeout, timeoutMs, timeoutMs) : undefined
@@ -75,21 +91,24 @@ export class TimeoutHandlerPlugin<T extends Context> implements StandardHandlerP
           const isIterator = isAsyncIteratorObject(body)
 
           if (isIterator || body instanceof ReadableStream) {
-            const streamingTimeoutId = setTimeout(abortWithTimeout, streamingTimeoutMs, streamingTimeoutMs)
+            const streamingTimeoutId = setTimeout(
+              abortWithTimeout,
+              streamingTimeoutMs,
+              streamingTimeoutMs,
+            )
             const onFinish = () => clearTimeout(streamingTimeoutId)
 
             return {
               ...response,
               body: isIterator
-                ? override(body, wrapAsyncIterator(body, { onFinish }))
-                : override(body, wrapReadableStream(body, { onFinish })),
+                ? wrapAsyncIterator(body, { onFinish })
+                : wrapReadableStream(body, { onFinish }),
             }
           }
         }
 
         return response
-      }
-      finally {
+      } finally {
         clearTimeout(timeoutId)
       }
     }

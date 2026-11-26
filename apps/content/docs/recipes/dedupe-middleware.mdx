@@ -1,6 +1,6 @@
 ---
-title: "Dedupe Middleware"
-description: "Learn how to use context to prevent the same middleware from repeating expensive work when it runs multiple times in a single call."
+title: 'Dedupe Middleware'
+description: 'Learn how to use context to prevent the same middleware from repeating expensive work when it runs multiple times in a single call.'
 ---
 
 ## Problem
@@ -26,12 +26,14 @@ import { os } from '@orpc/server'
 declare function loadAuth(headers: Headers): Promise<{ id: string } | undefined>
 // ---cut---
 const authProvider = os
-  .$context<{ headers: Headers, auth?: { id: string } | undefined, authLoaded?: boolean | undefined }>()
+  .$context<{
+    headers: Headers
+    auth?: { id: string } | undefined
+    authLoaded?: boolean | undefined
+  }>()
   .middleware(async ({ context, next }) => {
     // reuse the loaded auth value if it was already loaded
-    const auth = context.authLoaded
-      ? context.auth
-      : await loadAuth(context.headers)
+    const auth = context.authLoaded ? context.auth : await loadAuth(context.headers)
 
     return next({ context: { auth, authLoaded: true } })
   })
@@ -44,12 +46,14 @@ import { call, os } from '@orpc/server'
 
 declare function loadAuth(headers: Headers): Promise<{ id: string } | undefined>
 const authProvider = os
-  .$context<{ headers: Headers, auth?: { id: string } | undefined, authLoaded?: boolean | undefined }>()
+  .$context<{
+    headers: Headers
+    auth?: { id: string } | undefined
+    authLoaded?: boolean | undefined
+  }>()
   .middleware(async ({ context, next }) => {
     // reuse the loaded auth value if it was already loaded
-    const auth = context.authLoaded
-      ? context.auth
-      : await loadAuth(context.headers)
+    const auth = context.authLoaded ? context.auth : await loadAuth(context.headers)
 
     return next({ context: { auth, authLoaded: true } })
   })

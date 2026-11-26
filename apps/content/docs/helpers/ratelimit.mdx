@@ -1,8 +1,8 @@
 ---
-title: "Rate Limit Helpers"
-description: "Add rate limiting to oRPC with a unified RateLimiter interface, storage adapters, procedure middleware, and a handler plugin for HTTP headers."
+title: 'Rate Limit Helpers'
+description: 'Add rate limiting to oRPC with a unified RateLimiter interface, storage adapters, procedure middleware, and a handler plugin for HTTP headers.'
 sidebar:
-  label: "Rate Limit"
+  label: 'Rate Limit'
 ---
 
 ## Installation
@@ -19,7 +19,7 @@ The core concept is the `RateLimiter` interface, which defines a standard way to
 | -------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------- |
 | [`MemoryRateLimiter`](#memory)         | ✅            | In-memory storage                                                                                         |
 | [`RedisRateLimiter`](#redis)           | ✅            | [Redis](https://github.com/redis/redis)                                                                   |
-| [`UpstashRateLimiter`](#upstash)       | ✅            | [Upstash Rate Limit](https://www.npmjs.com/package/@upstash/ratelimit)                                    |
+| [`UpstashRateLimiter`](#upstash)       | ✅            | [Upstash Redis](https://github.com/upstash/redis-js)                                                      |
 | [`BunRedisRateLimiter`](#bun-redis)    | ✅            | [Bun's Redis](https://bun.com/docs/runtime/redis)                                                         |
 | [`CloudflareRateLimiter`](#cloudflare) | ❌            | [Cloudflare's Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) |
 
@@ -50,16 +50,13 @@ if (!result.success) {
 
 ### Blocking Mode
 
-Some adapters support blocking mode, which waits until capacity becomes available instead of rejecting requests immediately.
+Some adapters support blocking mode, which waits until capacity becomes available instead of rejecting requests immediately. Set `timeout` to how long a request may wait, in milliseconds. A request still fails right away when its window will not reset before the timeout elapses.
 
 ```ts
 const limiter = new MemoryRateLimiter({
   maxRequests: 10,
   window: 60000,
-  blockingUntilReady: {
-    enabled: true, // Disabled by default
-    timeout: 5000, // Wait up to 5 seconds
-  },
+  timeout: 5000, // Wait up to 5 seconds, 0 (no waiting) by default
 })
 ```
 
@@ -89,15 +86,24 @@ const ratelimiter = new MemoryRateLimiter({
   window: 60000,
 })
 
-const result = await call(
-  procedure,
-  { email: 'user@example.com' },
-  { context: { ratelimiter } }
-)
+const result = await call(procedure, { email: 'user@example.com' }, { context: { ratelimiter } })
 ```
 
 :::info[Automatic Deduplication]
 When the same `limiter` and `key` combination is used multiple times in a single request chain, the `ratelimit` middleware performs the rate limit check only once. This behavior follows the [Dedupe Middleware](/docs/recipes/dedupe-middleware) recipe. To disable deduplication, set `dedupe: false`.
+:::
+
+:::tip[Custom Error]
+By default the middleware throws `TOO_MANY_REQUESTS`. Use `error` to throw your own, which is [defined](/docs/error-handling#orpcerror-compatibility) when its `code` and `data` match an error the procedure declares. A custom code responds with `400` unless you map it in [`errorStatusMap`](/docs/rpc/handler#custom-error-response).
+
+```ts
+ratelimit({
+  limiter,
+  key,
+  error: (result) => new ORPCError('RATE_LIMITED', { data: { reset: result.reset } }),
+})
+```
+
 :::
 
 :::tip[Conditional Limiter]
@@ -135,9 +141,7 @@ The `RateLimitHandlerPlugin` automatically adds HTTP rate limiting headers (`Rat
 import { RateLimitHandlerPlugin } from '@orpc/ratelimit'
 
 const handler = new RPCHandler(router, {
-  plugins: [
-    new RateLimitHandlerPlugin(),
-  ],
+  plugins: [new RateLimitHandlerPlugin()],
 })
 ```
 
@@ -169,19 +173,13 @@ const limiter = new MemoryRateLimiter({
    */
   window: 60000,
 
-  blockingUntilReady: {
-    /**
-     * Block until the request may pass or timeout is reached.
-     *
-     * @default false
-     */
-    enabled: false,
-
-    /**
-     * milliseconds
-     */
-    timeout: 5000
-  },
+  /**
+   * How long to wait for capacity to become available, in milliseconds.
+   * Gives up right away when the window will not reset before the timeout elapses.
+   *
+   * @default 0
+   */
+  timeout: 0,
 })
 ```
 
@@ -217,68 +215,59 @@ const limiter = new RedisRateLimiter(client, {
    */
   window: 60000,
 
-  blockingUntilReady: {
-    /**
-     * Block until the request may pass or timeout is reached.
-     *
-     * @default false
-     */
-    enabled: false,
-
-    /**
-     * milliseconds
-     */
-    timeout: 5000
-  },
+  /**
+   * How long to wait for capacity to become available, in milliseconds.
+   * Gives up right away when the window will not reset before the timeout elapses.
+   *
+   * @default 0
+   */
+  timeout: 0,
 })
+
+// Creates a limiter with an extra prefix that shares this client, e.g. per tenant
+const tenantLimiter = limiter.prefix('tenant:123:')
 ```
 
 ### Upstash
 
-Delegates to an `@upstash/ratelimit` instance, so the algorithm and limits are configured there. A good fit for serverless and edge runtimes.
+Stores counters in Upstash Redis, so it shares counters with `RedisRateLimiter`. A good fit for serverless and edge runtimes.
 
-````ts
-import { Ratelimit } from '@upstash/ratelimit'
-import { Redis } from '@upstash/redis'
+```ts
 import { UpstashRateLimiter } from '@orpc/ratelimit/upstash'
+import { Redis } from '@upstash/redis'
 
 const redis = Redis.fromEnv()
-const ratelimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(10, '60 s'),
-  prefix: 'orpc:', // Optional key prefix
-})
 
-const limiter = new UpstashRateLimiter(ratelimit, {
-  blockingUntilReady: {
-    /**
-     * Block until the request may pass or timeout is reached.
-     *
-     * @default false
-     */
-    enabled: false,
-
-    /**
-     * milliseconds
-     */
-    timeout: 5000
-  },
+const limiter = new UpstashRateLimiter(redis, {
+  /**
+   * The prefix to use for Redis keys.
+   *
+   * @default ''
+   */
+  prefix: '',
 
   /**
-   * For the MultiRegion setup we do some synchronizing in the background, after returning the current limit.
-   * Or when analytics is enabled, we send the analytics asynchronously after returning the limit.
-   * In most case you can simply ignore this.
-   *
-   * On Vercel Edge or Cloudflare workers, you might need `.bind` before assign:
-   * ```ts
-   * const ratelimiter = new UpstashRateLimiter(ratelimit, {
-   *   waitUntil: ctx.waitUntil.bind(ctx),
-   * })
-   * ```
+   * Maximum number of requests allowed within the window.
    */
-  waitUntil: undefined
+  maxRequests: 10,
+
+  /**
+   * The duration of the fixed window in milliseconds.
+   */
+  window: 60000,
+
+  /**
+   * How long to wait for capacity to become available, in milliseconds.
+   * Gives up right away when the window will not reset before the timeout elapses.
+   *
+   * @default 0
+   */
+  timeout: 0,
 })
-````
+
+// Creates a limiter with an extra prefix that shares this client, e.g. per tenant
+const tenantLimiter = limiter.prefix('tenant:123:')
+```
 
 ### Bun Redis
 
@@ -306,20 +295,17 @@ const limiter = new BunRedisRateLimiter(redis, {
    */
   window: 60000,
 
-  blockingUntilReady: {
-    /**
-     * Block until the request may pass or timeout is reached.
-     *
-     * @default false
-     */
-    enabled: false,
-
-    /**
-     * milliseconds
-     */
-    timeout: 5000
-  },
+  /**
+   * How long to wait for capacity to become available, in milliseconds.
+   * Gives up right away when the window will not reset before the timeout elapses.
+   *
+   * @default 0
+   */
+  timeout: 0,
 })
+
+// Creates a limiter with an extra prefix that shares this client, e.g. per tenant
+const tenantLimiter = limiter.prefix('tenant:123:')
 ```
 
 ### Cloudflare
@@ -337,8 +323,11 @@ export default {
        *
        * @default ''
        */
-      prefix: ''
+      prefix: '',
     })
-  }
+
+    // Creates a limiter with an extra prefix that shares this binding, e.g. per tenant
+    const tenantLimiter = limiter.prefix('tenant:123:')
+  },
 }
 ```

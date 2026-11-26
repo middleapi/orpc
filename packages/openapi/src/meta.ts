@@ -1,9 +1,10 @@
 import type { AnyProcedureContract, AnySchema, ErrorMap, MetaPlugin } from '@orpc/contract'
 import type { Lazy } from '@orpc/server'
 import type { Value } from '@orpc/shared'
-import type { StandardBodyHint } from '@standard-server/core'
-import type { OpenAPIV3_2 } from './types'
 import { mergeHttpPath } from '@orpc/shared'
+import type { StandardBodyHint } from '@standard-server/core'
+
+import type { OpenAPIV3_2 } from './types'
 
 export interface OpenAPIMeta {
   /**
@@ -18,7 +19,7 @@ export interface OpenAPIMeta {
    * and `{+param}` to allow slashes in the matched value.
    *
    * @example `/users`, `/users/{id}`, `/files/{+path}`
-   * @default Router segments joined by `'/`
+   * @default Router segments joined by `/`
    */
   path?: `/${string}` | undefined
 
@@ -113,10 +114,9 @@ export interface OpenAPIMeta {
    *
    * @default `primitive` for all parameters
    */
-  paramsStyles?: Record<
-    string,
-    'primitive' | 'comma-delimited-array' | 'comma-delimited-object' | undefined
-  > | undefined
+  paramsStyles?:
+    | Record<string, 'primitive' | 'comma-delimited-array' | 'comma-delimited-object' | undefined>
+    | undefined
 
   /**
    * Controls how individual query parameters are encoding/decoding.
@@ -127,18 +127,18 @@ export interface OpenAPIMeta {
    *
    * Each key maps a query parameter name to one of the following strategies:
    *
-   * | Strategy                 | Encoded                   | Decoded                        | OpenAPI Parameter Style            |
-   * |--------------------------|---------------------------|--------------------------------|------------------------------------|
-   * | `primitive`              | `?a=1&a=2`                | `{ a: '2' }`                   | `form` / `explode: false`          |
-   * | `array`                  | `?a=1&a=2`                | `{ a: ['1', '2'] }`            | `form` / `explode: true`           |
-   * | `comma-delimited-array`  | `?a=1,2,3`                | `{ a: ['1', '2', '3'] }`       | `form` / `explode: false`          |
-   * | `comma-delimited-object` | `?a=A,1,B,2`              | `{ a: { A: '1', B: '2' } }`    | `form` / `explode: false`          |
-   * | `space-delimited-array`  | `?a=1 2 3`                | `{ a: ['1', '2', '3'] }`       | `spaceDelimited` / `explode: false`|
-   * | `space-delimited-object` | `?a=A 1 B 2`              | `{ a: { A: '1', B: '2' } }`    | `spaceDelimited` / `explode: false`|
-   * | `pipe-delimited-array`   | `?a=1\|2\|3`              | `{ a: ['1', '2', '3'] }`       | `pipeDelimited` / `explode: false` |
-   * | `pipe-delimited-object`  | `?a=A\|1\|B\|2`           | `{ a: { A: '1', B: '2' } }`    | `pipeDelimited` / `explode: false` |
-   * | `json`                   | `?meta={"key":"value"}`   | `{ meta: { key: 'value' } }`   | `content: application/json`        |
-   * | _default_              | `?a[]=1&a[]=2&b=3&c[d]=4` | `{a:['1', '2'], b:3, c:{d:4}}` | `deepObject` / `explode: true`     |
+   * | Strategy                 | Encoded                   | Decoded                                    | OpenAPI Parameter Style                  |
+   * |--------------------------|---------------------------|--------------------------------------------|------------------------------------------|
+   * | `primitive`              | `?a=1&a=2`                | `{ a: '2' }`                               | `form` / `explode: true`                 |
+   * | `array`                  | `?a=1&a=2`                | `{ a: ['1', '2'] }`                        | `form` / `explode: true`                 |
+   * | `comma-delimited-array`  | `?a=1,2,3`                | `{ a: ['1', '2', '3'] }`                   | `form` / `explode: false`                |
+   * | `comma-delimited-object` | `?a=A,1,B,2`              | `{ a: { A: '1', B: '2' } }`                | `form` / `explode: false`                |
+   * | `space-delimited-array`  | `?a=1 2 3`                | `{ a: ['1', '2', '3'] }`                   | `spaceDelimited` / `explode: false`      |
+   * | `space-delimited-object` | `?a=A 1 B 2`              | `{ a: { A: '1', B: '2' } }`                | `spaceDelimited` / `explode: false`      |
+   * | `pipe-delimited-array`   | `?a=1\|2\|3`              | `{ a: ['1', '2', '3'] }`                   | `pipeDelimited` / `explode: false`       |
+   * | `pipe-delimited-object`  | `?a=A\|1\|B\|2`           | `{ a: { A: '1', B: '2' } }`                | `pipeDelimited` / `explode: false`       |
+   * | `json`                   | `?meta={"key":"value"}`   | `{ meta: { key: 'value' } }`               | `content: application/json`              |
+   * | _default_                | `?a[]=1&a[]=2&b=3&c[d]=4` | `{ a: ['1', '2'], b: '3', c: { d: '4' } }` | `form` or `deepObject` / `explode: true` |
    *
    * **Strategy details:**
    *
@@ -147,14 +147,16 @@ export interface OpenAPIMeta {
    * - **`*-delimited-array`**: Splits the last value on the delimiter (`,`, space, or `|`) into an array.
    * - **`*-delimited-object`**: Splits the last value on the delimiter into alternating key–value pairs.
    * - **`json`**: Parses the last value as JSON; falls back to the raw string if parsing fails.
-   * - **`undefined`**: Standard bracket-notation decoding This is the default.
+   * - **`undefined`**: Standard bracket-notation decoding. This is the default.
+   *
+   * **Note**: With `array` and `*-delimited-*`, a missing parameter is decoded as `[]` or `{}`. With the others, it is decoded as `undefined`.
    *
    * **Note**: `*-delimited-*` strategies do not support keys or values containing the delimiter character.
    *
    * @example
    * ```ts
    * // GET /search?keyword=abc&tags=a,b,c&meta={"key":"value"}
-   * const queryParsing = {
+   * const queryStyles = {
    *   keyword: 'primitive',
    *   tags: 'comma-delimited-array',
    *   meta: 'json',
@@ -169,15 +171,26 @@ export interface OpenAPIMeta {
    *
    * @default `undefined` for all parameters (bracket-notation decoding)
    */
-  queryStyles?: Record<
-    string,
-    'primitive' | 'array' | 'comma-delimited-array' | 'comma-delimited-object' | 'space-delimited-array' | 'space-delimited-object' | 'pipe-delimited-array' | 'pipe-delimited-object' | 'json' | undefined
-  > | undefined
+  queryStyles?:
+    | Record<
+        string,
+        | 'primitive'
+        | 'array'
+        | 'comma-delimited-array'
+        | 'comma-delimited-object'
+        | 'space-delimited-array'
+        | 'space-delimited-object'
+        | 'pipe-delimited-array'
+        | 'pipe-delimited-object'
+        | 'json'
+        | undefined
+      >
+    | undefined
 
   /**
    * Hint for how to parse the incoming request body.
    *
-   * Note: The `standard-server` `Content-Type` header takes priority over this option.
+   * Note: This option takes priority over the `standard-server` and `Content-Type` headers.
    * `form-data` and `url-search-params` are decoded using bracket notation,
    * so the resulting value will be an object or array.
    *
@@ -186,9 +199,10 @@ export interface OpenAPIMeta {
   requestBodyHint?: StandardBodyHint | undefined
 
   /**
-   * Hint for how to parse the response body.
+   * Hint for how to parse a successful response body (status below 400).
+   * Error response bodies are always parsed from their headers.
    *
-   * Note: The `standard-server` `Content-Type` header takes priority over this option.
+   * Note: This option takes priority over the `standard-server` and `Content-Type` headers.
    * `form-data` and `url-search-params` are decoded using bracket notation,
    * so the resulting value will be an object or array.
    *
@@ -300,7 +314,7 @@ export interface OpenAPIMeta {
    *
    * Explicitly setting `undefined` resets the spec instead of merging.
    */
-  spec?: Value<OpenAPIV3_2.OperationObject, [current: OpenAPIV3_2.OperationObject]>
+  spec?: Value<OpenAPIV3_2.OperationObject, [current: OpenAPIV3_2.OperationObject]> | undefined
 
   /**
    * Prefix for the path. Useful when you want to apply a common path prefix across multiple procedures.
@@ -354,9 +368,9 @@ export interface OpenAPIPrefixMetaPlugin<
 export interface OpenAPIFunction {
   (meta: OpenAPIMeta): OpenAPIMetaPlugin<any, any, any>
   method(method: OpenAPIMeta['method']): OpenAPIMethodMetaPlugin<any, any, any>
-  path(method: OpenAPIMeta['path']): OpenAPIPathMetaPlugin<any, any, any>
-  spec(method: OpenAPIMeta['spec']): OpenAPISpecMetaPlugin<any, any, any>
-  prefix(method: OpenAPIMeta['prefix']): OpenAPIPrefixMetaPlugin<any, any, any>
+  path(path: OpenAPIMeta['path']): OpenAPIPathMetaPlugin<any, any, any>
+  spec(spec: OpenAPIMeta['spec']): OpenAPISpecMetaPlugin<any, any, any>
+  prefix(prefix: OpenAPIMeta['prefix']): OpenAPIPrefixMetaPlugin<any, any, any>
 }
 
 /**
@@ -366,39 +380,53 @@ export interface OpenAPIFunction {
  * @see {@link https://orpc.dev/docs/openapi/routing | OpenAPI Routing}
  * @see {@link https://orpc.dev/docs/openapi/specification | OpenAPI Specification}
  */
-export const openapi: OpenAPIFunction = incoming => ({
+export const openapi: OpenAPIFunction = (incoming) => ({
   name: '~openapi',
   init(meta) {
     const existing = meta['~openapi'] as undefined | OpenAPIMeta
 
-    const tags = existing?.tags && incoming.tags
-      ? [...existing.tags, ...incoming.tags]
-      : 'tags' in incoming ? incoming.tags : existing?.tags
+    const tags =
+      existing?.tags && incoming.tags
+        ? [...existing.tags, ...incoming.tags]
+        : 'tags' in incoming
+          ? incoming.tags
+          : existing?.tags
 
-    const queryStyles = existing?.queryStyles && incoming.queryStyles
-      ? { ...existing.queryStyles, ...incoming.queryStyles }
-      : 'queryStyles' in incoming ? incoming.queryStyles : existing?.queryStyles
+    const queryStyles =
+      existing?.queryStyles && incoming.queryStyles
+        ? { ...existing.queryStyles, ...incoming.queryStyles }
+        : 'queryStyles' in incoming
+          ? incoming.queryStyles
+          : existing?.queryStyles
 
-    const paramsStyles = existing?.paramsStyles && incoming.paramsStyles
-      ? { ...existing.paramsStyles, ...incoming.paramsStyles }
-      : 'paramsStyles' in incoming ? incoming.paramsStyles : existing?.paramsStyles
+    const paramsStyles =
+      existing?.paramsStyles && incoming.paramsStyles
+        ? { ...existing.paramsStyles, ...incoming.paramsStyles }
+        : 'paramsStyles' in incoming
+          ? incoming.paramsStyles
+          : existing?.paramsStyles
 
     const existingSpec = existing?.spec
     const incomingSpec = incoming.spec
 
     // AVOID a function spec, it requires the current spec as an argument, triggering an extra auto-generation step.
-    const spec: OpenAPIMeta['spec']
-      = typeof existingSpec === 'function' && typeof incomingSpec === 'function'
-        ? current => incomingSpec(existingSpec(current))
+    const spec: OpenAPIMeta['spec'] =
+      typeof existingSpec === 'function' && typeof incomingSpec === 'function'
+        ? (current) => incomingSpec(existingSpec(current))
         : typeof existingSpec === 'function' && typeof incomingSpec === 'object'
           ? existingSpec(incomingSpec)
           : typeof existingSpec === 'object' && typeof incomingSpec === 'function'
             ? incomingSpec(existingSpec)
-            : 'spec' in incoming ? incomingSpec : existingSpec
+            : 'spec' in incoming
+              ? incomingSpec
+              : existingSpec
 
-    const prefix = existing?.prefix && incoming.prefix
-      ? mergeHttpPath(existing.prefix, incoming.prefix)
-      : 'prefix' in incoming ? incoming.prefix : existing?.prefix
+    const prefix =
+      existing?.prefix && incoming.prefix
+        ? mergeHttpPath(existing.prefix, incoming.prefix)
+        : 'prefix' in incoming
+          ? incoming.prefix
+          : existing?.prefix
 
     // TODO: throw if incoming.path missing dynamic from existing.path
 
@@ -419,22 +447,22 @@ export const openapi: OpenAPIFunction = incoming => ({
   },
 })
 
-openapi.method = method => ({
+openapi.method = (method) => ({
   ...openapi({ method }),
   name: '~openapi/method',
 })
 
-openapi.path = path => ({
+openapi.path = (path) => ({
   ...openapi({ path }),
   name: '~openapi/path',
 })
 
-openapi.spec = spec => ({
+openapi.spec = (spec) => ({
   ...openapi({ spec }),
   name: '~openapi/spec',
 })
 
-openapi.prefix = prefix => ({
+openapi.prefix = (prefix) => ({
   ...openapi({ prefix }),
   name: '~openapi/prefix',
 })
@@ -444,6 +472,8 @@ openapi.prefix = prefix => ({
  *
  * @see {@link https://orpc.dev/docs/rpc/handler#enabling-the-get-method | RPC Handler - Enabling the GET Method}
  */
-export function getOpenAPIMeta(procedureOrLazy: AnyProcedureContract | Lazy<any>): OpenAPIMeta | undefined {
+export function getOpenAPIMeta(
+  procedureOrLazy: AnyProcedureContract | Lazy<any>,
+): OpenAPIMeta | undefined {
   return procedureOrLazy['~orpc'].meta['~openapi'] as OpenAPIMeta | undefined
 }

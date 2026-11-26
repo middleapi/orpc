@@ -1,11 +1,12 @@
 import { Suspense } from 'react'
+
+import { ChatRoom } from './components/chat-room'
 import { CreatePlanetForm } from './components/create-planet-form'
+import { HibernationChatRoom } from './components/hibernation-chat-room'
+import { PlanetTable } from './components/planet-table'
+import { PlanetTableSkeleton } from './components/planet-table-skeleton'
 import { ReferenceLinks } from './components/reference-links'
 import { TopBar } from './components/top-bar'
-import { PlanetTableSkeleton } from './components/planet-table-skeleton'
-import { PlanetTable } from './components/planet-table'
-import { ChatRoom } from './components/chat-room'
-import { HibernationChatRoom } from './components/hibernation-chat-room'
 
 export function App() {
   return (

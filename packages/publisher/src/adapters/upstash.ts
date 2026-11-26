@@ -1,8 +1,16 @@
 import type { ThrowableError } from '@orpc/shared'
+import { promiseWithResolvers, stringifyJSON, tryOrUndefined } from '@orpc/shared'
 import type { Redis } from '@upstash/redis'
+
 import type { BaseRedisPublisherOptions, RedisStreamEntry } from './base-redis'
-import { promiseWithResolvers } from '@orpc/shared'
 import { BaseRedisPublisher } from './base-redis'
+
+/**
+ * `@upstash/redis` puts the channel unencoded in the subscribe URL, which `fetch` may rewrite
+ * and the server may percent-decode. A `,` breaks the SDK's `message,<channel>,<data>` frames.
+ */
+// oxlint-disable-next-line no-control-regex
+const UNSAFE_SUBSCRIBE_CHANNEL_REGEX = /[\x00-\x1F\x7F/\\?#%,]| $|^\.\.?$/
 
 export interface UpstashPublisherOptions extends BaseRedisPublisherOptions {}
 
@@ -20,9 +28,21 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
 
   constructor(
     private readonly redis: Redis,
-    options: UpstashPublisherOptions = {},
+    private readonly options: UpstashPublisherOptions = {},
   ) {
     super(options)
+  }
+
+  /**
+   * Creates a publisher with `prefix` appended to this publisher's prefix, sharing its Redis client.
+   *
+   * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
+   */
+  prefix(prefix: string): UpstashPublisher<T> {
+    return new UpstashPublisher(this.redis, {
+      ...this.options,
+      prefix: `${this.keyPrefix}${prefix}`,
+    })
   }
 
   protected async publishMessage(channel: string, message: string): Promise<void> {
@@ -34,13 +54,18 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
     listener: (message: unknown) => void,
     onError?: (error: ThrowableError) => void,
   ): Promise<() => Promise<void>> {
+    if (UNSAFE_SUBSCRIBE_CHANNEL_REGEX.test(channel)) {
+      throw new TypeError(
+        `UpstashPublisher: cannot subscribe to ${stringifyJSON(channel)}. A channel (prefix + event name) must not contain "/", "\\", "?", "#", "%", "," or control characters, end with a space, or be "." or "..".`,
+      )
+    }
+
     // Registered before subscribing so messages that arrive meanwhile are not lost.
     push(this.listenersMap, channel, listener)
 
     try {
       await this.subscribeIfNeeded(channel)
-    }
-    catch (error) {
+    } catch (error) {
       remove(this.listenersMap, channel, listener)
       await this.unsubscribeIfUnused(channel)
       throw error
@@ -67,10 +92,9 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
   }
 
   protected async readStreamEntries(key: string, lastId: string): Promise<RedisStreamEntry[]> {
-    const results = await this.redis.xread(key, lastId) as null | Array<[
-      key: string,
-      entries: Array<[id: string, fields: [name: string, value: unknown]]>,
-    ]>
+    const results = (await this.redis.xread(key, lastId)) as null | Array<
+      [key: string, entries: Array<[id: string, fields: [name: string, value: unknown]]>]
+    >
 
     return results?.[0]?.[1].map(([id, fields]) => ({ id, data: fields[1] })) ?? []
   }
@@ -90,11 +114,21 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
     subscription.on('subscribe', () => resolve())
     subscription.on('error', (error) => {
       reject(error)
-      this.onErrorsMap.get(channel)?.slice().forEach(onError => onError(error))
+      this.onErrorsMap
+        .get(channel)
+        ?.slice()
+        .forEach((onError) => onError(error))
     })
-    subscription.on('message', ({ message }) => {
+    subscription.on('message', ({ channel: messageChannel, message }) => {
+      if (messageChannel !== channel) {
+        return
+      }
+
       // Snapshot, since a listener may unsubscribe itself mid-dispatch.
-      this.listenersMap.get(channel)?.slice().forEach(listener => listener(message))
+      this.listenersMap
+        .get(channel)
+        ?.slice()
+        .forEach((listener) => tryOrUndefined(() => listener(message)))
     })
 
     this.pendingSubscriptionsMap.set(channel, promise)
@@ -102,12 +136,10 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
     try {
       await promise
       this.subscriptionMap.set(channel, subscription)
-    }
-    catch (error) {
+    } catch (error) {
       await subscription.unsubscribe()
       throw error
-    }
-    finally {
+    } finally {
       this.pendingSubscriptionsMap.delete(channel)
     }
   }
@@ -127,7 +159,7 @@ function push<K, V>(map: Map<K, V[]>, key: K, value: V): void {
   let values = map.get(key)
 
   if (!values) {
-    map.set(key, values = [])
+    map.set(key, (values = []))
   }
 
   values.push(value)

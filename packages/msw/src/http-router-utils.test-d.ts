@@ -1,13 +1,14 @@
-import type { HTTPProcedureUtils } from './http-procedure-utils'
-import type { HTTPRouterUtils } from './http-router-utils'
 import { oc } from '@orpc/contract'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
-import z from 'zod'
+import * as z from 'zod'
+
+import type { HTTPProcedureUtils } from './http-procedure-utils'
+import type { HTTPRouterUtils } from './http-router-utils'
 import { createHTTPUtils } from './http-router-utils'
 
-const inputSchema = z.object({ input: z.number().transform(n => `${n}`) })
-const outputSchema = z.object({ output: z.number().transform(n => `${n}`) })
+const inputSchema = z.object({ input: z.number().transform((n) => `${n}`) })
+const outputSchema = z.object({ output: z.number().transform((n) => `${n}`) })
 
 const contract = {
   ping: oc.input(inputSchema).output(outputSchema),
@@ -17,14 +18,30 @@ const contract = {
 }
 
 it('mirrors the router-contract shape', () => {
-  const utils = createHTTPUtils(contract, { handler: router => new RPCHandler(router) })
+  const utils = createHTTPUtils(contract, { handler: (router) => new RPCHandler(router) })
 
   expectTypeOf(utils).toEqualTypeOf<HTTPRouterUtils<typeof contract, object>>()
-  expectTypeOf(utils.ping).toExtend<HTTPProcedureUtils<object, typeof inputSchema, typeof outputSchema, object>>()
+  expectTypeOf(utils.ping).toExtend<
+    HTTPProcedureUtils<object, typeof inputSchema, typeof outputSchema, object>
+  >()
   expectTypeOf(utils.nested.pong).toExtend<{ loading: () => unknown }>()
 
   // @ts-expect-error --- not a procedure
   expectTypeOf(utils.nested.handler)
+})
+
+it('maps optional keys', () => {
+  type Utils = HTTPRouterUtils<typeof contract, object>
+
+  expectTypeOf<
+    HTTPRouterUtils<
+      { ping?: typeof contract.ping; nested?: { pong?: typeof contract.nested.pong } },
+      object
+    >
+  >().toEqualTypeOf<{
+    ping?: Utils['ping'] | undefined
+    nested?: { pong?: Utils['nested']['pong'] | undefined } | undefined
+  }>()
 })
 
 it('supports implemented routers', () => {
@@ -35,7 +52,7 @@ it('supports implemented routers', () => {
       .handler(({ input }) => ({ output: Number(input.input) })),
   }
 
-  const utils = createHTTPUtils(router, { handler: router => new RPCHandler(router) })
+  const utils = createHTTPUtils(router, { handler: (router) => new RPCHandler(router) })
 
   utils.ping.handler(({ input }) => {
     expectTypeOf(input).toEqualTypeOf<{ input: string }>()

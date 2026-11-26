@@ -1,9 +1,15 @@
+import {
+  isAsyncIteratorObject,
+  isPlainObject,
+  NON_NEGATIVE_INTEGER_REGEX,
+  stringifyJSON,
+} from '@orpc/shared'
 import type { StandardBody } from '@standard-server/core'
-import type { RPCJsonSerializerOptions } from './rpc-json-serializer'
-import { isAsyncIteratorObject, stringifyJSON } from '@orpc/shared'
-import { ErrorEvent } from '@standard-server/core'
+import { EventStreamErrorEvent } from '@standard-server/core'
+
 import { wrapAsyncIteratorPreservingEventMeta } from './async-iterator-object'
 import { createORPCErrorFromJson, isORPCErrorJson, toORPCError } from './error-utils'
+import type { RPCJsonSerialization, RPCJsonSerializerOptions } from './rpc-json-serializer'
 import { RPCJsonSerializer } from './rpc-json-serializer'
 
 export interface RPCSerializerSerializeOptions {
@@ -13,7 +19,7 @@ export interface RPCSerializerSerializeOptions {
    *
    * @default true
    */
-  useFormDataForBlobFields?: boolean
+  useFormDataForBlobFields?: boolean | undefined
 }
 
 export interface RPCSerializerOptions extends RPCJsonSerializerOptions {
@@ -29,14 +35,11 @@ export interface RPCSerializerOptions extends RPCJsonSerializerOptions {
  *
  * @see {@link https://orpc.dev/docs/rpc/serializer | RPC Serializer}
  */
-export class RPCSerializer {
-  private readonly jsonSerializer: RPCJsonSerializer
+export class RPCSerializer extends RPCJsonSerializer {
   private readonly defaultSerializeOptions: RPCSerializerOptions['serialize']
 
-  constructor(
-    options: RPCSerializerOptions = {},
-  ) {
-    this.jsonSerializer = new RPCJsonSerializer(options)
+  constructor(options: RPCSerializerOptions = {}) {
+    super(options)
     this.defaultSerializeOptions = options.serialize
   }
 
@@ -54,21 +57,24 @@ export class RPCSerializer {
             return result
           }
 
-          return { done: result.done, value: this.serializeValue(result.value, false) }
+          return { done: result.done, value: this.serializePayload(result.value, false) }
         },
-        mapError: e => new ErrorEvent(
-          this.serializeValue(toORPCError(e).toJSON(), false),
-          { cause: e },
-        ),
+        mapError: (e) =>
+          new EventStreamErrorEvent(this.serializePayload(toORPCError(e).toJSON(), false), {
+            cause: e,
+          }),
       })
     }
 
-    const useFormDataForBlobs = options.useFormDataForBlobFields ?? this.defaultSerializeOptions?.useFormDataForBlobFields ?? true
-    return this.serializeValue(data, useFormDataForBlobs)
+    const useFormDataForBlobs =
+      options.useFormDataForBlobFields ??
+      this.defaultSerializeOptions?.useFormDataForBlobFields ??
+      true
+    return this.serializePayload(data, useFormDataForBlobs)
   }
 
-  private serializeValue(data: unknown, useFormDataForBlobs: boolean): unknown {
-    const { json, meta, maps, blobs } = this.jsonSerializer.serialize(data)
+  private serializePayload(data: unknown, useFormDataForBlobs: boolean): unknown {
+    const { json, meta, maps, blobs } = this.serializeJson(data)
 
     if (!useFormDataForBlobs || !blobs?.length) {
       return { json, meta }
@@ -97,41 +103,85 @@ export class RPCSerializer {
             return result
           }
 
-          return { done: result.done, value: this.deserializeValue(result.value) }
+          return { done: result.done, value: this.deserializePayload(result.value) }
         },
         mapError: (e) => {
-          if (!(e instanceof ErrorEvent)) {
+          if (!(e instanceof EventStreamErrorEvent) || e.data === undefined) {
             return e
           }
 
-          const deserialized = this.deserializeValue(e.data)
+          let deserialized: unknown
+
+          try {
+            deserialized = this.deserializePayload(e.data)
+          } catch {
+            return e
+          }
 
           if (isORPCErrorJson(deserialized)) {
             return createORPCErrorFromJson(deserialized, { cause: e })
           }
 
-          return new ErrorEvent(deserialized, { cause: e })
+          return new EventStreamErrorEvent(deserialized, { cause: e })
         },
       })
     }
 
-    return this.deserializeValue(data)
+    return this.deserializePayload(data)
   }
 
-  private deserializeValue(data: any): unknown {
+  private deserializePayload(data: unknown): unknown {
     if (!(data instanceof FormData)) {
-      return this.jsonSerializer.deserialize(data)
+      return this.deserializeJson(assertEnvelope(data, false))
     }
 
-    const serialized = JSON.parse(data.get('data') as string)
-
+    let raw: string | undefined
+    let hasBlobs = false
     const blobs: Blob[] = []
+
     for (const [key, value] of data) {
-      if (value instanceof Blob) {
+      if (key === 'data' && raw === undefined && typeof value === 'string') {
+        raw = value
+      } else if (value instanceof Blob && NON_NEGATIVE_INTEGER_REGEX.test(key)) {
         blobs[Number(key)] = value
+        hasBlobs = true
+      } else {
+        throw invalidFormat()
       }
     }
 
-    return this.jsonSerializer.deserialize({ ...serialized, blobs })
+    const serialized =
+      raw === undefined ? { json: undefined } : assertEnvelope(JSON.parse(raw), true)
+
+    if (hasBlobs && serialized.maps === undefined) {
+      throw invalidFormat()
+    }
+
+    return this.deserializeJson({ ...serialized, blobs } as RPCJsonSerialization)
   }
+}
+
+function invalidFormat(): TypeError {
+  return new TypeError('Invalid RPC serialized data format.')
+}
+
+function assertEnvelope(value: unknown, allowMaps: boolean): RPCJsonSerialization {
+  if (!isPlainObject(value)) {
+    throw invalidFormat()
+  }
+
+  for (const key of Object.keys(value)) {
+    if (key !== 'json' && key !== 'meta' && (!allowMaps || key !== 'maps')) {
+      throw invalidFormat()
+    }
+  }
+
+  if (
+    (value.meta !== undefined && !Array.isArray(value.meta)) ||
+    (value.maps !== undefined && !Array.isArray(value.maps))
+  ) {
+    throw invalidFormat()
+  }
+
+  return value as RPCJsonSerialization
 }

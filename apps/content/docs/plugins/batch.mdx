@@ -1,8 +1,8 @@
 ---
-title: "Batch Plugin"
-description: "Combine multiple requests into a single batch and receive their responses together, reducing the overhead of separate requests."
+title: 'Batch Plugin'
+description: 'Combine multiple requests into a single batch and receive their responses together, reducing the overhead of separate requests.'
 sidebar:
-  label: "Batch"
+  label: 'Batch'
 ---
 
 :::warning
@@ -19,9 +19,7 @@ Set up batching on both the server and the client. The server plugin handles inc
 import { BatchHandlerPlugin } from '@orpc/server/plugins'
 
 const handler = new RPCHandler(router, {
-  plugins: [
-    new BatchHandlerPlugin(),
-  ],
+  plugins: [new BatchHandlerPlugin()],
 })
 ```
 
@@ -46,28 +44,31 @@ const link = new RPCLink({
 </CodeGroup>
 
 :::warning
-`BatchHandlerPlugin` detects batch requests by checking for the `orpc-batch` header. If you enable CORS, add this header to your allowlist so cross-origin batch requests are not blocked.
+`BatchHandlerPlugin` recognizes batch requests by the `orpc-batch` header (exported as `BATCH_HEADER`), so make sure nothing between the client and server blocks or strips it, such as a CORS policy or proxy. This is usually fine by default, as the [CORS Plugin](/docs/plugins/cors) allows the headers a request asks for.
+:::
 
-```ts
-const cors = new CORSHandlerPlugin({
-  allowHeaders: ['orpc-batch'],
+## Max Size
+
+Both plugins limit how many requests a batch holds with `maxSize`, and each side defaults to `DEFAULT_BATCH_MAX_SIZE` (10) independently. The client splits a larger group into several batches, while the server rejects a larger batch with a `413` for every request in it, so keep the client limit at or below the server's.
+
+<CodeGroup>
+
+```ts server.ts
+const handler = new RPCHandler(router, {
+  plugins: [
+    new BatchHandlerPlugin({
+      maxSize: 20,
+    }),
+  ],
 })
 ```
 
-:::
-
-## Response Modes
-
-By default, the plugin uses `streaming` mode. Responses are sent as soon as they are ready, so one slow request does not block the rest of the batch.
-
-If your environment does not support streaming responses, such as some serverless platforms or older browsers, switch to `buffered` mode instead. In this mode, all responses are collected and sent together.
-
-```ts
+```ts client.ts
 const link = new RPCLink({
   url: '/rpc',
   plugins: [
     new BatchLinkPlugin({
-      mode: 'buffered',
+      maxSize: 20,
       groups: [
         {
           condition: () => true,
@@ -79,21 +80,51 @@ const link = new RPCLink({
 })
 ```
 
+</CodeGroup>
+
+## Response Modes
+
+In the default `buffered` mode, the server starts the batch response once every procedure has responded, so it can carry their [headers](#response-headers). The response streams only if one of them returned an [AsyncIteratorObject](/docs/async-iterator-object) or a [`ReadableStream`](/docs/binary-data). If your client cannot read streamed responses, keep these procedures out of the batch with [`filter`](#filtering-requests).
+
+In `streaming` mode, the server starts the response once the first procedure responds and sends each other response as soon as it is ready, so a slow procedure does not hold back the rest:
+
+```ts
+const link = new RPCLink({
+  url: '/rpc',
+  plugins: [
+    new BatchLinkPlugin({
+      mode: 'streaming',
+      groups: [
+        {
+          condition: () => true,
+          context: {},
+        },
+      ],
+    }),
+  ],
+})
+```
+
+:::warning
+A `streaming` batch response always streams, so your client and any proxy in between must support streamed responses. It also carries only the cookies of the first procedure to respond. Send procedures that set cookies, such as a login, outside the batch with [`filter`](#filtering-requests).
+:::
+
 ### Keep-Alive Timer
 
-In **streaming** mode, long-running batch responses may remain idle for extended periods. The server plugin can send keep-alive frames to keep the connection alive.
+A streaming batch response may stay idle for long periods. The server plugin can send keep-alive frames to keep the connection alive.
 
 ```ts
 const handler = new RPCHandler(router, {
   plugins: [
     new BatchHandlerPlugin({
+      /**
+       * Keep-alive frames sent periodically while the stream is idle.
+       *
+       * `false` disables it, an object customizes it.
+       *
+       * @default true
+       */
       keepAlive: {
-        /**
-         * If true, a keep-alive frame is sent periodically while the stream is idle.
-         *
-         * @default true
-         */
-        enabled: true,
         /**
          * Interval (in milliseconds) between keep-alive frames after the last message.
          *
@@ -114,10 +145,7 @@ A batch response might be left uncompressed by the [Response Compression Plugin]
 import { BatchResponseCompressionHandlerPlugin } from '@orpc/node'
 
 const handler = new RPCHandler(router, {
-  plugins: [
-    new BatchHandlerPlugin(),
-    new BatchResponseCompressionHandlerPlugin(),
-  ],
+  plugins: [new BatchHandlerPlugin(), new BatchResponseCompressionHandlerPlugin()],
 })
 ```
 
@@ -145,21 +173,24 @@ const link = new RPCLink<ClientContext>({
       groups: [
         {
           condition: ({ context }) => context?.cache === 'force-cache',
-          context: { // used for the rest of the request lifecycle
+          context: {
+            // used for the rest of the request lifecycle
             cache: 'force-cache',
           },
         },
-        { // Fallback for all other requests. Keep this last.
+        {
+          // Fallback for all other requests. Keep this last.
           condition: () => true,
           context: {},
         },
       ],
     }),
   ],
-  fetch: (url, init, { context }) => globalThis.fetch(url, {
-    ...init,
-    cache: context?.cache,
-  }),
+  fetch: (url, init, { context }) =>
+    globalThis.fetch(url, {
+      ...init,
+      cache: context?.cache,
+    }),
 })
 ```
 
@@ -238,26 +269,17 @@ const link = new RPCLink({
 Per-request data passed through the link's [`headers` option](/docs/rpc/link#url-and-header-options) is resolved for each request, so it is safe without `scope`.
 :::
 
-## Limitations
+## Request Headers
 
-Cookies set in a batched call are never stored, because the browser only reads headers from the batch response itself, not from each subresponse. Send procedures that set cookies outside the batch:
+Headers shared by every request in a batch are sent on the batch request. Other headers stay on each subrequest.
 
-```ts
-const link = new RPCLink({
-  url: '/rpc',
-  plugins: [
-    new BatchLinkPlugin({
-      filter: ({ path }) => path[0] !== 'auth', // auth procedures set cookies
-      groups: [
-        {
-          condition: () => true,
-          context: {},
-        },
-      ],
-    }),
-  ],
-})
-```
+A `GET` batch puts only the headers listed in `allowedUrlHeaders` in its URL, by default `traceparent` and `tracestate`. After `mapSubrequest`, `GET` requests with other headers are batched only with requests that have the same headers, once the `headers` option moves them to the batch request. The rest are sent individually.
+
+Requests sent individually skip the `headers` and `mapSubrequest` options.
+
+## Response Headers
+
+In `buffered` mode, the batch response carries the cookies and `Vary` fields of its subresponses, and the headers they all share. In `streaming` mode, it carries only the cookies of the first subresponse to respond. Other headers stay on their subresponse. To change what stays on each subresponse, set the server plugin's `mapSubresponse` option.
 
 ## Learn More
 

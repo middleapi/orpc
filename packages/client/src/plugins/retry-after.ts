@@ -1,62 +1,78 @@
 import type { Value } from '@orpc/shared'
+import { isAsyncIteratorObject, sleep, toArray, value } from '@orpc/shared'
 import type { StandardLazyResponse } from '@standard-server/core'
-import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
-import type { ClientContext } from '../types'
-import { sleep, toArray, value } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
+
+import type {
+  StandardLinkOptions,
+  StandardLinkPlugin,
+  StandardLinkTransportInterceptor,
+  StandardLinkTransportInterceptorOptions,
+} from '../adapters/standard/index'
 import { COMMON_ERROR_STATUS_MAP } from '../error'
+import type { ClientContext } from '../types'
 
 export interface RetryAfterLinkPluginOptions<T extends ClientContext> {
   /**
-   * Override condition to determine whether to retry or not.
+   * Determine whether to retry a response.
    *
    * @default ((response) => response.status === 429 || response.status === 503)
    */
-  condition?: Value<boolean, [
-    response: StandardLazyResponse,
-    options: StandardLinkTransportInterceptorOptions<T>,
-  ]>
+  shouldRetry?:
+    | Value<
+        boolean,
+        [response: StandardLazyResponse, options: StandardLinkTransportInterceptorOptions<T>]
+      >
+    | undefined
 
   /**
-   * Maximum attempts before giving up retries.
+   * Maximum number of attempts in total, before returning the response as-is.
+   * The first request is counted: `3` allows up to 2 retries, and `1` disables retries.
    *
    * @default 3
    */
-  maxAttempts?: Value<number, [
-    response: StandardLazyResponse,
-    options: StandardLinkTransportInterceptorOptions<T>,
-  ]>
+  maxAttempts?:
+    | Value<
+        number,
+        [response: StandardLazyResponse, options: StandardLinkTransportInterceptorOptions<T>]
+      >
+    | undefined
 
   /**
    * Maximum timeout in milliseconds to wait before giving up retries.
    *
    * @default 5 * 60 * 1000 (5 minutes)
    */
-  timeout?: Value<number, [
-    response: StandardLazyResponse,
-    options: StandardLinkTransportInterceptorOptions<T>,
-  ]>
+  timeout?:
+    | Value<
+        number,
+        [response: StandardLazyResponse, options: StandardLinkTransportInterceptorOptions<T>]
+      >
+    | undefined
 }
 
 /**
  * The Retry After Link Plugin automatically retries requests based on server `retry-after` header.
  * This is particularly useful for handling rate limiting and temporary server unavailability.
  *
+ * @remarks
+ * **Note**: Requests with a stream or async iterator body are never retried, since the body cannot be resent.
+ *
  * @see {@link https://orpc.dev/docs/plugins/retry-after | Retry After Plugin}
  */
 export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLinkPlugin<T> {
-  private readonly condition: Exclude<RetryAfterLinkPluginOptions<T>['condition'], undefined>
+  private readonly shouldRetry: Exclude<RetryAfterLinkPluginOptions<T>['shouldRetry'], undefined>
   private readonly maxAttempts: Exclude<RetryAfterLinkPluginOptions<T>['maxAttempts'], undefined>
   private readonly timeout: Exclude<RetryAfterLinkPluginOptions<T>['timeout'], undefined>
 
-  name = '~retry-after'
+  readonly name = '~retry-after'
 
   constructor(options: RetryAfterLinkPluginOptions<T> = {}) {
-    this.condition = options.condition ?? (
-      response =>
-        response.status === COMMON_ERROR_STATUS_MAP.TOO_MANY_REQUESTS
-        || response.status === COMMON_ERROR_STATUS_MAP.SERVICE_UNAVAILABLE
-    )
+    this.shouldRetry =
+      options.shouldRetry ??
+      ((response) =>
+        response.status === COMMON_ERROR_STATUS_MAP.TOO_MANY_REQUESTS ||
+        response.status === COMMON_ERROR_STATUS_MAP.SERVICE_UNAVAILABLE)
 
     this.maxAttempts = options.maxAttempts ?? 3
     this.timeout = options.timeout ?? 5 * 60 * 1000 // 5 minutes
@@ -64,6 +80,16 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
 
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
     const interceptor: StandardLinkTransportInterceptor<T> = async (interceptorOptions) => {
+      const { body } = interceptorOptions.request
+
+      /**
+       * A stream or iterator body is consumed by the first attempt and cannot be resent,
+       * so return its response as-is instead of retrying with an empty or locked body.
+       */
+      if (body instanceof ReadableStream || isAsyncIteratorObject(body)) {
+        return interceptorOptions.next()
+      }
+
       const startTime = Date.now()
       let attemptCount = 0
 
@@ -72,7 +98,7 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
 
         const response = await interceptorOptions.next()
 
-        if (!value(this.condition, response, interceptorOptions)) {
+        if (!value(this.shouldRetry, response, interceptorOptions)) {
           return response
         }
 
@@ -94,8 +120,7 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
 
         try {
           await sleep(retryAfterMs, { signal: interceptorOptions.signal })
-        }
-        catch {
+        } catch {
           // can throw if the signal is aborted while sleeping
         }
 
@@ -105,7 +130,10 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
       }
     }
 
-    return { ...options, transportInterceptors: [interceptor, ...toArray(options.transportInterceptors)] }
+    return {
+      ...options,
+      transportInterceptors: [interceptor, ...toArray(options.transportInterceptors)],
+    }
   }
 }
 

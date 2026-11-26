@@ -1,6 +1,6 @@
 ---
-title: "Procedure"
-description: "Learn how oRPC procedures combine input and output validation, middleware, metadata, and typesafe errors through a composable builder."
+title: 'Procedure'
+description: 'Learn how oRPC procedures combine input and output validation, middleware, metadata, and typesafe errors through a composable builder.'
 ---
 
 ## Overview
@@ -11,20 +11,17 @@ import type { AnyMetaPlugin } from '@orpc/server'
 
 declare const someMeta: AnyMetaPlugin
 
-const requireAuth = os
-  .middleware(({ context, next }) => {
-    return next({
-      context: {
-        user: { id: 1 }
-      }
-    })
+const requireAuth = os.middleware(({ context, next }) => {
+  return next({
+    context: {
+      user: { id: 1 },
+    },
   })
+})
 
-const canEdit = os
-  .$context<{ user: { id: number } }>()
-  .middleware(async ({ next }, id: number) => {
-    return next()
-  })
+const canEdit = os.$context<{ user: { id: number } }>().middleware(async ({ next }, id: number) => {
+  return next()
+})
 // ---cut---
 import { os } from '@orpc/server'
 
@@ -34,9 +31,10 @@ const example = os
   .errors({ NOT_FOUND: {} }) // <- define errors
   .use(requireAuth) // <- apply middleware
   .input(z.object({ id: z.number(), name: z.string() })) // <- input validation
-  .use(canEdit.adaptInput(input => input.id)) // <- middleware with typed input
+  .use(canEdit.adaptInput((input) => input.id)) // <- middleware with typed input
   .output(z.object({ id: z.number(), name: z.string() })) // <- output validation
-  .handler(async ({ input, context, errors }) => { // <- handler logic
+  .handler(async ({ input, context, errors }) => {
+    // <- handler logic
     return { id: 1, name: 'example' }
   })
 ```
@@ -73,8 +71,7 @@ By specifying `.output` or the handler's return type, TypeScript can infer the o
 Each `.input` object schema validates the original input with the earlier results applied, then the results are merged. This lets you extend a base procedure without repeating its fields. Fields no schema defines are dropped before the handler runs. [Middleware](/docs/middleware) between schemas receives the fields validated so far plus the raw rest of the input, so whole-input middleware like caching works anywhere in the chain.
 
 ```ts
-const base = os
-  .input(z.object({ params: z.object({ id: z.string() }) }))
+const base = os.input(z.object({ params: z.object({ id: z.string() }) }))
 
 const example = base
   .input(z.object({ params: z.object({ slug: z.string() }) }))
@@ -131,7 +128,9 @@ const aMiddleware = os.middleware(async ({ context, next }) => next())
 const example = os
   .use(aMiddleware) // Apply middleware
   .use(async ({ context, next }) => next()) // Inline middleware
-  .handler(async ({ context }) => { /* logic */ })
+  .handler(async ({ context }) => {
+    /* logic */
+  })
 ```
 
 :::warning
@@ -152,8 +151,10 @@ const canEdit = os.middleware(async ({ next }, id: string) => {
 
 const example = os
   .input(z.object({ id: z.string(), name: z.string() }))
-  .use(canEdit.adaptInput(input => input.id)) // Adapt input to match middleware's expected shape
-  .handler(async ({ context }) => { /* logic */ })
+  .use(canEdit.adaptInput((input) => input.id)) // Adapt input to match middleware's expected shape
+  .handler(async ({ context }) => {
+    /* logic */
+  })
 ```
 
 :::
@@ -166,11 +167,13 @@ Each modification to a builder creates a completely new instance, avoiding refer
 const pub = os.use(logMiddleware) // Base setup for procedures that publish
 const authed = pub.use(requireAuth) // Extends 'pub' with authentication
 
-const pubExample = pub
-  .handler(async ({ context }) => { /* logic */ })
+const pubExample = pub.handler(async ({ context }) => {
+  /* logic */
+})
 
-const authedExample = authed
-  .handler(async ({ context }) => { /* logic */ })
+const authedExample = authed.handler(async ({ context }) => {
+  /* logic */
+})
 ```
 
 This pattern helps prevent duplication while maintaining flexibility.

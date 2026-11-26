@@ -30,7 +30,7 @@ export function promiseWithResolvers<T>(): {
  */
 export function captureAsyncContext(): <T>(callback: () => Promise<T>) => Promise<T> {
   const { promise, resolve } = promiseWithResolvers<() => Promise<unknown>>()
-  const result = promise.then(callback => callback())
+  const result = promise.then((callback) => callback())
   let called = false
 
   return (callback) => {

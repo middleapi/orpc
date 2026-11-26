@@ -1,8 +1,9 @@
 import type { MaybeOptionalOptions, PartialDeep } from '@orpc/shared'
-import type { OperationKeyPrefixOptions } from './key'
-import type { Matcher, MatcherOptions, MatcherStrategy } from './types'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
+
+import type { OperationKeyPrefixOptions } from './key'
 import { generateOperationKey } from './key'
+import type { Matcher, MatcherOptions, MatcherStrategy } from './types'
 import { isSubsetOf } from './utils'
 
 export class SharedUtils<TInput> {
@@ -21,7 +22,10 @@ export class SharedUtils<TInput> {
   ): Matcher {
     const { input, strategy = 'partial' } = resolveMaybeOptionalOptions(rest)
 
-    const expectedKey = generateOperationKey(this.path, { prefix: this.options.prefix, input: input as PartialDeep<TInput> })
+    const expectedKey = generateOperationKey(this.path, {
+      prefix: this.options.prefix,
+      input: input as PartialDeep<TInput>,
+    })
 
     return (key) => {
       if (!isSubsetOf(expectedKey, key)) {

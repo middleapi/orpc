@@ -1,6 +1,13 @@
 import { context, propagation, SpanStatusCode, trace } from '@opentelemetry/api'
-import { InMemorySpanExporter, NodeTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node'
+import {
+  InMemorySpanExporter,
+  NodeTracerProvider,
+  SimpleSpanProcessor,
+} from '@opentelemetry/sdk-trace-node'
+import type { TracingHeaders } from '@orpc/shared'
+
 import { OpenTelemetrySpan, OpenTelemetryTracer } from './tracer'
+import type { OpenTelemetryTracerOptions } from './tracer'
 
 const exporter = new InMemorySpanExporter()
 const provider = new NodeTracerProvider({
@@ -24,17 +31,16 @@ afterAll(async () => {
   propagation.disable()
 })
 
-function createTracer(options: { propagation?: boolean } = {}) {
-  return new OpenTelemetryTracer({
-    tracer: () => trace.getTracer('test'),
-    trace,
-    context,
-    propagation: options.propagation === false ? undefined : propagation,
-  })
+function createTracer(options: Omit<OpenTelemetryTracerOptions, 'tracer'> = {}) {
+  return new OpenTelemetryTracer({ tracer: () => trace.getTracer('test'), ...options })
+}
+
+function activeBaggageUser() {
+  return propagation.getActiveBaggage()?.getEntry('user')?.value
 }
 
 function finishedSpan(name: string) {
-  const span = exporter.getFinishedSpans().find(span => span.name === name)
+  const span = exporter.getFinishedSpans().find((span) => span.name === name)
   expect(span).toBeDefined()
   return span!
 }
@@ -61,7 +67,7 @@ describe('openTelemetryTracer', () => {
 
     const span = finishedSpan('renamed')
     expect(span.attributes).toEqual({ key: 'value', list: ['a', 'b'] })
-    expect(span.events.map(event => event.name)).toEqual(['event'])
+    expect(span.events.map((event) => event.name)).toEqual(['event'])
   })
 
   it('parents active spans on the parent option', async () => {
@@ -129,11 +135,14 @@ describe('openTelemetryTracer', () => {
     const tracer = createTracer()
 
     const failed = tracer.startSpan('failed')
-    failed.recordException('error', { name: 'Error', message: 'boom', stack: 'stack', code: 'CODE' })
+    failed.recordException(
+      'error',
+      Object.assign(new Error('boom'), { stack: 'stack', code: 'CODE' }),
+    )
     failed.end()
 
     const aborted = tracer.startSpan('aborted')
-    aborted.recordException('info', { name: 'AbortError', message: 'aborted' })
+    aborted.recordException('info', Object.assign(new Error('aborted'), { name: 'AbortError' }))
     aborted.end()
 
     const failedSpan = finishedSpan('failed')
@@ -150,10 +159,43 @@ describe('openTelemetryTracer', () => {
     expect(abortedSpan.events[0]?.name).toBe('exception')
   })
 
+  it('records numeric codes and values that are not errors', () => {
+    const tracer = createTracer()
+
+    const coded = tracer.startSpan('coded')
+    coded.recordException('error', Object.assign(new Error('boom'), { code: 123 }))
+    coded.end()
+
+    const thrown = tracer.startSpan('thrown')
+    thrown.recordException('error', 123)
+    thrown.end()
+
+    expect(finishedSpan('coded').events[0]?.attributes).toMatchObject({
+      'exception.type': '123',
+      'exception.message': 'boom',
+    })
+
+    const thrownSpan = finishedSpan('thrown')
+    expect(thrownSpan.status).toEqual({ code: SpanStatusCode.ERROR, message: '123' })
+    expect(thrownSpan.events[0]?.attributes).toEqual({ 'exception.message': '123' })
+  })
+
+  it('records the string form of an error OpenTelemetry fails to read', () => {
+    const tracer = createTracer()
+
+    const span = tracer.startSpan('unreadable')
+    span.recordException('error', Object.assign(new Error('boom'), { code: Object.create(null) }))
+    span.end()
+
+    const unreadableSpan = finishedSpan('unreadable')
+    expect(unreadableSpan.status).toEqual({ code: SpanStatusCode.ERROR, message: 'boom' })
+    expect(unreadableSpan.events[0]?.attributes).toEqual({ 'exception.message': 'Error: boom' })
+  })
+
   it('injects the trace context of a span into headers', () => {
     const tracer = createTracer()
     const span = tracer.startSpan('span') as OpenTelemetrySpan
-    const headers: Record<string, string | string[] | undefined> = { existing: 'header' }
+    const headers: TracingHeaders = { existing: 'header' }
 
     tracer.inject!(span, headers)
     span.end()
@@ -180,13 +222,193 @@ describe('openTelemetryTracer', () => {
     expect(child.parentSpanContext?.spanId).toBe('00f067aa0ba902b7')
   })
 
+  it('keeps the baggage of the extracted context visible in the handler and re-injects it', async () => {
+    const tracer = createTracer()
+    const parent = tracer.extract!({
+      traceparent: '00-4bf92f3577b34da6a2ce929d0e0e4736-00f067aa0ba902b7-01',
+      baggage: 'user=alice',
+    })
+
+    const headers: TracingHeaders = {}
+
+    await tracer.startActiveSpan('handler', parent, async (span) => {
+      expect(activeBaggageUser()).toBe('alice')
+
+      const client = tracer.startSpan('client')
+      tracer.inject!(client, headers)
+      client.end()
+
+      span.end()
+    })
+
+    const client = finishedSpan('client')
+    expect(headers).toEqual({
+      traceparent: `00-4bf92f3577b34da6a2ce929d0e0e4736-${client.spanContext().spanId}-01`,
+      baggage: 'user=alice',
+    })
+    expect(finishedSpan('handler').parentSpanContext?.spanId).toBe('00f067aa0ba902b7')
+  })
+
+  it('keeps baggage of headers without trace context and starts a new trace', async () => {
+    const tracer = createTracer()
+    const parent = tracer.extract!({ baggage: 'user=alice' })
+
+    const headers: TracingHeaders = {}
+
+    await tracer.startActiveSpan('handler', parent, async (span) => {
+      expect(activeBaggageUser()).toBe('alice')
+      tracer.inject!(span, headers)
+      span.end()
+    })
+
+    expect(trace.getSpan((parent as OpenTelemetrySpan).context)).toBeUndefined()
+
+    const handler = finishedSpan('handler')
+    expect(handler.parentSpanContext).toBeUndefined()
+    expect(headers).toEqual({
+      traceparent: `00-${handler.spanContext().traceId}-${handler.spanContext().spanId}-01`,
+      baggage: 'user=alice',
+    })
+  })
+
+  it('keeps the baggage of a span activated after its scope ended, e.g. while a stream is consumed', async () => {
+    const tracer = createTracer()
+    const parent = tracer.extract!({ baggage: 'user=alice' })
+
+    // Like the server handler: the span outlives `startActiveSpan` and is re-activated per stream pull
+    const handler = await tracer.startActiveSpan('handler', parent, async (span) => span)
+
+    expect(propagation.getActiveBaggage()).toBeUndefined()
+
+    const headers: TracingHeaders = {}
+
+    await tracer.withActiveSpan(handler, async () => {
+      expect(activeBaggageUser()).toBe('alice')
+      expect(trace.getActiveSpan()).toBe((handler as OpenTelemetrySpan).span)
+
+      const child = tracer.startSpan('child')
+      tracer.inject!(child, headers)
+
+      await tracer.withActiveSpan(child, () => {
+        expect(activeBaggageUser()).toBe('alice')
+      })
+
+      child.end()
+    })
+
+    handler.end()
+
+    expect(finishedSpan('child').parentSpanContext?.spanId).toBe(
+      finishedSpan('handler').spanContext().spanId,
+    )
+    expect(headers.baggage).toBe('user=alice')
+  })
+
+  it('keeps the baggage of an explicit parent for spans used outside its scope', async () => {
+    const tracer = createTracer()
+    const child = tracer.startSpan('child', tracer.extract!({ baggage: 'user=alice' }))
+    const headers: TracingHeaders = {}
+
+    tracer.inject!(child, headers)
+    await tracer.withActiveSpan(child, () => {
+      expect(activeBaggageUser()).toBe('alice')
+    })
+    child.end()
+
+    expect(headers.baggage).toBe('user=alice')
+  })
+
+  it('uses the active span as parent for baggage-only headers', async () => {
+    const tracer = createTracer()
+
+    await tracer.startActiveSpan('http', undefined, async (http) => {
+      const parent = tracer.extract!({ baggage: 'user=alice' }) as OpenTelemetrySpan
+      expect(parent.span).toBe((http as OpenTelemetrySpan).span)
+
+      await tracer.startActiveSpan('handler', parent, async (span) => {
+        expect(activeBaggageUser()).toBe('alice')
+        span.end()
+      })
+
+      http.end()
+    })
+
+    expect(finishedSpan('handler').parentSpanContext?.spanId).toBe(
+      finishedSpan('http').spanContext().spanId,
+    )
+  })
+
+  it('injects the baggage of the context the active span was read in', async () => {
+    const tracer = createTracer()
+    const headers: TracingHeaders = {}
+    const baggage = propagation.createBaggage({ user: { value: 'alice' } })
+
+    await tracer.startActiveSpan('active', undefined, async (span) => {
+      await context.with(propagation.setBaggage(context.active(), baggage), async () => {
+        tracer.inject!(tracer.getActiveSpan()!, headers)
+      })
+      span.end()
+    })
+
+    expect(headers.baggage).toBe('user=alice')
+  })
+
+  it('keeps baggage already in the active context when extracting, and lets it win on conflict', async () => {
+    const tracer = createTracer()
+    const baggage = propagation.createBaggage({
+      tenant: { value: 't1' },
+      user: { value: 'server' },
+    })
+
+    const parent = context.with(propagation.setBaggage(context.active(), baggage), () =>
+      tracer.extract!({ baggage: 'user=alice,region=eu' }),
+    )
+
+    await tracer.withActiveSpan(parent!, () => {
+      const entries = Object.fromEntries(
+        propagation
+          .getActiveBaggage()!
+          .getAllEntries()
+          .map(([key, entry]) => [key, entry.value]),
+      )
+      expect(entries).toEqual({ tenant: 't1', user: 'server', region: 'eu' })
+    })
+  })
+
+  it('falls back to the active context for spans of another tracer', async () => {
+    const tracer = createTracer()
+    const foreign = {
+      setAttribute() {},
+      updateName() {},
+      addEvent() {},
+      recordException() {},
+      end() {},
+    }
+    const headers: TracingHeaders = {}
+
+    await tracer.startActiveSpan('outer', undefined, async (outer) => {
+      tracer.startSpan('child', foreign).end()
+      tracer.inject!(foreign, headers)
+      expect(await tracer.withActiveSpan(foreign, () => 'out')).toBe('out')
+      outer.end()
+    })
+
+    const outer = finishedSpan('outer')
+    expect(finishedSpan('child').parentSpanContext?.spanId).toBe(outer.spanContext().spanId)
+    expect(headers.traceparent).toBe(
+      `00-${outer.spanContext().traceId}-${outer.spanContext().spanId}-01`,
+    )
+  })
+
   it('falls back to the active span when headers carry no trace context', async () => {
     const tracer = createTracer()
 
     expect(tracer.extract!({})).toBeUndefined()
 
     await tracer.startActiveSpan('outer', undefined, async (outer) => {
-      expect((tracer.extract!({}) as OpenTelemetrySpan).span).toBe((outer as OpenTelemetrySpan).span)
+      expect((tracer.extract!({}) as OpenTelemetrySpan).span).toBe(
+        (outer as OpenTelemetrySpan).span,
+      )
       outer.end()
     })
   })
@@ -194,6 +416,24 @@ describe('openTelemetryTracer', () => {
   it('has no propagation methods when propagation is disabled', () => {
     const tracer = createTracer({ propagation: false })
     expect(tracer.inject).toBeUndefined()
+    expect(tracer.extract).toBeUndefined()
+  })
+
+  it('has propagation methods when propagation is an empty object', () => {
+    const tracer = createTracer({ propagation: {} })
+    expect(tracer.inject).toBeTypeOf('function')
+    expect(tracer.extract).toBeTypeOf('function')
+  })
+
+  it('has no inject method when inject is disabled', () => {
+    const tracer = createTracer({ propagation: { inject: false } })
+    expect(tracer.inject).toBeUndefined()
+    expect(tracer.extract).toBeTypeOf('function')
+  })
+
+  it('has no extract method when extract is disabled', () => {
+    const tracer = createTracer({ propagation: { extract: false } })
+    expect(tracer.inject).toBeTypeOf('function')
     expect(tracer.extract).toBeUndefined()
   })
 })

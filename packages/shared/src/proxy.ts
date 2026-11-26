@@ -1,5 +1,6 @@
-import type { Value } from './value'
 import { getOrBind } from '@standard-server/shared'
+
+import type { Value } from './value'
 import { value } from './value'
 
 /**

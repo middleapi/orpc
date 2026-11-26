@@ -1,19 +1,30 @@
-import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { AddressInfo } from 'node:net'
-import type { StaticFileHandlerPluginOptions } from './static-file-handler-plugin'
 import { Buffer } from 'node:buffer'
-import { mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import {
+  appendFileSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createServer, request as httpRequest } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 import { brotliCompressSync, gzipSync } from 'node:zlib'
+
 import { os } from '@orpc/server'
 import { RPCHandler as FetchRPCHandler } from '@orpc/server/fetch'
 import { RPCHandler } from '@orpc/server/node'
 import { ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
 import * as sharedModule from '@orpc/shared'
 import request from 'supertest'
+
+import type { StaticFileHandlerPluginOptions } from './static-file-handler-plugin'
 import { StaticFileHandlerPlugin } from './static-file-handler-plugin'
 
 describe('staticFileHandlerPlugin', () => {
@@ -63,7 +74,7 @@ describe('staticFileHandlerPlugin', () => {
     rmSync(baseDir, { recursive: true, force: true })
   })
 
-  function createAgent(handler: RPCHandler<Record<never, never>>, options: { prefix?: `/${string}` } = {}) {
+  function createAgent(handler: RPCHandler<{}>, options: { prefix?: `/${string}` } = {}) {
     return request(async (req: IncomingMessage, response: ServerResponse) => {
       const result = await handler.handle(req as any, response as any, { context: {}, ...options })
 
@@ -74,23 +85,32 @@ describe('staticFileHandlerPlugin', () => {
     })
   }
 
-  function createStaticAgent(pluginOptions: Partial<StaticFileHandlerPluginOptions> = {}, handleOptions: { prefix?: `/${string}` } = {}) {
-    const handler = new RPCHandler({}, {
-      plugins: [new StaticFileHandlerPlugin({ rootDir, ...pluginOptions })],
-    })
+  function createStaticAgent(
+    pluginOptions: Partial<StaticFileHandlerPluginOptions> = {},
+    handleOptions: { prefix?: `/${string}` } = {},
+  ) {
+    const handler = new RPCHandler(
+      {},
+      {
+        plugins: [new StaticFileHandlerPlugin({ rootDir, ...pluginOptions })],
+      },
+    )
 
     return createAgent(handler, handleOptions)
   }
 
   /**
    * supertest and fetch both normalize the request target with the WHATWG url parser,
-   * which resolves dot segments and collapses leading slashes before the server sees them.
-   * These attacks only reach the plugin through a client that sends the target verbatim.
+   * which resolves dot segments before the server sees them. Dot segments only reach
+   * the plugin through a client that sends the target verbatim.
    */
   async function createRawClient(pluginOptions: Partial<StaticFileHandlerPluginOptions> = {}) {
-    const handler = new RPCHandler({}, {
-      plugins: [new StaticFileHandlerPlugin({ rootDir, ...pluginOptions })],
-    })
+    const handler = new RPCHandler(
+      {},
+      {
+        plugins: [new StaticFileHandlerPlugin({ rootDir, ...pluginOptions })],
+      },
+    )
 
     const server = createServer(async (req, res) => {
       const result = await handler.handle(req, res, { context: {} })
@@ -101,23 +121,24 @@ describe('staticFileHandlerPlugin', () => {
       }
     })
 
-    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     const { port } = server.address() as AddressInfo
 
     return {
       close: () => {
         server.close()
       },
-      get: (target: string) => new Promise<{ status: number | undefined, location: string | undefined, body: string }>((resolve, reject) => {
-        const req = httpRequest({ host: '127.0.0.1', port, path: target }, (res) => {
-          let body = ''
-          res.setEncoding('utf8')
-          res.on('data', chunk => body += chunk)
-          res.on('end', () => resolve({ status: res.statusCode, location: res.headers.location, body }))
-        })
-        req.on('error', reject)
-        req.end()
-      }),
+      get: (target: string) =>
+        new Promise<{ status: number | undefined; body: string }>((resolve, reject) => {
+          const req = httpRequest({ host: '127.0.0.1', port, path: target }, (res) => {
+            let body = ''
+            res.setEncoding('utf8')
+            res.on('data', (chunk) => (body += chunk))
+            res.on('end', () => resolve({ status: res.statusCode, body }))
+          })
+          req.on('error', reject)
+          req.end()
+        }),
     }
   }
 
@@ -131,7 +152,9 @@ describe('staticFileHandlerPlugin', () => {
     expect(res.headers['cache-control']).toBe('public, max-age=0')
     expect(res.headers['accept-ranges']).toBe('bytes')
     expect(res.headers.etag).toMatch(/^"[0-9a-f]+-[0-9a-f]+"$/)
-    expect(res.headers['last-modified']).toBe(statSync(path.join(rootDir, 'hello.txt')).mtime.toUTCString())
+    expect(res.headers['last-modified']).toBe(
+      statSync(path.join(rootDir, 'hello.txt')).mtime.toUTCString(),
+    )
     // Guards against a Blob body, which would make the adapter attach a content-disposition
     expect(res.headers['content-disposition']).toBeUndefined()
   })
@@ -221,16 +244,21 @@ describe('staticFileHandlerPlugin', () => {
   })
 
   it('prefers matched procedures over files', async () => {
-    const handler = new RPCHandler({
-      ping: os.handler(() => 'pong'),
-    }, {
-      allowMethods: ['GET'],
-      plugins: [new StaticFileHandlerPlugin({ rootDir })],
-    })
+    const handler = new RPCHandler(
+      {
+        ping: os.handler(() => 'pong'),
+      },
+      {
+        allowMethods: ['GET'],
+        plugins: [new StaticFileHandlerPlugin({ rootDir })],
+      },
+    )
 
     writeFileSync(path.join(rootDir, 'ping'), 'file content')
 
-    const res = await createAgent(handler).get(`/ping?data=${encodeURIComponent(JSON.stringify({ json: null }))}`)
+    const res = await createAgent(handler).get(
+      `/ping?data=${encodeURIComponent(JSON.stringify({ json: null }))}`,
+    )
 
     expect(res.status).toBe(200)
     expect(res.text).toContain('pong')
@@ -291,7 +319,9 @@ describe('staticFileHandlerPlugin', () => {
     })
 
     it('responds 304 when not modified since if-modified-since', async () => {
-      const res = await createStaticAgent().get('/hello.txt').set('if-modified-since', helloLastModified)
+      const res = await createStaticAgent()
+        .get('/hello.txt')
+        .set('if-modified-since', helloLastModified)
 
       expect(res.status).toBe(304)
     })
@@ -304,32 +334,19 @@ describe('staticFileHandlerPlugin', () => {
     })
 
     it('if-none-match takes precedence over if-modified-since', async () => {
-      const res = await createStaticAgent().get('/hello.txt').set('if-none-match', '"different"').set('if-modified-since', helloLastModified)
+      const res = await createStaticAgent()
+        .get('/hello.txt')
+        .set('if-none-match', '"different"')
+        .set('if-modified-since', helloLastModified)
 
       expect(res.status).toBe(200)
     })
 
-    it('responds 412 when if-match or if-unmodified-since fails', async () => {
-      const agent = createStaticAgent()
-
-      expect((await agent.get('/hello.txt').set('if-match', '"nope"')).status).toBe(412)
-      expect((await agent.get('/hello.txt').set('if-match', helloEtag)).status).toBe(200)
-      expect((await agent.get('/hello.txt').set('if-match', '*')).status).toBe(200)
-      expect((await agent.get('/hello.txt').set('if-match', `"other", ${helloEtag}`)).status).toBe(200)
-
-      const past = new Date(Date.now() - 100_000_000).toUTCString()
-      expect((await agent.get('/hello.txt').set('if-unmodified-since', past)).status).toBe(412)
-
-      const future = new Date(Date.now() + 100_000).toUTCString()
-      expect((await agent.get('/hello.txt').set('if-unmodified-since', future)).status).toBe(200)
-
-      // An unparsable date and an empty list are malformed, so both are ignored
-      expect((await agent.get('/hello.txt').set('if-unmodified-since', 'not a date')).status).toBe(200)
-      expect((await agent.get('/hello.txt').set('if-match', '  ')).status).toBe(200)
-    })
-
     it('revalidates to 304 even when the client sends cache-control no-cache, like fetch does', async () => {
-      const res = await createStaticAgent().get('/hello.txt').set('if-none-match', helloEtag).set('cache-control', 'no-cache')
+      const res = await createStaticAgent()
+        .get('/hello.txt')
+        .set('if-none-match', helloEtag)
+        .set('cache-control', 'no-cache')
 
       expect(res.status).toBe(304)
     })
@@ -389,14 +406,20 @@ describe('staticFileHandlerPlugin', () => {
     })
 
     it('ignores the range when if-range does not match', async () => {
-      const res = await createStaticAgent().get('/data.bin').set('range', 'bytes=0-3').set('if-range', new Date(Date.now() - 100_000_000).toUTCString())
+      const res = await createStaticAgent()
+        .get('/data.bin')
+        .set('range', 'bytes=0-3')
+        .set('if-range', new Date(Date.now() - 100_000_000).toUTCString())
 
       expect(res.status).toBe(200)
       expect(res.headers['content-length']).toBe('10')
     })
 
     it('applies the range when if-range matches the last modified date', async () => {
-      const res = await createStaticAgent().get('/data.bin').set('range', 'bytes=0-3').set('if-range', statSync(path.join(rootDir, 'data.bin')).mtime.toUTCString())
+      const res = await createStaticAgent()
+        .get('/data.bin')
+        .set('range', 'bytes=0-3')
+        .set('if-range', statSync(path.join(rootDir, 'data.bin')).mtime.toUTCString())
 
       expect(res.status).toBe(206)
     })
@@ -409,13 +432,36 @@ describe('staticFileHandlerPlugin', () => {
       expect(matching.status).toBe(206)
       expect(matching.headers['content-range']).toBe('bytes 0-3/10')
 
-      const mismatching = await agent.get('/data.bin').set('range', 'bytes=0-3').set('if-range', '"other"')
+      const mismatching = await agent
+        .get('/data.bin')
+        .set('range', 'bytes=0-3')
+        .set('if-range', '"other"')
       expect(mismatching.status).toBe(200)
       expect(mismatching.headers['content-length']).toBe('10')
 
       // A weak tag can never satisfy the strong comparison if-range requires
-      const weak = await agent.get('/data.bin').set('range', 'bytes=0-3').set('if-range', `W/${etag}`)
+      const weak = await agent
+        .get('/data.bin')
+        .set('range', 'bytes=0-3')
+        .set('if-range', `W/${etag}`)
       expect(weak.status).toBe(200)
+    })
+
+    it('never parses an entity tag in if-range as a date', async ({ onTestFinished }) => {
+      // The lenient date parser reads this tag as a date, so the file gets exactly that mtime
+      const tag = '"1-2"'
+      const date = new Date(Date.parse(tag))
+      const filePath = path.join(rootDir, 'tag-date.bin')
+      writeFileSync(filePath, '0123456789')
+      utimesSync(filePath, date, date)
+      onTestFinished(() => rmSync(filePath, { force: true }))
+
+      const res = await createStaticAgent()
+        .get('/tag-date.bin')
+        .set('range', 'bytes=0-3')
+        .set('if-range', tag)
+      expect(res.status).toBe(200)
+      expect(res.headers['content-length']).toBe('10')
     })
 
     it('responds 416 for a zero length suffix range and for any suffix range on an empty file', async () => {
@@ -458,21 +504,11 @@ describe('staticFileHandlerPlugin', () => {
       expect(res.text).toBe('<h1>nested</h1>')
     })
 
-    it('redirects directories without a trailing slash, preserving the query', async () => {
-      const res = await createStaticAgent().get('/nested?foo=bar')
-
-      expect(res.status).toBe(301)
-      expect(res.headers.location).toBe('/nested/?foo=bar')
-    })
-
-    it('applies the cache policy to the directory redirect', async () => {
+    it('serves the index file of a directory without a trailing slash', async () => {
       const res = await createStaticAgent().get('/nested')
-      expect(res.status).toBe(301)
-      expect(res.headers['cache-control']).toBe('public, max-age=0')
 
-      const disabledRes = await createStaticAgent({ cacheControl: false }).get('/nested')
-      expect(disabledRes.status).toBe(301)
-      expect(disabledRes.headers['cache-control']).toBeUndefined()
+      expect(res.status).toBe(200)
+      expect(res.text).toBe('<h1>nested</h1>')
     })
 
     it('does not serve a file for a url with a trailing slash', async () => {
@@ -486,12 +522,6 @@ describe('staticFileHandlerPlugin', () => {
       expect(fallbackRes.text).toBe('<h1>home</h1>')
     })
 
-    it('falls through instead of redirecting when index files are disabled', async () => {
-      const res = await createStaticAgent({ indexFile: false }).get('/nested')
-
-      expect(res.status).toBe(404)
-    })
-
     it('falls through when the directory has no index file', async () => {
       const res = await createStaticAgent().get('/no-index/')
 
@@ -499,9 +529,11 @@ describe('staticFileHandlerPlugin', () => {
     })
 
     it('supports disabling index files', async () => {
-      const res = await createStaticAgent({ indexFile: false }).get('/nested/')
+      const agent = createStaticAgent({ indexFile: false })
 
-      expect(res.status).toBe(404)
+      for (const url of ['/nested', '/nested/']) {
+        expect((await agent.get(url)).status, url).toBe(404)
+      }
     })
 
     it('supports a custom index file', async () => {
@@ -513,179 +545,176 @@ describe('staticFileHandlerPlugin', () => {
   })
 
   describe('security', () => {
-    it('blocks directory traversal', async () => {
-      const agent = createStaticAgent()
+    // Sent verbatim, since supertest would resolve dot segments itself. secret.txt really exists
+    // one directory above the root, so a 404 here asserts a blocked escape.
+    it.for([false, true])(
+      'blocks directory traversal (dotfiles: %s)',
+      async (dotfiles, { onTestFinished }) => {
+        const client = await createRawClient({ dotfiles })
+        onTestFinished(() => client.close())
 
-      const urls = [
-        '/../secret.txt',
-        '/%2e%2e/secret.txt',
-        '/%2E%2E/secret.txt',
-        '/..%2fsecret.txt',
-        '/%2e%2e%2fsecret.txt',
-        '/%252e%252e/secret.txt',
-        '/..%c0%af/secret.txt',
-        '/nested/%2e%2e/%2e%2e/secret.txt',
-        '/foo%5c..%5cbar.txt',
-        '/foo%2fbar.txt',
-        '/....//secret.txt',
-        '/..;/secret.txt',
-        '/..%00/secret.txt',
-        '/%c0%ae%c0%ae/secret.txt',
-        '/..%5csecret.txt',
-        '/%2e%2e%5csecret.txt',
-        '/..%252fsecret.txt',
-        '/.%2e/secret.txt',
-        '/./../secret.txt',
-      ]
+        const urls = [
+          '/../secret.txt',
+          '/%2e%2e/secret.txt',
+          '/%2E%2E/secret.txt',
+          '/..%2fsecret.txt',
+          '/%2e%2e%2fsecret.txt',
+          '/%252e%252e/secret.txt',
+          '/..%c0%af/secret.txt',
+          '/..%c0%afsecret.txt',
+          '/nested/%2e%2e/%2e%2e/secret.txt',
+          '/nested/../../secret.txt',
+          '/foo%5c..%5cbar.txt',
+          '/foo%2fbar.txt',
+          '/....//secret.txt',
+          '/..;/secret.txt',
+          '/..%00/secret.txt',
+          '/%c0%ae%c0%ae/secret.txt',
+          '/..%5csecret.txt',
+          '/%2e%2e%5csecret.txt',
+          '/..%252fsecret.txt',
+          '/.%2e/secret.txt',
+          '/./../secret.txt',
+        ]
 
-      for (const url of urls) {
-        const res = await agent.get(url)
-        expect(res.status, url).toBe(404)
-        expect(res.text, url).toBe('not matched')
-      }
-    })
+        for (const url of urls) {
+          const res = await client.get(url)
+          expect(res.status, url).toBe(404)
+          expect(res.body, url).toBe('not matched')
+        }
+      },
+    )
 
-    it('blocks directory traversal when dotfiles are enabled', async () => {
-      const agent = createStaticAgent({ dotfiles: true })
+    // Win32 strips trailing dots and spaces, so any segment of only those can mean `..` there.
+    // A refused path falls through before the fallback, while an allowed missing one is answered by it.
+    it.for([false, true])(
+      'refuses segments of only dots and spaces (dotfiles: %s)',
+      async (dotfiles, { onTestFinished }) => {
+        const client = await createRawClient({ dotfiles, fallbackFile: 'hello.txt' })
+        onTestFinished(() => client.close())
 
-      for (const url of ['/../secret.txt', '/..%c0%af/secret.txt', '/..%c0%afsecret.txt', '/..%2fsecret.txt']) {
-        expect((await agent.get(url)).status, url).toBe(404)
-      }
-    })
+        for (const url of [
+          '/..',
+          '/..%20/secret.txt',
+          '/...%20./secret.txt',
+          '/.../secret.txt',
+          '/%20./secret.txt',
+          '/%20../secret.txt',
+          '/%20/secret.txt',
+        ]) {
+          expect((await client.get(url)).status, url).toBe(404)
+        }
 
-    it('resolves dot segments within the root instead of following them', async () => {
-      const agent = createStaticAgent()
+        expect((await client.get('/..a/missing.txt')).status).toBe(dotfiles ? 200 : 404)
+        expect((await client.get('/a%20b/missing.txt')).status).toBe(200)
+      },
+    )
 
-      const inside = await agent.get('/nested/%2e%2e/hello.txt')
-      expect(inside.status).toBe(200)
-      expect(inside.text).toBe('hello world')
-
-      const clamped = await agent.get('/%2e%2e/%2e%2e/%2e%2e/hello.txt')
-      expect(clamped.status).toBe(200)
-      expect(clamped.text).toBe('hello world')
-    })
-
-    it('resolves dot segments sent verbatim by a client that does not normalize them', async ({ onTestFinished }) => {
-      const client = await createRawClient()
-      onTestFinished(() => client.close())
-
-      const inside = await client.get('/nested/../hello.txt')
-      expect(inside.status).toBe(200)
-      expect(inside.body).toBe('hello world')
-
-      // Climbing above the served path is refused rather than clamped, so a proxy in front of
-      // this plugin can never disagree with it about which path was requested
-      const above = await client.get('/../../../hello.txt')
-      expect(above.status).toBe(404)
-      expect(above.body).toBe('not matched')
-
-      // secret.txt really exists one directory above the root, so this asserts a blocked escape
-      const traversed = await client.get('/nested/../../secret.txt')
-      expect(traversed.status).toBe(404)
-      expect(traversed.body).toBe('not matched')
-    })
-
-    it('refuses dot segments that climb above the mounted path', async ({ onTestFinished }) => {
+    it('refuses dot segments instead of resolving them', async ({ onTestFinished }) => {
       const client = await createRawClient({ path: '/assets' })
       onTestFinished(() => client.close())
 
-      const above = await client.get('/assets/../../hello.txt')
-      expect(above.status).toBe(404)
-      expect(above.body).toBe('not matched')
-
-      // Dot segments that stay within the mount are still resolved
-      const inside = await client.get('/assets/nested/../hello.txt')
-      expect(inside.status).toBe(200)
-      expect(inside.body).toBe('hello world')
+      for (const target of [
+        '/assets/nested/../hello.txt',
+        '/assets/nested/%2e%2e/hello.txt',
+        '/assets/nested/..%5chello.txt',
+        '/assets/../../hello.txt',
+        '/assets/nested/../../secret.txt',
+      ]) {
+        const res = await client.get(target)
+        expect(res.status, target).toBe(404)
+        expect(res.body, target).toBe('not matched')
+      }
     })
 
-    it('never redirects to a protocol relative location', async ({ onTestFinished }) => {
-      const client = await createRawClient()
+    it('skips single dot segments sent verbatim', async ({ onTestFinished }) => {
+      const client = await createRawClient({ path: '/assets' })
       onTestFinished(() => client.close())
 
-      // Without rebuilding the location these resolve to http://attacker.example
-      const rootRes = await client.get('//attacker.example/..')
-      expect(rootRes.status).toBe(301)
-      expect(rootRes.location).toBe('/')
-
-      const nestedRes = await client.get('//attacker.example/../nested')
-      expect(nestedRes.status).toBe(301)
-      expect(nestedRes.location).toBe('/nested/')
-    })
-
-    it('never serves index or fallback files that escape the root', async ({ onTestFinished }) => {
-      const siblingDir = `${rootDir}-secret`
-      mkdirSync(siblingDir, { recursive: true })
-      writeFileSync(path.join(siblingDir, 'x.txt'), 'sibling secret')
-      onTestFinished(() => rmSync(siblingDir, { recursive: true, force: true }))
-
-      // The second form would escape if the root prefix lost its trailing separator
-      for (const file of ['../secret.txt', `../${path.basename(siblingDir)}/x.txt`]) {
-        expect((await createStaticAgent({ indexFile: file }).get('/')).status, file).toBe(404)
-        expect((await createStaticAgent({ fallbackFile: file }).get('/missing.txt')).status, file).toBe(404)
+      for (const target of [
+        '/assets/./hello.txt',
+        '/assets/%2e/hello.txt',
+        '/assets/nested/./style.css',
+      ]) {
+        expect((await client.get(target)).status, target).toBe(200)
       }
 
-      // A path that leaves and re-enters the root is still served
-      const inside = await createStaticAgent({ fallbackFile: 'nested/../hello.txt' }).get('/missing.txt')
-      expect(inside.status).toBe(200)
+      // A trailing dot segment denotes a directory like a trailing slash, so a file is not served
+      for (const target of ['/assets/hello.txt/.', '/assets/hello.txt/%2e']) {
+        expect((await client.get(target)).status, target).toBe(404)
+      }
+
+      expect((await client.get('/assets/nested/.')).body).toBe('<h1>nested</h1>')
+    })
+
+    it('follows symbolic links, including ones that leave the root', async ({ onTestFinished }) => {
+      const outsideDir = path.join(baseDir, 'outside-dir')
+      mkdirSync(outsideDir, { recursive: true })
+      writeFileSync(path.join(outsideDir, 'file.txt'), 'outside dir')
+      writeFileSync(path.join(baseDir, 'outside.gz'), gzipSync('outside gzip'))
+      writeFileSync(path.join(rootDir, 'sidecar.txt'), 'identity content')
+      symlinkSync(path.join(baseDir, 'secret.txt'), path.join(rootDir, 'link.txt'))
+      symlinkSync(outsideDir, path.join(rootDir, 'linkdir'))
+      symlinkSync(path.join(baseDir, 'outside.gz'), path.join(rootDir, 'sidecar.txt.gz'))
+      onTestFinished(() => {
+        for (const name of ['link.txt', 'linkdir', 'sidecar.txt', 'sidecar.txt.gz']) {
+          rmSync(path.join(rootDir, name), { force: true })
+        }
+        rmSync(outsideDir, { recursive: true, force: true })
+        rmSync(path.join(baseDir, 'outside.gz'), { force: true })
+      })
+
+      const agent = createStaticAgent({ precompressed: true })
+
+      expect((await agent.get('/link.txt')).text).toBe('outside root')
+      expect((await agent.get('/linkdir/file.txt')).text).toBe('outside dir')
+
+      const sidecarRes = await agent.get('/sidecar.txt').set('accept-encoding', 'gzip')
+      expect(sidecarRes.headers['content-encoding']).toBe('gzip')
+      expect(sidecarRes.text).toBe('outside gzip')
+    })
+
+    it('allows names that merely contain dots', async ({ onTestFinished }) => {
+      writeFileSync(path.join(rootDir, 'a..b.txt'), 'dots')
+      onTestFinished(() => rmSync(path.join(rootDir, 'a..b.txt'), { force: true }))
+
+      const res = await createStaticAgent().get('/a..b.txt')
+      expect(res.status).toBe(200)
+      expect(res.text).toBe('dots')
     })
 
     it('serves configured index and fallback files even when they are dotfiles', async () => {
       expect((await createStaticAgent({ indexFile: '.secret' }).get('/')).status).toBe(200)
-      expect((await createStaticAgent({ fallbackFile: '.secret' }).get('/missing')).status).toBe(200)
+      expect((await createStaticAgent({ fallbackFile: '.secret' }).get('/missing')).status).toBe(
+        200,
+      )
 
       // Request paths are still blocked
-      expect((await createStaticAgent({ fallbackFile: 'index.html' }).get('/.secret')).status).toBe(404)
+      expect((await createStaticAgent({ fallbackFile: 'index.html' }).get('/.secret')).status).toBe(
+        404,
+      )
     })
 
-    it('never follows symlinks that leave the root', async ({ onTestFinished }) => {
-      const outsideDir = path.join(baseDir, 'outside-dir')
-      mkdirSync(outsideDir, { recursive: true })
-      writeFileSync(path.join(outsideDir, 'file.txt'), 'outside dir')
-      symlinkSync(path.join(baseDir, 'secret.txt'), path.join(rootDir, 'link.txt'))
-      symlinkSync(baseDir, path.join(rootDir, 'up'))
-      symlinkSync(outsideDir, path.join(rootDir, 'linkdir'))
-      symlinkSync(path.join(rootDir, '.secret'), path.join(rootDir, 'notdot.txt'))
-      onTestFinished(() => {
-        for (const name of ['link.txt', 'up', 'linkdir', 'notdot.txt']) {
-          rmSync(path.join(rootDir, name), { force: true })
-        }
-        rmSync(outsideDir, { recursive: true, force: true })
-      })
+    it('refuses encoded separators, so a proxy matching the raw path cannot be bypassed', async () => {
+      const agent = createStaticAgent({ dotfiles: true })
 
-      const agent = createStaticAgent()
-
-      for (const url of ['/link.txt', '/up/secret.txt', '/linkdir/file.txt']) {
+      for (const url of ['/nested%2Fstyle.css', '/nested%5Cstyle.css', '/nested%2fstyle.css']) {
         expect((await agent.get(url)).status, url).toBe(404)
       }
-
-      const allowedRes = await createStaticAgent({ allowSymlinks: true }).get('/link.txt')
-      expect(allowedRes.status).toBe(200)
-      expect(allowedRes.text).toBe('outside root')
-
-      // Dotfile hiding is a url policy, so a link inside the root to a dotfile still resolves
-      expect((await agent.get('/notdot.txt')).text).toBe('dotfile')
     })
 
-    it('never serves a precompressed sidecar that leaves the root', async ({ onTestFinished }) => {
-      writeFileSync(path.join(baseDir, 'evil.gz'), gzipSync('outside gzip'))
-      writeFileSync(path.join(rootDir, 'sidecar.txt'), 'identity content')
-      symlinkSync(path.join(baseDir, 'evil.gz'), path.join(rootDir, 'sidecar.txt.gz'))
-      onTestFinished(() => rmSync(path.join(rootDir, 'sidecar.txt.gz'), { force: true }))
+    it('decodes each segment on its own, so one malformed escape does not affect the others', async ({
+      onTestFinished,
+    }) => {
+      mkdirSync(path.join(rootDir, 'caf\u00E9'))
+      writeFileSync(path.join(rootDir, 'caf\u00E9', '50%.txt'), 'percent')
+      onTestFinished(() =>
+        rmSync(path.join(rootDir, 'caf\u00E9'), { recursive: true, force: true }),
+      )
 
-      const res = await createStaticAgent({ precompressed: true }).get('/sidecar.txt').set('accept-encoding', 'gzip')
-
+      const res = await createStaticAgent().get('/caf%C3%A9/50%.txt')
       expect(res.status).toBe(200)
-      expect(res.headers['content-encoding']).toBeUndefined()
-      expect(res.text).toBe('identity content')
-    })
-
-    it('serves files when rootDir itself is a symlink', async ({ onTestFinished }) => {
-      const linkedRoot = path.join(baseDir, 'rootlink')
-      symlinkSync(rootDir, linkedRoot)
-      onTestFinished(() => rmSync(linkedRoot, { force: true }))
-
-      expect((await createStaticAgent({ rootDir: linkedRoot }).get('/hello.txt')).status).toBe(200)
+      expect(res.text).toBe('percent')
     })
 
     it('falls through when rootDir does not exist', async () => {
@@ -713,7 +742,16 @@ describe('staticFileHandlerPlugin', () => {
       // A refused path falls through before the fallback, while an allowed missing one is answered by it
       const agent = createStaticAgent({ fallbackFile: 'hello.txt' })
 
-      for (const url of ['/ENV~1', '/env~1', '/HTACCE~1', '/ENV~1.LOC', '/ENV~1.', '/ENV~1::$DATA', '/GIT~1/config', '/nested/GIT~1/HEAD']) {
+      for (const url of [
+        '/ENV~1',
+        '/env~1',
+        '/HTACCE~1',
+        '/ENV~1.LOC',
+        '/ENV~1.',
+        '/ENV~1::$DATA',
+        '/GIT~1/config',
+        '/nested/GIT~1/HEAD',
+      ]) {
         expect((await agent.get(url)).status, url).toBe(404)
       }
 
@@ -722,7 +760,18 @@ describe('staticFileHandlerPlugin', () => {
         expect((await agent.get(url)).status, url).toBe(200)
       }
 
-      expect((await createStaticAgent({ fallbackFile: 'hello.txt', dotfiles: true }).get('/ENV~1')).status).toBe(200)
+      expect(
+        (await createStaticAgent({ fallbackFile: 'hello.txt', dotfiles: true }).get('/ENV~1'))
+          .status,
+      ).toBe(200)
+    })
+
+    it('hides nested dotfiles and dot directories', async () => {
+      const agent = createStaticAgent({ fallbackFile: 'index.html' })
+
+      for (const url of ['/nested/.secret', '/.git/config', '/nested/%2esecret']) {
+        expect((await agent.get(url)).status, url).toBe(404)
+      }
     })
   })
 
@@ -759,11 +808,11 @@ describe('staticFileHandlerPlugin', () => {
       expect(outsideRes.status).toBe(404)
     })
 
-    it('redirects a mounted directory path without a trailing slash', async () => {
+    it('serves the index file for a mounted path without a trailing slash', async () => {
       const res = await createStaticAgent({ path: '/assets' }).get('/assets')
 
-      expect(res.status).toBe(301)
-      expect(res.headers.location).toBe('/assets/')
+      expect(res.status).toBe(200)
+      expect(res.text).toBe('<h1>home</h1>')
     })
 
     it('normalizes a trailing slash in the path option', async () => {
@@ -773,17 +822,22 @@ describe('staticFileHandlerPlugin', () => {
       expect(res.status).toBe(200)
       expect(res.text).toBe('hello world')
 
-      const redirectRes = await agent.get('/assets')
-      expect(redirectRes.status).toBe(301)
-      expect(redirectRes.headers.location).toBe('/assets/')
+      const indexRes = await agent.get('/assets')
+      expect(indexRes.status).toBe(200)
+      expect(indexRes.text).toBe('<h1>home</h1>')
     })
 
-    it.skipIf(process.platform === 'win32')('supports a rootDir that is the filesystem root', async () => {
-      const res = await createStaticAgent({ rootDir: path.parse(rootDir).root }).get(path.join(rootDir, 'hello.txt'))
+    it.skipIf(process.platform === 'win32')(
+      'supports a rootDir that is the filesystem root',
+      async () => {
+        const res = await createStaticAgent({ rootDir: path.parse(rootDir).root }).get(
+          path.join(rootDir, 'hello.txt'),
+        )
 
-      expect(res.status).toBe(200)
-      expect(res.text).toBe('hello world')
-    })
+        expect(res.status).toBe(200)
+        expect(res.text).toBe('hello world')
+      },
+    )
   })
 
   describe('precompressed', () => {
@@ -821,9 +875,7 @@ describe('staticFileHandlerPlugin', () => {
     })
 
     it('is disabled by default', async () => {
-      const res = await createStaticAgent()
-        .get('/compressed.txt')
-        .set('accept-encoding', 'gzip')
+      const res = await createStaticAgent().get('/compressed.txt').set('accept-encoding', 'gzip')
 
       expect(res.headers['content-encoding']).toBeUndefined()
       expect(res.headers.vary).toBeUndefined()
@@ -851,7 +903,9 @@ describe('staticFileHandlerPlugin', () => {
       const rejectedRes = await agent.get('/compressed.txt').set('accept-encoding', 'br;q=0, *')
       expect(rejectedRes.headers['content-encoding']).toBe('gzip')
 
-      const allRejectedRes = await agent.get('/compressed.txt').set('accept-encoding', '*, br;q=0, gzip;q=0, zstd;q=0')
+      const allRejectedRes = await agent
+        .get('/compressed.txt')
+        .set('accept-encoding', '*, br;q=0, gzip;q=0, zstd;q=0')
       expect(allRejectedRes.headers['content-encoding']).toBeUndefined()
       expect(allRejectedRes.text).toBe('identity content')
     })
@@ -892,9 +946,23 @@ describe('staticFileHandlerPlugin', () => {
       const agent = createStaticAgent({ precompressed: true })
       const etag = (await agent.get('/compressed.txt').set('accept-encoding', 'gzip')).headers.etag!
 
-      const res = await agent.get('/compressed.txt').set('accept-encoding', 'gzip').set('if-none-match', etag)
+      const res = await agent
+        .get('/compressed.txt')
+        .set('accept-encoding', 'gzip')
+        .set('if-none-match', etag)
 
       expect(res.status).toBe(304)
+      expect(res.headers['content-encoding']).toBeUndefined()
+      expect(res.headers.vary).toBe('accept-encoding')
+    })
+
+    it('omits content-encoding from a 416', async () => {
+      const res = await createStaticAgent({ precompressed: true })
+        .get('/compressed.txt')
+        .set('accept-encoding', 'gzip')
+        .set('range', 'bytes=999-')
+
+      expect(res.status).toBe(416)
       expect(res.headers['content-encoding']).toBeUndefined()
       expect(res.headers.vary).toBe('accept-encoding')
     })
@@ -911,9 +979,17 @@ describe('staticFileHandlerPlugin', () => {
   })
 
   it('restarts a download resumed through response compression instead of splicing identity bytes into compressed ones', async () => {
-    const agent = createAgent(new RPCHandler({}, {
-      plugins: [new StaticFileHandlerPlugin({ rootDir }), new ResponseCompressionHandlerPlugin({ threshold: 0 })],
-    }))
+    const agent = createAgent(
+      new RPCHandler(
+        {},
+        {
+          plugins: [
+            new StaticFileHandlerPlugin({ rootDir }),
+            new ResponseCompressionHandlerPlugin({ threshold: 0 }),
+          ],
+        },
+      ),
+    )
 
     const first = await agent.get('/hello.txt').set('accept-encoding', 'gzip')
     expect(first.headers['content-encoding']).toBe('gzip')
@@ -921,12 +997,19 @@ describe('staticFileHandlerPlugin', () => {
     expect(first.headers['accept-ranges']).toBeUndefined()
 
     // The weak tag cannot satisfy if-range, so the full compressed body comes back instead of a 206
-    const resumed = await agent.get('/hello.txt').set('accept-encoding', 'gzip').set('range', 'bytes=5-').set('if-range', first.headers.etag!)
+    const resumed = await agent
+      .get('/hello.txt')
+      .set('accept-encoding', 'gzip')
+      .set('range', 'bytes=5-')
+      .set('if-range', first.headers.etag!)
     expect(resumed.status).toBe(200)
     expect(resumed.headers['content-encoding']).toBe('gzip')
     expect(resumed.text).toBe('hello world')
 
-    const revalidated = await agent.get('/hello.txt').set('accept-encoding', 'gzip').set('if-none-match', first.headers.etag!)
+    const revalidated = await agent
+      .get('/hello.txt')
+      .set('accept-encoding', 'gzip')
+      .set('if-none-match', first.headers.etag!)
     expect(revalidated.status).toBe(304)
   })
 
@@ -963,11 +1046,42 @@ describe('staticFileHandlerPlugin', () => {
     expect(freshRes.status).toBe(304)
   })
 
+  it('never sends more bytes than content-length when the file grows after stat', async ({
+    onTestFinished,
+  }) => {
+    const growingPath = path.join(rootDir, 'growing.txt')
+    const growingEmptyPath = path.join(rootDir, 'growing-empty.txt')
+    writeFileSync(growingPath, 'hello world')
+    writeFileSync(growingEmptyPath, '')
+    onTestFinished(() => {
+      rmSync(growingPath, { force: true })
+      rmSync(growingEmptyPath, { force: true })
+    })
+
+    const handler = new FetchRPCHandler({}, { plugins: [new StaticFileHandlerPlugin({ rootDir })] })
+
+    const served = await handler.handle(new Request('https://example.com/growing.txt'))
+    appendFileSync(growingPath, ' + appended')
+    expect(served.response!.headers.get('content-length')).toBe('11')
+    expect(await served.response!.text()).toBe('hello world')
+
+    const servedEmpty = await handler.handle(new Request('https://example.com/growing-empty.txt'))
+    appendFileSync(growingEmptyPath, 'appended')
+    expect(servedEmpty.response!.headers.get('content-length')).toBe('0')
+    expect(await servedEmpty.response!.text()).toBe('')
+  })
+
   describe('tracing', () => {
     it('renames the active span to the mounted base path', async ({ onTestFinished }) => {
-      const span = { updateName: vi.fn(), setAttribute: vi.fn(), recordException: vi.fn(), end: vi.fn() }
+      const span = {
+        updateName: vi.fn(),
+        setAttribute: vi.fn(),
+        recordException: vi.fn(),
+        end: vi.fn(),
+      }
       const spy = vi.spyOn(sharedModule, 'getTracer').mockReturnValue({
-        startActiveSpan: (_name: unknown, _parent: unknown, fn: (span: unknown) => unknown) => fn(span),
+        startActiveSpan: (_name: unknown, _parent: unknown, fn: (span: unknown) => unknown) =>
+          fn(span),
         withActiveSpan: (_: unknown, fn: () => unknown) => fn(),
         getActiveSpan: () => span,
       } as any)
@@ -992,9 +1106,12 @@ describe('staticFileHandlerPlugin', () => {
    */
   describe('fetch adapter', () => {
     it('serves a file and falls through when no file matches', async () => {
-      const handler = new FetchRPCHandler({}, {
-        plugins: [new StaticFileHandlerPlugin({ rootDir })],
-      })
+      const handler = new FetchRPCHandler(
+        {},
+        {
+          plugins: [new StaticFileHandlerPlugin({ rootDir })],
+        },
+      )
 
       const served = await handler.handle(new Request('https://example.com/hello.txt'))
       expect(served.matched).toBe(true)

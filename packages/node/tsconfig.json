@@ -1,15 +1,7 @@
 {
   "extends": "../../tsconfig.lib.json",
   "compilerOptions": {
+    "lib": ["ES2022"],
     "types": ["node"]
-  },
-  "include": ["package.json", "src"],
-  "exclude": [
-    "**/*.test.*",
-    "**/*.test-d.ts",
-    "**/*.bench.*",
-    "**/__tests__/**",
-    "**/__mocks__/**",
-    "**/__snapshots__/**"
-  ]
+  }
 }

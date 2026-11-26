@@ -1,14 +1,17 @@
+import { isNonPrimitive } from '@orpc/shared'
+
+import { RECURSIVE_CLIENT_UNWRAP_KEYS } from './consts'
 import type { AnyNestedClient, Client, ClientRest } from './types'
 import type { SafeResult } from './utils'
-import { isTypescriptObject } from '@orpc/shared'
-import { RECURSIVE_CLIENT_UNWRAP_KEYS } from './consts'
 import { safe } from './utils'
 
-export type SafeClient<T extends AnyNestedClient>
-  = T extends Client<infer UContext, infer UInput, infer UOutput, infer UError>
+export type SafeClient<T extends AnyNestedClient> = SafeClientInternal<T>
+
+export type SafeClientInternal<T> =
+  T extends Client<infer UContext, infer UInput, infer UOutput, infer UError>
     ? (...rest: ClientRest<UContext, UInput>) => Promise<SafeResult<UOutput, UError>>
     : {
-        [K in keyof T]: T[K] extends AnyNestedClient ? SafeClient<T[K]> : never
+        [K in keyof T]: SafeClientInternal<T[K] & {}>
       }
 
 /**
@@ -37,7 +40,7 @@ export function createSafeClient<T extends AnyNestedClient>(client: T): SafeClie
       if (safeClient === undefined) {
         const value = (client as Record<string, unknown>)[prop]
 
-        if (!isTypescriptObject(value)) {
+        if (!isNonPrimitive(value)) {
           return value
         }
 

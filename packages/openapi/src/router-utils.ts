@@ -1,20 +1,24 @@
 import type { RouterContract } from '@orpc/contract'
 import { ProcedureContract, resolveMetaPlugins } from '@orpc/contract'
-import { isTypescriptObject, pathToHttpPath, toArray } from '@orpc/shared'
+import { isNonPrimitive, pathToHttpPath, toArray } from '@orpc/shared'
+
 import { getOpenAPIMeta, openapi } from './meta'
 
-export type PopulatedContractRouterOpenAPIPaths<T extends RouterContract>
-  = T extends ProcedureContract<infer UInputSchema, infer UOutputSchema, infer UErrors>
+export type PopulatedRouterContractOpenAPIPaths<T extends RouterContract> =
+  PopulatedRouterContractOpenAPIPathsInternal<T>
+
+export type PopulatedRouterContractOpenAPIPathsInternal<T> =
+  T extends ProcedureContract<infer UInputSchema, infer UOutputSchema, infer UErrors>
     ? ProcedureContract<UInputSchema, UOutputSchema, UErrors>
     : {
-        [K in keyof T]: T[K] extends RouterContract ? PopulatedContractRouterOpenAPIPaths<T[K]> : never
+        [K in keyof T]: PopulatedRouterContractOpenAPIPathsInternal<T[K] & {}>
       }
 
 export interface PopulateRouterContractOpenAPIPathsOptions {
   /**
    * Base path segments.
    */
-  path?: undefined | string[]
+  path?: string[] | undefined
 }
 
 /**
@@ -28,7 +32,7 @@ export interface PopulateRouterContractOpenAPIPathsOptions {
 export function populateRouterContractOpenAPIPaths<T extends RouterContract>(
   router: T,
   options: PopulateRouterContractOpenAPIPathsOptions = {},
-): PopulatedContractRouterOpenAPIPaths<T> {
+): PopulatedRouterContractOpenAPIPaths<T> {
   const path = toArray(options.path)
 
   if (router instanceof ProcedureContract) {
@@ -49,17 +53,17 @@ export function populateRouterContractOpenAPIPaths<T extends RouterContract>(
     }) as any
   }
 
-  if (!isTypescriptObject(router)) {
+  if (!isNonPrimitive(router)) {
     return router as any
   }
 
   const populated: Record<string, any> = {}
 
   for (const key of Object.keys(router)) {
-    populated[key] = populateRouterContractOpenAPIPaths(
-      router[key]!,
-      { ...options, path: [...path, key] },
-    )
+    populated[key] = populateRouterContractOpenAPIPaths(router[key]!, {
+      ...options,
+      path: [...path, key],
+    })
   }
 
   return populated as any

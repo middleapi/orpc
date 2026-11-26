@@ -1,36 +1,51 @@
 import type { AnyORPCError } from '@orpc/client'
+import { COMMON_ERROR_STATUS_MAP, RPCSerializer } from '@orpc/client'
 import type { Promisable, Public, Value } from '@orpc/shared'
+import { getOwn, parseEmptyableJSON, value } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
+import { parseStandardUrl } from '@standard-server/core'
+
+import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '../../constants'
 import type { Context } from '../../context'
 import type { AnyProcedure } from '../../procedure'
 import type { AnyRouter } from '../../router'
-import type { ResolvedStandardHandlerHandleOptions, StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from '../standard'
+import type {
+  ResolvedStandardHandlerHandleOptions,
+  StandardHandlerCodec,
+  StandardHandlerCodecResolvedProcedure,
+} from '../standard/index'
 import type { RPCMatcherOptions } from './rpc-matcher'
-import { COMMON_ERROR_STATUS_MAP, RPCSerializer } from '@orpc/client'
-import { getOwn, parseEmptyableJSON, value } from '@orpc/shared'
-import { parseStandardUrl } from '@standard-server/core'
-import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '../../constants'
 import { RPCMatcher } from './rpc-matcher'
 
 export interface RPCHandlerCodecOptions<T extends Context> extends RPCMatcherOptions {
   /**
    * Override the default RPC serializer.
    */
-  serializer?: Public<RPCSerializer>
+  serializer?: Public<RPCSerializer> | undefined
 
   /**
    * Resolve HTTP status for encoded successful outputs.
    *
    * Value should be in the `2xx` range and must be less than `400`.
-   * Return `undefined` or `null` to fallback to default
    *
    * @default DEFAULT_SUCCESS_STATUS (200)
    */
-  outputStatus?: Value<number | undefined | null, [output: unknown, procedure: AnyProcedure, path: string[], options: ResolvedStandardHandlerHandleOptions<T>]>
+  outputStatus?:
+    | Value<
+        number,
+        [
+          output: unknown,
+          procedure: AnyProcedure,
+          path: string[],
+          options: ResolvedStandardHandlerHandleOptions<T>,
+        ]
+      >
+    | undefined
 
   /**
    * Mapping ORPCError Code -> HTTP Status Code
    * The status code should be in the `4xx` or `5xx` range (must be greater than or equal to `400`).
+   * Codes missing from the map fall back to `DEFAULT_ERROR_STATUS` (400).
    *
    * @default COMMON_ERROR_STATUS_MAP
    */
@@ -41,16 +56,19 @@ export class RPCHandlerCodec<T extends Context> implements StandardHandlerCodec<
   private readonly matcher: RPCMatcher
   private readonly serializer: Public<RPCSerializer>
   private readonly errorStatusMap: Exclude<RPCHandlerCodecOptions<T>['errorStatusMap'], undefined>
-  private readonly outputStatus: RPCHandlerCodecOptions<T>['outputStatus']
+  private readonly outputStatus: Exclude<RPCHandlerCodecOptions<T>['outputStatus'], undefined>
 
   constructor(router: AnyRouter, options: RPCHandlerCodecOptions<T> = {}) {
     this.matcher = new RPCMatcher(router, options)
     this.serializer = options.serializer ?? new RPCSerializer()
     this.errorStatusMap = options.errorStatusMap ?? COMMON_ERROR_STATUS_MAP
-    this.outputStatus = options.outputStatus
+    this.outputStatus = options.outputStatus ?? DEFAULT_SUCCESS_STATUS
   }
 
-  async resolveProcedure(request: StandardLazyRequest, options: ResolvedStandardHandlerHandleOptions<T>): Promise<StandardHandlerCodecResolvedProcedure | undefined> {
+  async resolveProcedure(
+    request: StandardLazyRequest,
+    options: ResolvedStandardHandlerHandleOptions<T>,
+  ): Promise<StandardHandlerCodecResolvedProcedure | undefined> {
     const [pathname, query] = parseStandardUrl(request.url)
 
     const matched = await this.matcher.match(request.method, pathname, options.prefix)
@@ -63,7 +81,7 @@ export class RPCHandlerCodec<T extends Context> implements StandardHandlerCodec<
       path: matched.path,
       decodeInput: async () => {
         if (request.method === 'GET') {
-          const dataString = (new URLSearchParams(query)).getAll('data').at(-1)
+          const dataString = new URLSearchParams(query).getAll('data').at(-1)
           return this.serializer.deserialize(parseEmptyableJSON(dataString))
         }
 
@@ -73,15 +91,25 @@ export class RPCHandlerCodec<T extends Context> implements StandardHandlerCodec<
     }
   }
 
-  encodeOutput(output: unknown, procedure: AnyProcedure, path: string[], options: ResolvedStandardHandlerHandleOptions<T>): Promisable<StandardResponse> {
+  encodeOutput(
+    output: unknown,
+    procedure: AnyProcedure,
+    path: string[],
+    options: ResolvedStandardHandlerHandleOptions<T>,
+  ): Promisable<StandardResponse> {
     return {
       headers: {},
-      status: value(this.outputStatus, output, procedure, path, options) ?? DEFAULT_SUCCESS_STATUS,
+      status: value(this.outputStatus, output, procedure, path, options),
       body: this.serializer.serialize(output),
     }
   }
 
-  encodeError(error: AnyORPCError, _procedure: AnyProcedure, _path: string[], _options: ResolvedStandardHandlerHandleOptions<T>): Promisable<StandardResponse> {
+  encodeError(
+    error: AnyORPCError,
+    _procedure: AnyProcedure,
+    _path: string[],
+    _options: ResolvedStandardHandlerHandleOptions<T>,
+  ): Promisable<StandardResponse> {
     const status = getOwn(this.errorStatusMap, error.code) ?? DEFAULT_ERROR_STATUS
 
     return {

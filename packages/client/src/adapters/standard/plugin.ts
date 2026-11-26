@@ -1,8 +1,14 @@
 import type { OrderablePlugin } from '@orpc/shared'
-import type { ClientContext } from '../../types'
-import type { StandardLinkOptions } from './link'
 import { sortPlugins } from '@orpc/shared'
 
+import type { ClientContext } from '../../types'
+import type { StandardLinkOptions } from './link'
+
+/**
+ * A link plugin. `before` and `after` order the `init()` calls, not the interceptors.
+ *
+ * @see {@link https://orpc.dev/docs/plugins#plugin-order | Plugins - Plugin Order}
+ */
 export interface StandardLinkPlugin<T extends ClientContext> extends OrderablePlugin {
   /**
    * Initializes the plugin and returns new link options.
@@ -28,7 +34,7 @@ export interface StandardLinkPlugin<T extends ClientContext> extends OrderablePl
 }
 
 export class CompositeStandardLinkPlugin<T extends ClientContext> implements StandardLinkPlugin<T> {
-  name = '~composite'
+  readonly name = '~composite'
   protected readonly plugins: StandardLinkPlugin<T>[]
 
   constructor(plugins: StandardLinkPlugin<T>[] = []) {

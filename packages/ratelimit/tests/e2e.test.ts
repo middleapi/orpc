@@ -1,9 +1,18 @@
-import type { RateLimiter } from '../src'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { z } from 'zod'
-import { ratelimit, RateLimitHandlerPlugin } from '../src'
+
 import { MemoryRateLimiter } from '../src/adapters/memory'
+import type { RateLimiter } from '../src/index'
+import { ratelimit, RateLimitHandlerPlugin } from '../src/index'
+
+beforeEach(() => {
+  vi.useFakeTimers()
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 it('works', async () => {
   const router = {
@@ -22,9 +31,7 @@ it('works', async () => {
   }
 
   const handler = new RPCHandler(router, {
-    plugins: [
-      new RateLimitHandlerPlugin(),
-    ],
+    plugins: [new RateLimitHandlerPlugin()],
   })
 
   const request = new Request('https://example.com/login', {
@@ -62,6 +69,6 @@ it('works', async () => {
   expect(response?.status).toBe(429)
   expect(response?.headers.get('RateLimit-Limit')).toBe('5')
   expect(response?.headers.get('RateLimit-Remaining')).toBe('0')
-  expect(response?.headers.get('RateLimit-Reset')).toBeTypeOf('string')
-  expect(response?.headers.get('Retry-After')).toBeTypeOf('string')
+  expect(response?.headers.get('RateLimit-Reset')).toBe('1') // seconds left in the 1s window
+  expect(response?.headers.get('Retry-After')).toBe('1')
 })

@@ -1,8 +1,8 @@
 ---
-title: "Hibernation Integration"
+title: 'Hibernation Integration'
 description: "Learn how oRPC integrates with Hibernation APIs like Cloudflare's WebSocket Hibernation so servers can sleep without dropping connections."
 sidebar:
-  label: "Hibernation"
+  label: 'Hibernation'
 ---
 
 ## Installation
@@ -17,9 +17,7 @@ npm install @orpc/hibernation@beta
 import { HibernationHandlerPlugin } from '@orpc/hibernation'
 
 const handler = new RPCHandler(router, {
-  plugins: [
-    new HibernationHandlerPlugin(),
-  ],
+  plugins: [new HibernationHandlerPlugin()],
 })
 ```
 
@@ -63,14 +61,26 @@ The plugin provides `HibernationAsyncIteratorClass` and `encodeHibernationRPCEve
          const { id } = ws.deserializeAttachment()
 
          // yield an event to all clients
-         ws.send(await encodeHibernationRPCEvent(id, { message: input.message }, {
-           // override the default RPC serializer if needed
-           serializer: new RPCSerializer(),
-         }))
+         ws.send(
+           await encodeHibernationRPCEvent(
+             id,
+             { message: input.message },
+             {
+               // override the default RPC serializer if needed
+               serializer: new RPCSerializer(),
+             },
+           ),
+         )
          // return an event and stop the iterator
-         ws.send(await encodeHibernationRPCEvent(id, { message: input.message }, { event: 'close' }))
+         ws.send(
+           await encodeHibernationRPCEvent(id, { message: input.message }, { event: 'close' }),
+         )
          // throw an error and stop the iterator
-         ws.send(await encodeHibernationRPCEvent(id, new ORPCError('INTERNAL_SERVER_ERROR'), { event: 'error' }))
+         ws.send(
+           await encodeHibernationRPCEvent(id, new ORPCError('INTERNAL_SERVER_ERROR'), {
+             event: 'error',
+           }),
+         )
        }
      })
    ```
@@ -126,9 +136,7 @@ const handler = new RPCHandler(router, {
       console.error(error)
     }),
   ],
-  plugins: [
-    new HibernationHandlerPlugin(),
-  ],
+  plugins: [new HibernationHandlerPlugin()],
 })
 
 export class ChatRoom extends DurableObject {
@@ -165,7 +173,9 @@ import { createORPCClient } from '@orpc/client'
 import type { router } from '../../worker/dos/chat-room'
 import type { RouterClient } from '@orpc/server'
 
-const websocket = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/chat-room`)
+const websocket = new WebSocket(
+  `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/chat-room`,
+)
 
 websocket.addEventListener('error', (event) => {
   console.error(event)
@@ -189,8 +199,10 @@ export function ChatRoom() {
     const controller = new AbortController()
 
     void (async () => {
-      for await (const message of await chatRoomClient.onMessage(undefined, { signal: controller.signal })) {
-        setMessages(messages => [...messages, message])
+      for await (const message of await chatRoomClient.onMessage(undefined, {
+        signal: controller.signal,
+      })) {
+        setMessages((messages) => [...messages, message])
       }
     })()
 

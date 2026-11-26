@@ -1,10 +1,15 @@
 import type { RouterContract } from '@orpc/contract'
+import { isNonPrimitive } from '@orpc/shared'
+
 import type { Lazyable } from './lazy'
 import type { AnyRouter } from './router'
 
-const HIDDEN_ROUTER_CONTRACT_SYMBOL = Symbol.for('ORPC_HIDDEN_ROUTER_CONTRACT')
+const HIDDEN_ROUTER_CONTRACT_SYMBOL = /* @__PURE__ */ Symbol.for('ORPC_HIDDEN_ROUTER_CONTRACT')
 
-export function withHiddenRouterContract<T extends Lazyable<AnyRouter>>(router: T, contract: RouterContract): T {
+export function withHiddenRouterContract<T extends Lazyable<AnyRouter>>(
+  router: T,
+  contract: RouterContract,
+): T {
   return new Proxy(router, {
     get(target, key) {
       if (key === HIDDEN_ROUTER_CONTRACT_SYMBOL) {
@@ -16,6 +21,10 @@ export function withHiddenRouterContract<T extends Lazyable<AnyRouter>>(router: 
   })
 }
 
-export function getHiddenRouterContract(router: Lazyable<AnyRouter | RouterContract>): RouterContract | undefined {
-  return (router as any)[HIDDEN_ROUTER_CONTRACT_SYMBOL]
+export function getHiddenRouterContract(router: unknown): RouterContract | undefined {
+  if (!isNonPrimitive(router)) {
+    return undefined
+  }
+
+  return router[HIDDEN_ROUTER_CONTRACT_SYMBOL] as RouterContract | undefined
 }

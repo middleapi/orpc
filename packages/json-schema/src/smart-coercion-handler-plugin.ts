@@ -1,15 +1,17 @@
 import type { AnySchema } from '@orpc/contract'
 import type { Context } from '@orpc/server'
 import type { StandardHandlerOptions, StandardHandlerPlugin } from '@orpc/server/standard'
-import type { JsonSchemaConverter } from './convert'
-import type { JsonSchema } from './types'
 import { toArray } from '@orpc/shared'
+
+import type { JsonSchemaCoercerOptions } from './coercer'
 import { JsonSchemaCoercer } from './coercer'
+import type { JsonSchemaConverter } from './convert'
 import { DelegatingJsonSchemaConverter } from './convert'
 import { StandardJsonSchemaConverter } from './standard-json-schema-converter'
+import type { JsonSchema } from './types'
 
-export interface SmartCoercionHandlerPluginOptions {
-  converters?: undefined | JsonSchemaConverter[]
+export interface SmartCoercionHandlerPluginOptions extends JsonSchemaCoercerOptions {
+  converters?: JsonSchemaConverter[] | undefined
 }
 
 /**
@@ -19,7 +21,7 @@ export interface SmartCoercionHandlerPluginOptions {
  * @see {@link https://orpc.dev/docs/plugins/smart-coercion | Smart Coercion Plugin}
  */
 export class SmartCoercionHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  name = '~smart-coercion'
+  readonly name = '~smart-coercion'
 
   private readonly converter: DelegatingJsonSchemaConverter
   private readonly coercer: JsonSchemaCoercer
@@ -30,7 +32,7 @@ export class SmartCoercionHandlerPlugin<T extends Context> implements StandardHa
       ...toArray(options.converters),
       new StandardJsonSchemaConverter(),
     ])
-    this.coercer = new JsonSchemaCoercer()
+    this.coercer = new JsonSchemaCoercer(options)
   }
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {

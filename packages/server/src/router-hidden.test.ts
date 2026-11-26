@@ -1,4 +1,5 @@
 import { oc } from '@orpc/contract'
+
 import { os } from './builder'
 import { getHiddenRouterContract, withHiddenRouterContract } from './router-hidden'
 
@@ -15,5 +16,12 @@ it('withHiddenRouterContract & getHiddenRouterContract', () => {
 
   expect(applied).not.toBe(router)
   expect(applied).toEqual(router)
-  expect(getHiddenRouterContract(applied)).toEqual(contract)
+  expect(getHiddenRouterContract(applied)).toBe(contract)
+  expect(getHiddenRouterContract(withHiddenRouterContract(router.ping, contract.ping))).toBe(
+    contract.ping,
+  )
+})
+
+it.each([undefined, null])('getHiddenRouterContract returns undefined for %s', (router) => {
+  expect(getHiddenRouterContract(router)).toBeUndefined()
 })

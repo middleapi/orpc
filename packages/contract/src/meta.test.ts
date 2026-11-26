@@ -5,7 +5,7 @@ describe('getHiddenMetaPlugins', () => {
   const metaPlugins: AnyMetaPlugin[] = [
     {
       name: 'plugin',
-      init: meta => ({ ...meta, enabled: true }),
+      init: (meta) => ({ ...meta, enabled: true }),
     },
   ]
 

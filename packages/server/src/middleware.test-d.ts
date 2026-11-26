@@ -1,6 +1,7 @@
 import type { ErrorMap, ORPCErrorConstructorMap } from '@orpc/contract'
-import type { Middleware } from './middleware'
-import z from 'zod'
+import * as z from 'zod'
+
+import type { Middleware, MiddlewareResult } from './middleware'
 
 const errorMap = {
   BASE: {
@@ -10,13 +11,7 @@ const errorMap = {
 
 describe('Middleware', () => {
   it('can be a regular function', () => {
-    type T = Middleware<
-      { in: string },
-      object,
-      { input: boolean },
-      string,
-      typeof errorMap
-    >
+    type T = Middleware<{ in: string }, object, { input: boolean }, string, typeof errorMap>
 
     const mid: T = ({ next, context, errors }, input, done) => {
       expectTypeOf(context).toEqualTypeOf<{ in: string }>()
@@ -32,13 +27,7 @@ describe('Middleware', () => {
   })
 
   it('can stop by using done function', () => {
-    type T = Middleware<
-      { in: string },
-      object,
-      { input: boolean },
-      number,
-      typeof errorMap
-    >
+    type T = Middleware<{ in: string }, object, { input: boolean }, number, typeof errorMap>
 
     const mid: T = ({ next, context, errors }, input, done) => {
       return done({ output: 123 })
@@ -52,6 +41,24 @@ describe('Middleware', () => {
 
       // @ts-expect-error - invalid data
       return done({ output: 'invalid' })
+    }
+  })
+
+  it('optional return context when out context is an index signature', () => {
+    type T = Middleware<
+      { in: string },
+      Record<string, unknown>,
+      { input: boolean },
+      string,
+      typeof errorMap
+    >
+
+    const mid: T = ({ next }) => {
+      return next()
+    }
+
+    const midDone: T = ({ next }, input, done) => {
+      return done({ output: '123' })
     }
   })
 
@@ -93,18 +100,35 @@ describe('Middleware', () => {
     }
   })
 
+  it('can return a result directly or as a promise', () => {
+    type T = Middleware<object, { out: number }, unknown, string, typeof errorMap>
+
+    const sync: T = (_opts, _input, done) => {
+      const result = done({ output: '123', context: { out: 123 } })
+      expectTypeOf(result).toEqualTypeOf<MiddlewareResult<{ out: number }, string>>()
+      return result
+    }
+    const async: T = async ({ next }) => {
+      const result = next({ context: { out: 123 } })
+      expectTypeOf(result).toEqualTypeOf<Promise<MiddlewareResult<{ out: number }, string>>>()
+      return result
+    }
+    const promise: T = () => Promise.resolve({ output: '123', context: { out: 123 } })
+
+    // @ts-expect-error - invalid output
+    const invalid: T = async () => ({ output: 123, context: { out: 123 } })
+  })
+
   it('can infer back error map', async () => {
-    const mid: Middleware<
-      { in: string },
-      object,
-      { input: boolean },
-      string,
-      typeof errorMap
-    > = ({ next }) => {
+    const mid: Middleware<{ in: string }, object, { input: boolean }, string, typeof errorMap> = ({
+      next,
+    }) => {
       return next()
     }
 
     expectTypeOf(mid['~orpc']?.errorMap).toEqualTypeOf<typeof errorMap | undefined>()
-    expectTypeOf<typeof mid extends Middleware<any, any, any, any, infer TErrorMap> ? TErrorMap : never>().toEqualTypeOf<typeof errorMap>()
+    expectTypeOf<
+      typeof mid extends Middleware<any, any, any, any, infer TErrorMap> ? TErrorMap : never
+    >().toEqualTypeOf<typeof errorMap>()
   })
 })

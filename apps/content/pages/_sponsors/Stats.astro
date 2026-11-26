@@ -10,7 +10,7 @@ interface Props {
 const { tiers, past } = Astro.props
 
 const active = tiers.flatMap(tier => tier.sponsors)
-const amounts = active.map(sponsor => sponsor.amount).sort((a, b) => a - b)
+const amounts = active.map(sponsor => sponsor.amount).toSorted((a, b) => a - b)
 const middle = Math.floor(amounts.length / 2)
 
 // The median needs at least one active sponsor.
@@ -26,7 +26,7 @@ const stats = active.length === 0
       },
       {
         value: active.length + past.length,
-        label: `Sponsors since ${monthYear([...active, ...past].map(sponsor => sponsor.createdAt).sort()[0]!)}`,
+        label: `Sponsors since ${monthYear([...active, ...past].map(sponsor => sponsor.createdAt).toSorted()[0]!)}`,
         // The past list only renders when there is someone in it.
         href: past.length > 0 ? '#past-sponsors' : '#sponsors',
       },

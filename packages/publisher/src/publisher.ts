@@ -7,8 +7,6 @@ export interface PublisherOptions {
    *
    * If the buffer exceeds this limit, the oldest event is dropped.
    * This prevents unbounded memory growth if consumers process events slowly.
-   * Missed events the adapter replays for `lastEventId` while subscribing are all kept,
-   * and the limit then applies to how much further behind the consumer falls.
    *
    * Set to:
    * - `0`: Disable buffering. Events must be consumed before the next one arrives.
@@ -17,7 +15,23 @@ export interface PublisherOptions {
    *
    * @default 100
    */
-  maxBufferedEvents?: number
+  maxBufferedEvents?: number | undefined
+}
+
+/**
+ * Configuration for event resume support, shared by the adapters that support it.
+ * Passing it enables resume.
+ */
+export interface PublisherResumeOptions {
+  /**
+   * How long to retain events for resume, in milliseconds.
+   *
+   * Expired events are cleaned up lazily for performance reasons, so
+   * some events may remain available slightly longer than this period.
+   *
+   * @default 300000 (5 min)
+   */
+  ttl?: number | undefined
 }
 
 export interface PublisherSubscribeListenerOptions {
@@ -29,23 +43,23 @@ export interface PublisherSubscribeListenerOptions {
   /**
    * Triggered when an error occur
    */
-  onError?: (error: ThrowableError) => void
+  onError?: ((error: ThrowableError) => void) | undefined
 }
 
 export interface PublisherSubscribeIteratorOptions
-  extends Pick<PublisherSubscribeListenerOptions, 'lastEventId'>, Pick<PublisherOptions, 'maxBufferedEvents'> {
+  extends
+    Pick<PublisherSubscribeListenerOptions, 'lastEventId'>,
+    Pick<PublisherOptions, 'maxBufferedEvents'> {
   /**
    * Abort signal, automatically unsubscribes on abort
    */
-  signal?: AbortSignal | undefined | null
+  signal?: AbortSignal | null | undefined
 }
 
 export abstract class Publisher<T extends Record<string, object>> {
   private readonly maxBufferedEvents: Exclude<PublisherOptions['maxBufferedEvents'], undefined>
 
-  constructor(
-    options: PublisherOptions = {},
-  ) {
+  constructor(options: PublisherOptions = {}) {
     this.maxBufferedEvents = options.maxBufferedEvents ?? 100
   }
 
@@ -56,9 +70,7 @@ export abstract class Publisher<T extends Record<string, object>> {
 
   /**
    * Subscribes to a specific event using a callback function.
-   * Returns an unsubscribe function to remove the listener.
-   * Events missed since `lastEventId` should reach the listener before the returned promise
-   * resolves, so iterator subscribers keep them all regardless of `maxBufferedEvents`.
+   * Resolves with an unsubscribe function to remove the listener.
    *
    * @remarks
    * This method should be protected to avoid conflicts with `subscribe` method
@@ -66,16 +78,16 @@ export abstract class Publisher<T extends Record<string, object>> {
   protected abstract subscribeListener<K extends keyof T & string>(
     event: K,
     listener: (payload: T[K]) => void,
-    options?: PublisherSubscribeListenerOptions
+    options?: PublisherSubscribeListenerOptions,
   ): Promise<() => Promise<void>>
 
   /**
    * Subscribes to a specific event using a callback function.
-   * Returns an unsubscribe function to remove the listener.
+   * Resolves with an unsubscribe function to remove the listener.
    *
    * @example
    * ```ts
-   * const unsubscribe = publisher.subscribe('event', (payload) => {
+   * const unsubscribe = await publisher.subscribe('event', (payload) => {
    *   console.log(payload)
    * }, {
    *   lastEventId,
@@ -85,10 +97,14 @@ export abstract class Publisher<T extends Record<string, object>> {
    * })
    *
    * // Later
-   * unsubscribe()
+   * await unsubscribe()
    * ```
    */
-  subscribe<K extends keyof T & string>(event: K, listener: (payload: T[K]) => void, options?: PublisherSubscribeListenerOptions): Promise<() => Promise<void>>
+  subscribe<K extends keyof T & string>(
+    event: K,
+    listener: (payload: T[K]) => void,
+    options?: PublisherSubscribeListenerOptions,
+  ): Promise<() => Promise<void>>
   /**
    * Subscribes to a specific event using an AsyncIteratorObject.
    * Useful for `for await...of` loops with optional buffering and abort support.
@@ -100,7 +116,10 @@ export abstract class Publisher<T extends Record<string, object>> {
    * }
    * ```
    */
-  subscribe<K extends keyof T & string>(event: K, options?: PublisherSubscribeIteratorOptions): AsyncIteratorClass<T[K], void, void>
+  subscribe<K extends keyof T & string>(
+    event: K,
+    options?: PublisherSubscribeIteratorOptions,
+  ): AsyncIteratorClass<T[K], void, void>
   subscribe<K extends keyof T & string>(
     event: K,
     listenerOrOptions?: ((payload: T[K]) => void) | PublisherSubscribeIteratorOptions,
@@ -115,48 +134,41 @@ export abstract class Publisher<T extends Record<string, object>> {
 
     throwIfAborted(signal)
 
-    const resuming = listenerOrOptions?.lastEventId !== undefined
     const bufferedEvents = new Queue<T[K]>()
-    const pullResolvers: { resolve: (result: IteratorResult<T[K]>) => void, reject: (error: Error) => void }[] = []
+    const pullResolvers: {
+      resolve: (result: IteratorResult<T[K]>) => void
+      reject: (error: Error) => void
+    }[] = []
 
-    let bufferFloor = 0
-    let bufferLimit = resuming ? Infinity : maxBufferedEvents
-
-    const subscription = this.subscribeListener(event, (payload) => {
-      if (signal?.aborted) {
-        return
-      }
-
-      const resolver = pullResolvers.shift()
-
-      if (resolver) {
-        resolver.resolve({ done: false, value: payload })
-      }
-      else {
-        bufferedEvents.push(payload)
-
-        if (bufferedEvents.length > bufferLimit) {
-          bufferedEvents.shift()
+    const unsubscribePromise = this.subscribeListener(
+      event,
+      (payload) => {
+        if (signal?.aborted) {
+          return
         }
-      }
-    }, {
-      lastEventId: listenerOrOptions?.lastEventId,
-      onError: error => terminate({ kind: 'error', error }),
-    })
 
-    const unsubscribePromise = (
-      resuming
-        ? subscription.finally(() => {
-            bufferFloor = bufferedEvents.length
-            bufferLimit = bufferFloor + maxBufferedEvents
-          })
-        : subscription
-    ).catch(error => terminate({ kind: 'error', error }))
+        const resolver = pullResolvers.shift()
+
+        if (resolver) {
+          resolver.resolve({ done: false, value: payload })
+        } else {
+          bufferedEvents.push(payload)
+
+          if (bufferedEvents.length > maxBufferedEvents) {
+            bufferedEvents.shift()
+          }
+        }
+      },
+      {
+        lastEventId: listenerOrOptions?.lastEventId,
+        onError: (error) => terminate({ kind: 'error', error }),
+      },
+    ).catch((error) => terminate({ kind: 'error', error }))
 
     const abortListener = () => terminate({ kind: 'error', error: signal!.reason })
     signal?.addEventListener('abort', abortListener)
 
-    let terminalState: { kind: 'error', error: ThrowableError } | { kind: 'cancelled' } | undefined
+    let terminalState: { kind: 'error'; error: ThrowableError } | { kind: 'cancelled' } | undefined
     async function terminate(state: Exclude<typeof terminalState, undefined>) {
       if (terminalState) {
         return
@@ -166,10 +178,9 @@ export abstract class Publisher<T extends Record<string, object>> {
       signal?.removeEventListener('abort', abortListener)
 
       if (state.kind === 'error') {
-        pullResolvers.forEach(resolver => resolver.reject(state.error))
-      }
-      else {
-        pullResolvers.forEach(resolver => resolver.resolve({ done: true, value: undefined }))
+        pullResolvers.forEach((resolver) => resolver.reject(state.error))
+      } else {
+        pullResolvers.forEach((resolver) => resolver.resolve({ done: true, value: undefined }))
       }
 
       if (signal?.aborted) {
@@ -178,7 +189,7 @@ export abstract class Publisher<T extends Record<string, object>> {
       }
 
       // Keep this async call at the end to avoid race conditions.
-      await unsubscribePromise.then(unsubscribe => unsubscribe?.())
+      await unsubscribePromise.then((unsubscribe) => unsubscribe?.())
     }
 
     return new AsyncIteratorClass(
@@ -191,11 +202,6 @@ export abstract class Publisher<T extends Record<string, object>> {
         const value = bufferedEvents.shift()
 
         if (value !== undefined) {
-          if (bufferedEvents.length < bufferFloor) {
-            bufferFloor = bufferedEvents.length
-            bufferLimit = bufferFloor + maxBufferedEvents
-          }
-
           return { done: false, value }
         }
 

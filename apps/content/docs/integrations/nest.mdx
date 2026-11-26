@@ -1,8 +1,8 @@
 ---
-title: "Implement oRPC contract with NestJS"
-description: "Learn how to implement oRPC contracts in NestJS with the @orpc/nest package while keeping type safety and OpenAPI compatibility."
+title: 'Implement oRPC contract with NestJS'
+description: 'Learn how to implement oRPC contracts in NestJS with the @orpc/nest package while keeping type safety and OpenAPI compatibility.'
 sidebar:
-  label: "NestJS"
+  label: 'NestJS'
 ---
 
 ## Installation
@@ -33,14 +33,16 @@ Before implementation, define your [contract](/docs/contract/procedure) as usual
 import { oc } from '@orpc/contract'
 import { openapi, populateRouterContractOpenAPIPaths } from '@orpc/openapi'
 
-const example = oc.meta(openapi({
-  path: '/example' // [!code highlight]
-}))
+const example = oc.meta(
+  openapi({
+    path: '/example', // [!code highlight]
+  }),
+)
 
 // or using the `populateRouterContractOpenAPIPaths` helper to
 // automatically populate OpenAPI paths for all contracts
 const contract = populateRouterContractOpenAPIPaths({
-  example
+  example,
 })
 ```
 
@@ -96,7 +98,24 @@ When you use the `@Implement` decorator with a router contract, under the hood i
 
 ## Error Handling
 
-By default, errors thrown in implemented procedures are caught and handled by oRPC, which then rethrows a generic `HttpException` to NestJS. If you want NestJS to catch the original error instead of `HttpException`, use the [Rethrow Plugin](/docs/plugins/rethrow) to bypass oRPC error handling and let NestJS handle the error directly.
+By default, errors thrown in implemented procedures are caught and handled by oRPC, which then rethrows an `ORPCHttpException` (a subclass of `HttpException`) to NestJS. If you want NestJS to catch the original error instead, use the [Rethrow Plugin](/docs/plugins/rethrow) to bypass oRPC error handling and let NestJS handle the error directly.
+
+An exception filter that catches everything replaces the oRPC error response unless it delegates `ORPCHttpException` to NestJS:
+
+```ts
+import { ORPCHttpException } from '@orpc/nest'
+
+@Catch()
+export class CatchEverythingFilter extends BaseExceptionFilter {
+  catch(exception: unknown, host: ArgumentsHost) {
+    if (exception instanceof ORPCHttpException) {
+      return super.catch(exception, host)
+    }
+
+    // ...
+  }
+}
+```
 
 :::tip
 Learn how to customize input and output validation errors in [Validation Errors](/docs/recipes/validation-customization#custom-validation-errors) and the [ORPCModule](#configuration) section.
@@ -121,6 +140,23 @@ async function bootstrap() {
   await app.listen(process.env.PORT ?? 3000)
 }
 ```
+
+:::warning
+NestJS only limits the bodies it parses itself. Bodies parsed by oRPC (other content types, or every body when `bodyParser: false` is set) have no size limit, so cap them with [Request Limit](/docs/plugins/request-limit) or [Tmp File Upload](/docs/plugins/tmp-file-upload).
+:::
+
+:::tip
+With the Fastify adapter, content types Fastify has no parser for, such as `multipart/form-data`, are rejected with `415`. Register a catch-all parser that leaves the body unread so oRPC can parse it. Learn more in the [Fastify Adapter](/docs/adapters/fastify) documentation.
+
+```ts
+const fastify = app.getHttpAdapter().getInstance()
+
+fastify.addContentTypeParser('*', (request, payload, done) => {
+  done(null, undefined)
+})
+```
+
+:::
 
 ## Configuration
 
@@ -214,7 +250,7 @@ Most handler plugins also work in NestJS, for example [Request Headers](/docs/pl
       plugins: [
         new RethrowHandlerPlugin({
           // Bypass oRPC error handling and let NestJS handle the error instead
-          filter: error => !(error instanceof ORPCError)
+          filter: (error) => !(error instanceof ORPCError),
         }),
       ],
     }),
@@ -237,14 +273,15 @@ Configure how an [AsyncIteratorObject](/docs/async-iterator-object) is streamed 
     ORPCModule.forRoot({
       toNestResponse: {
         eventStream: {
+          /**
+           * Initial comment sent immediately upon stream start to flush headers. This allows the
+           * receiving side to establish the connection without waiting for the first event.
+           *
+           * `false` disables it, an object customizes it.
+           *
+           * @default true
+           */
           initialComment: {
-            /**
-             * If true, an initial comment is sent immediately upon stream start to flush headers.
-             * This allows the receiving side to establish the connection without waiting for the first event.
-             *
-             * @default true
-             */
-            enabled: true,
             /**
              * The content of the initial comment sent upon stream start. Must not include newline characters.
              *
@@ -252,13 +289,14 @@ Configure how an [AsyncIteratorObject](/docs/async-iterator-object) is streamed 
              */
             comment: '',
           },
+          /**
+           * Ping comment sent periodically to keep the connection alive.
+           *
+           * `false` disables it, an object customizes it.
+           *
+           * @default true
+           */
           keepAlive: {
-            /**
-             * If true, a ping comment is sent periodically to keep the connection alive.
-             *
-             * @default true
-             */
-            enabled: true,
             /**
              * Interval (in milliseconds) between ping comments sent after the last event.
              *
@@ -282,7 +320,7 @@ export class AppModule {}
 
 ### `toNestStandardLazyRequest` option
 
-By default, `@orpc/nest` supports the Express and Fastify adapters. If you use another adapter, you may need to customize how a NestJS request is converted into a standard request (including additional params). For details, see [Standard Server](https://github.com/middleapi/standard-server#request-and-response-types).
+By default, `@orpc/nest` supports the Express, Fastify, and Node (`@nestjs/platform-node`, NestJS v12.3+) adapters. If you use another adapter, you may need to customize how a NestJS request is converted into a standard request (including additional params). For details, see [Standard Server](https://github.com/middleapi/standard-server#request-and-response-types).
 
 ```ts
 import { NestStandardLazyRequest } from '@orpc/nest'
@@ -302,6 +340,41 @@ import { toStandardLazyRequest } from '@standard-server/fetch'
 })
 export class AppModule {}
 ```
+
+## Testing
+
+`@Implement` only registers routing metadata, so a controller method is a plain method that returns an implemented procedure. In unit tests, resolve the controller from a testing module and run that procedure with [`call`](/docs/recipes/testing-and-mocking#testing). Input validation, middleware, the handler, and output validation all run, and nothing needs to be mocked except your own dependencies.
+
+```ts
+import { Test } from '@nestjs/testing'
+import { call } from '@orpc/server'
+
+it('lists planets', async () => {
+  const moduleRef = await Test.createTestingModule({
+    controllers: [PlanetController],
+    providers: [PlanetService],
+  }).compile()
+
+  const controller = moduleRef.get(PlanetController)
+
+  await expect(call(controller.list(), { page: 1, size: 10 })).resolves.toEqual([
+    { id: '1', name: 'Earth' },
+  ])
+
+  // contract validation runs, so invalid input is rejected
+  await expect(call(controller.list(), { page: 0, size: 10 })).rejects.toMatchObject({
+    code: 'BAD_REQUEST',
+  })
+})
+```
+
+If you extended `DefaultInitialContext` (see [Initial Context](#initial-context)), pass it as `call(controller.list(), input, { context })`, because `ORPCModule` is not involved in this kind of test.
+
+Guards, pipes, interceptors, and parameter decorators only run inside a NestJS application, so `call` does not exercise them. Test those end to end by creating an app with `moduleRef.createNestApplication()` and sending HTTP requests to it.
+
+:::info
+For more on calling and mocking procedures, see [Testing and Mocking](/docs/recipes/testing-and-mocking).
+:::
 
 ## Typesafe Client
 

@@ -1,35 +1,41 @@
-import type { Context, Middleware, MiddlewareOptions } from '@orpc/server'
-import type { Promisable, Value } from '@orpc/shared'
-import type { RateLimitHandlerPluginContext } from './handler-plugin'
-import type { RateLimiter } from './types'
+import type { AnyORPCError, Context, Middleware, MiddlewareOptions } from '@orpc/server'
 import { ORPCError } from '@orpc/server'
+import type { Promisable, Value } from '@orpc/shared'
 import { toArray, value } from '@orpc/shared'
-import { RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
 
-export const RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_RATELIMIT_MIDDLEWARE_CONTEXT')
+import type { RateLimitHandlerPluginContext } from './handler-plugin'
+import { RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
+import type { RateLimiter, RateLimitResult } from './types'
+
+export const RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for(
+  'ORPC_RATELIMIT_MIDDLEWARE_CONTEXT',
+)
 
 export interface RateLimitMiddlewareContext {
   [RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL]?: {
     /**
      * The applied limits in this request, mainly for deduplication purposes
      */
-    applied: { limiter: RateLimiter, key: string }[]
+    applied: { limiter: RateLimiter; key: string }[]
   }
 }
 
-export interface RateLimitMiddlewareOptions<
-  TInContext extends Context,
-  TInput,
-> {
+export interface RateLimitMiddlewareOptions<TInContext extends Context, TInput> {
   /**
    * The rule set to use for rate limiting
    */
-  limiter: Value<Promisable<RateLimiter>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
+  limiter: Value<
+    Promisable<RateLimiter>,
+    [options: MiddlewareOptions<TInContext, unknown, {}>, input: TInput]
+  >
 
   /**
    * The key to identify the user/requester
    */
-  key: Value<Promisable<string>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
+  key: Value<
+    Promisable<string>,
+    [options: MiddlewareOptions<TInContext, unknown, {}>, input: TInput]
+  >
 
   /**
    * The weight of the request. Determines how many tokens or quota
@@ -37,7 +43,12 @@ export interface RateLimitMiddlewareOptions<
    *
    * @default 1
    */
-  weight?: Value<Promisable<number>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
+  weight?:
+    | Value<
+        Promisable<number>,
+        [options: MiddlewareOptions<TInContext, unknown, {}>, input: TInput]
+      >
+    | undefined
 
   /**
    * If your ratelimit middleware is used multiple times
@@ -47,7 +58,23 @@ export interface RateLimitMiddlewareOptions<
    *
    * @default true
    */
-  dedupe?: boolean
+  dedupe?: boolean | undefined
+
+  /**
+   * The error to throw when the limit is exceeded.
+   *
+   * @default ORPCError('TOO_MANY_REQUESTS') with `limit`, `remaining` and `reset` as data
+   */
+  error?:
+    | Value<
+        AnyORPCError,
+        [
+          result: RateLimitResult,
+          options: MiddlewareOptions<TInContext, unknown, {}>,
+          input: TInput,
+        ]
+      >
+    | undefined
 }
 
 /**
@@ -56,12 +83,24 @@ export interface RateLimitMiddlewareOptions<
  *
  * @see {@link https://orpc.dev/docs/helpers/ratelimit#ratelimit-middleware | Rate Limit Helpers - Ratelimit Middleware}
  */
-export function ratelimit<
-  TInContext extends Context,
+export function ratelimit<TInContext extends Context, TInput>({
+  dedupe = true,
+  error = (result) =>
+    new ORPCError('TOO_MANY_REQUESTS', {
+      data: {
+        limit: result.limit,
+        remaining: result.remaining,
+        reset: result.reset,
+      },
+    }),
+  ...options
+}: RateLimitMiddlewareOptions<TInContext, TInput>): Middleware<
+  TInContext,
+  object,
   TInput,
->(
-  { dedupe = true, ...options }: RateLimitMiddlewareOptions<TInContext, TInput>,
-): Middleware<TInContext, object, TInput, any, object> {
+  any,
+  object
+> {
   return async function ratelimit(middlewareOptions, input) {
     const [limiter, key, weight] = await Promise.all([
       value(options.limiter, middlewareOptions, input),
@@ -69,36 +108,35 @@ export function ratelimit<
       value(options.weight, middlewareOptions, input),
     ])
 
-    const middlewareContext = (middlewareOptions.context as RateLimitMiddlewareContext)[RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL]
-    if (dedupe && middlewareContext?.applied.some(l => l.key === key && l.limiter === limiter)) {
+    const middlewareContext = (middlewareOptions.context as RateLimitMiddlewareContext)[
+      RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL
+    ]
+    if (dedupe && middlewareContext?.applied.some((l) => l.key === key && l.limiter === limiter)) {
       return middlewareOptions.next()
     }
 
     const result = await limiter.limit(key, { weight })
 
-    const pluginContext = (middlewareOptions.context as RateLimitHandlerPluginContext)[RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL]
+    const pluginContext = (middlewareOptions.context as RateLimitHandlerPluginContext)[
+      RATELIMIT_HANDLER_PLUGIN_CONTEXT_SYMBOL
+    ]
     if (pluginContext) {
-      pluginContext.checks.push({ path: middlewareOptions.path, procedure: middlewareOptions.procedure, result })
+      pluginContext.checks.push({
+        path: middlewareOptions.path,
+        procedure: middlewareOptions.procedure,
+        result,
+      })
     }
 
     if (!result.success) {
-      throw new ORPCError('TOO_MANY_REQUESTS', {
-        data: {
-          limit: result.limit,
-          remaining: result.remaining,
-          reset: result.reset,
-        },
-      })
+      throw value(error, result, middlewareOptions, input)
     }
 
     return middlewareOptions.next({
       context: {
         [RATELIMIT_MIDDLEWARE_CONTEXT_SYMBOL]: {
           ...middlewareContext,
-          applied: [
-            ...toArray(middlewareContext?.applied),
-            { limiter, key },
-          ],
+          applied: [...toArray(middlewareContext?.applied), { limiter, key }],
         },
       } satisfies RateLimitMiddlewareContext,
     })

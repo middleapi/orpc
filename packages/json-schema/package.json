@@ -1,51 +1,50 @@
 {
   "name": "@orpc/json-schema",
-  "type": "module",
-  "version": "2.0.0-beta.42",
+  "version": "2.0.0-beta.53",
   "description": "JSON Schema conversion and smart request coercion for oRPC and OpenAPI",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "coercion",
+    "json-schema",
+    "openapi",
+    "orpc",
+    "typescript",
+    "validation"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/json-schema"
   },
-  "keywords": [
-    "orpc",
-    "json-schema",
-    "openapi",
-    "coercion",
-    "validation",
-    "typescript"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
-  "publishConfig": {
-    "exports": {
-      "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
-      }
-    }
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts"
   },
-  "files": [
-    "dist"
-  ],
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      }
+    }
+  },
   "scripts": {
-    "prepack": "unbuild",
-    "type:check": "tsc -b"
+    "prepack": "tsdown"
   },
   "dependencies": {
-    "@openapi-spec/types": "~0.3.0",
+    "@openapi-spec/types": "~0.8.0",
     "@orpc/client": "workspace:*",
     "@orpc/contract": "workspace:*",
     "@orpc/server": "workspace:*",
@@ -53,6 +52,6 @@
     "@standard-schema/spec": "^1.1.0"
   },
   "devDependencies": {
-    "zod": "^4.5.4"
+    "zod": "^4.6.7"
   }
 }

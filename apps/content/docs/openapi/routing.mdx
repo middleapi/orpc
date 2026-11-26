@@ -1,6 +1,6 @@
 ---
-title: "OpenAPI Routing"
-description: "Use openapi metadata to control how procedures are exposed over HTTP, including methods, paths, path parameters, and prefixes."
+title: 'OpenAPI Routing'
+description: 'Use openapi metadata to control how procedures are exposed over HTTP, including methods, paths, path parameters, and prefixes.'
 ---
 
 ## Basic Routing
@@ -17,9 +17,8 @@ const router = {
     list: os
       .meta(openapi({ method: 'GET', path: '/planets' }))
       .handler(async () => [{ id: 'earth', name: 'Earth' }]),
-    create: os
-      .handler(async () => ({})),
-  }
+    create: os.handler(async () => ({})),
+  },
 }
 ```
 
@@ -62,8 +61,7 @@ const listPlanets = planetBuilder
   .meta(openapi({ method: 'GET', path: '/' }))
   .handler(async () => [{ id: 'earth', name: 'Earth' }])
 
-const createPlanet = planetBuilder
-  .handler(async () => ({}))
+const createPlanet = planetBuilder.handler(async () => ({}))
 
 const router = os.meta(openapi({ prefix: '/api/v2' })).router({
   planet: {
@@ -103,9 +101,7 @@ When using a [lazy router](/docs/router#lazy-router), define a `prefix` so lazy 
 
 ```ts
 const router = {
-  project: os
-    .meta(openapi({ prefix: '/projects' }))
-    .lazy(() => import('./project')),
+  project: os.meta(openapi({ prefix: '/projects' })).lazy(() => import('./project')),
 }
 ```
 
@@ -113,17 +109,28 @@ const router = {
 
 When `openapi` is applied multiple times, `prefix` values are concatenated in definition order, while `method`, `path`, and `successStatus` are overridden by the most recent call. For the full merge behavior of every field, see [Metadata Merging](/docs/openapi/specification#metadata-merging).
 
+:::warning
+A router-level `prefix` applies again, even if a procedure already has it:
+
 ```ts
-const router = os
-  .meta(openapi({ prefix: '/api/v2' }))
-  .router({
-    get: os
-      .meta(openapi({ prefix: '/planets' }))
-      .meta(openapi({ method: 'GET', path: '/planets/{id}' }))
-      .meta(openapi({ path: '/{id}' }))
-      .input(z.object({ id: z.string() }))
-      .handler(async () => ({})),
-  })
+const base = os.meta(openapi({ prefix: '/api' }))
+
+const router = base.router({
+  ping: base.handler(() => 'pong'), // prefix: '/api/api'
+})
+```
+
+:::
+
+```ts
+const router = os.meta(openapi({ prefix: '/api/v2' })).router({
+  get: os
+    .meta(openapi({ prefix: '/planets' }))
+    .meta(openapi({ method: 'GET', path: '/planets/{id}' }))
+    .meta(openapi({ path: '/{id}' }))
+    .input(z.object({ id: z.string() }))
+    .handler(async () => ({})),
+})
 ```
 
 These calls are equivalent to:
@@ -131,11 +138,13 @@ These calls are equivalent to:
 ```ts
 const router = {
   get: os
-    .meta(openapi({
-      prefix: '/api/v2/planets',
-      method: 'GET',
-      path: '/{id}',
-    }))
+    .meta(
+      openapi({
+        prefix: '/api/v2/planets',
+        method: 'GET',
+        path: '/{id}',
+      }),
+    )
     .handler(async () => ({})),
 }
 ```
@@ -144,9 +153,7 @@ const router = {
 Metadata resets to its default behavior when set to `undefined` in subsequent calls:
 
 ```ts
-const example = os
-  .meta(openapi({ prefix: '/api/v2' }))
-  .meta(openapi({ prefix: undefined }))
+const example = os.meta(openapi({ prefix: '/api/v2' })).meta(openapi({ prefix: undefined }))
 ```
 
 In this example, the final `prefix` is `undefined`, so no prefix is applied to `example`.
@@ -176,7 +183,7 @@ const ping = base
     method: 'GET',
     path: '/ping',
   })
-  .input(z.object({ name: z.string(), }))
+  .input(z.object({ name: z.string() }))
   .handler(async ({ input }) => {
     return `Hello ${input.name}!`
   })

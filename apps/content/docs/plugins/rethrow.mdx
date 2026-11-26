@@ -1,8 +1,8 @@
 ---
-title: "Rethrow Handler Plugin"
+title: 'Rethrow Handler Plugin'
 description: "Bypass oRPC's built-in error handling and rethrow matching errors to your framework, such as NestJS filters or Express error middleware."
 sidebar:
-  label: "Rethrow"
+  label: 'Rethrow'
 ---
 
 ## Usage
@@ -23,8 +23,7 @@ const handler = new RPCHandler(router, {
 
 try {
   await handler.handle(request)
-}
-catch (error) {
+} catch (error) {
   // If the filter returns true, the error can be caught here
 }
 ```

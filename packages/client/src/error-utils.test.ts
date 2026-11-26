@@ -1,9 +1,9 @@
 import type { Writable } from '@orpc/shared'
-import { MalformedResponseError, ORPCError } from './error'
+
+import { ORPCError } from './error'
 import {
   cloneORPCError,
   createORPCErrorFromJson,
-  createORPCErrorFromMalformedResponse,
   isDefinedError,
   isORPCErrorJson,
   toORPCError,
@@ -50,7 +50,11 @@ describe('toORPCError', () => {
 })
 
 describe('isORPCErrorJson', () => {
-  const error = new ORPCError('BAD_REQUEST', { message: 'Bad request', cause: 'cause', data: 'data' })
+  const error = new ORPCError('BAD_REQUEST', {
+    message: 'Bad request',
+    cause: 'cause',
+    data: 'data',
+  })
   ;(error as any).defined = true as any
 
   it('returns true for valid ORPC error JSON', () => {
@@ -125,7 +129,11 @@ describe('isORPCErrorJson', () => {
 })
 
 describe('createORPCErrorFromJson', () => {
-  const error = new ORPCError('BAD_REQUEST', { message: 'Bad request', cause: 'cause', data: 'data' })
+  const error = new ORPCError('BAD_REQUEST', {
+    message: 'Bad request',
+    cause: 'cause',
+    data: 'data',
+  })
   ;(error as any).defined = true as any
 
   it('creates ORPCError from valid JSON', () => {
@@ -157,72 +165,6 @@ describe('createORPCErrorFromJson', () => {
 
     expect(createdError).toBeInstanceOf(ORPCError)
     expect(createdError.cause).toBe(cause)
-  })
-})
-
-describe('createORPCErrorFromMalformedResponse', () => {
-  it('creates a MALFORMED_ORPC_RESPONSE error with the response as data and a MalformedResponseError cause', () => {
-    const response = { status: 500, headers: { 'x-header': 'value' }, body: { something: 'unexpected' } }
-    const error = createORPCErrorFromMalformedResponse({ response })
-
-    expect(error).toBeInstanceOf(ORPCError)
-    expect(error.code).toBe('MALFORMED_ORPC_RESPONSE')
-    expect(error.defined).toBe(false)
-    expect(error.data).toBe(response)
-    expect(error.cause).toBeInstanceOf(MalformedResponseError)
-    expect((error.cause as MalformedResponseError).name).toBe('MalformedResponseError')
-    expect((error.cause as MalformedResponseError).response).toBe(response)
-    expect((error.cause as MalformedResponseError).message).toBe(error.message)
-  })
-
-  it('supports overriding the message and forwarding a cause to the MalformedResponseError', () => {
-    const cause = new Error('deserialize failed')
-    const error = createORPCErrorFromMalformedResponse({
-      message: 'Invalid RPC response format.',
-      response: { status: 200, headers: {}, body: 'not rpc format' },
-      cause,
-    })
-
-    expect(error.message).toBe('Invalid RPC response format.')
-    expect((error.cause as MalformedResponseError).message).toBe('Invalid RPC response format.')
-    expect((error.cause as MalformedResponseError).cause).toBe(cause)
-  })
-
-  it('infers message from a string body', () => {
-    const error = createORPCErrorFromMalformedResponse({ response: { status: 500, headers: {}, body: 'upstream exploded' } })
-
-    expect(error.message).toBe('upstream exploded')
-  })
-
-  it('infers message from body.message', () => {
-    const error = createORPCErrorFromMalformedResponse({ response: { status: 500, headers: {}, body: { message: 'upstream exploded', detail: 'ignored' } } })
-
-    expect(error.message).toBe('upstream exploded')
-  })
-
-  it('infers message from a common error code matching the status', () => {
-    expect(createORPCErrorFromMalformedResponse({ response: { status: 404, headers: {}, body: { detail: 'no message here' } } }).message).toBe('Not Found')
-    expect(createORPCErrorFromMalformedResponse({ response: { status: 503, headers: {}, body: undefined } }).message).toBe('Service Unavailable')
-    expect(createORPCErrorFromMalformedResponse({ response: { status: 411, headers: {}, body: undefined } }).message).toBe('Length Required')
-  })
-
-  it('ignores bodies longer than 256 characters', () => {
-    const long = 'x'.repeat(257)
-
-    expect(createORPCErrorFromMalformedResponse({ response: { status: 502, headers: {}, body: long } }).message).toBe('Bad Gateway')
-    expect(createORPCErrorFromMalformedResponse({ response: { status: 502, headers: {}, body: { message: long } } }).message).toBe('Bad Gateway')
-  })
-
-  it.each([
-    ['empty string body', ''],
-    ['empty body.message', { message: '' }],
-    ['oversized string body', 'x'.repeat(257)],
-    ['non-string body.message', { message: 42 }],
-    ['non-object body', 42],
-  ])('falls back to the default message when the status is uncommon and the body has no message (%s)', (_, body) => {
-    const error = createORPCErrorFromMalformedResponse({ response: { status: 599, headers: {}, body } })
-
-    expect(error.message).toBe('Malformed Orpc Response')
   })
 })
 
@@ -272,7 +214,7 @@ describe('cloneORPCError', () => {
     const cloned = cloneORPCError(original)
 
     // Modifying cloned data doesn't affect original
-    cloned.data = 2
+    ;(cloned.data as any) = 2
 
     expect(original.data).toBe(1)
     expect(cloned.data).toBe(2)
@@ -305,6 +247,7 @@ describe('cloneORPCError', () => {
 
     expect(Object.prototype.toString.call(cloned)).toBe('[object Error]')
     expect(Object.keys(cloned)).toEqual(Object.keys(original))
+    // oxlint-disable-next-line typescript/no-misused-spread
     expect({ ...cloned }).toEqual({ ...original })
   })
 })

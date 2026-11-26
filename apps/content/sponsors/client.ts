@@ -33,8 +33,7 @@ function apply(card: HTMLAnchorElement, sponsor: AdSponsor): void {
   const tint = tintStyle(sponsor)
   if (tint === undefined) {
     card.removeAttribute('style')
-  }
-  else {
+  } else {
     card.setAttribute('style', tint)
   }
 }
@@ -76,7 +75,6 @@ function rotate(): void {
 // parsed; the guard only covers a non-deferred injection.
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', rotate)
-}
-else {
+} else {
   rotate()
 }

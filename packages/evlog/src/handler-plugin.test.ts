@@ -1,8 +1,10 @@
 import { ORPCError, RPCSerializer } from '@orpc/client'
 import { AbortError, ORPC_NAME, sleep } from '@orpc/shared'
-import { ErrorEvent } from '@standard-server/core'
+import { EventStreamErrorEvent } from '@standard-server/core'
+import type { LogLevel } from 'evlog'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { LOGGER_CONTEXT_SYMBOL } from './context'
+
+import { EVLOG_LOGGER_CONTEXT_SYMBOL } from './context'
 import { EvlogHandlerPlugin } from './handler-plugin'
 
 const mocks = vi.hoisted(() => ({
@@ -23,7 +25,7 @@ vi.mock('evlog/toolkit', () => ({
 
 function createRequest(
   url: string,
-  options: { headers?: Record<string, string | string[]>, signal?: AbortSignal } = {},
+  options: { headers?: Record<string, string | string[]>; signal?: AbortSignal } = {},
 ) {
   return {
     method: 'GET',
@@ -118,11 +120,13 @@ describe('evlogHandlerPlugin', () => {
     expect(mocks.defineFrameworkIntegration).toHaveBeenCalledTimes(1)
     expect(mocks.spec.name).toBe(ORPC_NAME)
     expect(mocks.spec.storage).toBe(storage)
-    expect(mocks.spec.extractRequest({
-      request: createRequest('/hello/world?debug=1', {
-        headers: { 'x-request-id': 'request-id' },
+    expect(
+      mocks.spec.extractRequest({
+        request: createRequest('/hello/world?debug=1', {
+          headers: { 'x-request-id': 'request-id' },
+        }),
       }),
-    })).toEqual({
+    ).toEqual({
       method: 'GET',
       path: '/hello/world',
       headers: { 'x-request-id': 'request-id' },
@@ -136,14 +140,8 @@ describe('evlogHandlerPlugin', () => {
       clientInterceptors: [existingClientInterceptor],
     } as any)
 
-    expect(initialized.routingInterceptors).toEqual([
-      expect.any(Function),
-      existingRouting,
-    ])
-    expect(initialized.interceptors).toEqual([
-      expect.any(Function),
-      existingInterceptor,
-    ])
+    expect(initialized.routingInterceptors).toEqual([expect.any(Function), existingRouting])
+    expect(initialized.interceptors).toEqual([expect.any(Function), existingInterceptor])
     expect(initialized.clientInterceptors).toEqual([
       expect.any(Function),
       existingClientInterceptor,
@@ -162,16 +160,21 @@ describe('evlogHandlerPlugin', () => {
       logger: createLogger(),
     })
 
-    await expect(routing({
-      next,
-      context: { existing: true },
-      request: createRequest('/skip'),
-    })).resolves.toBe('skipped')
+    await expect(
+      routing({
+        next,
+        context: { existing: true },
+        request: createRequest('/skip'),
+      }),
+    ).resolves.toBe('skipped')
 
-    expect(mocks.start).toHaveBeenCalledWith(expect.objectContaining({
-      context: { existing: true },
-      request: expect.objectContaining({ url: '/skip' }),
-    }), {})
+    expect(mocks.start).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: { existing: true },
+        request: expect.objectContaining({ url: '/skip' }),
+      }),
+      {},
+    )
     expect(next).toHaveBeenCalledWith()
   })
 
@@ -181,7 +184,7 @@ describe('evlogHandlerPlugin', () => {
     const { finish, logger, runWith } = mockIntegration()
     const next = vi.fn(async (options: any) => {
       expect(options.context.existing).toBe(true)
-      expect(options.context[LOGGER_CONTEXT_SYMBOL]).toBe(logger)
+      expect(options.context[EVLOG_LOGGER_CONTEXT_SYMBOL]).toBe(logger)
 
       return {
         matched: true,
@@ -232,11 +235,13 @@ describe('evlogHandlerPlugin', () => {
     const { finish, logger } = mockIntegration()
     const error = new Error('internal-error')
 
-    await expect(routing({
-      next: vi.fn().mockRejectedValue(error),
-      context: {},
-      request: createRequest('/ping'),
-    })).rejects.toThrow(error)
+    await expect(
+      routing({
+        next: vi.fn().mockRejectedValue(error),
+        context: {},
+        request: createRequest('/ping'),
+      }),
+    ).rejects.toThrow(error)
 
     expect(logger.error).toHaveBeenCalledWith(error)
     expect(finish).toHaveBeenCalledWith()
@@ -252,8 +257,7 @@ describe('evlogHandlerPlugin', () => {
       yield 2
     }
 
-    const iterator = source() as unknown as AsyncIterable<number> & { meta: string }
-    iterator.meta = 'preserved'
+    const iterator = source()
 
     const result = await routing({
       next: vi.fn().mockResolvedValue({
@@ -267,8 +271,9 @@ describe('evlogHandlerPlugin', () => {
       request: createRequest('/iterable'),
     })
 
-    expect((result.response.body as typeof iterator).meta).toBe('preserved')
-    await expect(collectIterator(result.response.body as AsyncIterable<number>)).resolves.toEqual([1, 2])
+    await expect(collectIterator(result.response.body as AsyncIterable<number>)).resolves.toEqual([
+      1, 2,
+    ])
     expect(finish).toHaveBeenCalledWith({ status: 200 })
   })
 
@@ -278,7 +283,7 @@ describe('evlogHandlerPlugin', () => {
     const { finish, logger } = mockIntegration()
 
     async function* source() {
-      // eslint-disable-next-line no-throw-literal
+      // oxlint-disable-next-line no-throw-literal
       throw 'iterator-failure'
     }
 
@@ -294,13 +299,15 @@ describe('evlogHandlerPlugin', () => {
       request: createRequest('/iterable-error'),
     })
 
-    await expect(collectIterator(result.response.body as AsyncIterable<unknown>)).rejects.toBe('iterator-failure')
+    await expect(collectIterator(result.response.body as AsyncIterable<unknown>)).rejects.toBe(
+      'iterator-failure',
+    )
     expect(logger.error).toHaveBeenCalledWith('iterator-failure')
     expect(finish).toHaveBeenCalledWith({ status: 200 })
     expect(logger.error).toHaveBeenCalledBefore(finish)
   })
 
-  it('does not log ErrorEvent from response body iterators', async () => {
+  it('does not log EventStreamErrorEvent from response body iterators', async () => {
     const plugin = new EvlogHandlerPlugin()
     const { routing } = getPluginHooks(plugin)
     const { finish, logger } = mockIntegration()
@@ -321,7 +328,9 @@ describe('evlogHandlerPlugin', () => {
       request: createRequest('/iterable-error-event'),
     })
 
-    await expect(collectIterator(result.response.body as AsyncIterable<unknown>)).rejects.toBeInstanceOf(ErrorEvent)
+    await expect(
+      collectIterator(result.response.body as AsyncIterable<unknown>),
+    ).rejects.toBeInstanceOf(EventStreamErrorEvent)
     expect(logger.error).not.toHaveBeenCalled()
     expect(finish).toHaveBeenCalledWith({ status: 200 })
   })
@@ -337,9 +346,7 @@ describe('evlogHandlerPlugin', () => {
         controller.enqueue('chunk-2')
         controller.close()
       },
-    }) as ReadableStream<string> & { meta: string }
-
-    stream.meta = 'preserved'
+    })
 
     const result = await routing({
       next: vi.fn().mockResolvedValue({
@@ -353,8 +360,10 @@ describe('evlogHandlerPlugin', () => {
       request: createRequest('/stream'),
     })
 
-    expect((result.response.body as typeof stream).meta).toBe('preserved')
-    await expect(collectStream(result.response.body as ReadableStream<string>)).resolves.toEqual(['chunk-1', 'chunk-2'])
+    await expect(collectStream(result.response.body as ReadableStream<string>)).resolves.toEqual([
+      'chunk-1',
+      'chunk-2',
+    ])
     await sleep(0)
     expect(finish).toHaveBeenCalledWith({ status: 206 })
   })
@@ -381,7 +390,9 @@ describe('evlogHandlerPlugin', () => {
       request: createRequest('/stream-error'),
     })
 
-    await expect(collectStream(result.response.body as ReadableStream<unknown>)).rejects.toThrow(streamError)
+    await expect(collectStream(result.response.body as ReadableStream<unknown>)).rejects.toThrow(
+      streamError,
+    )
     await sleep(0)
     expect(logger.error).toHaveBeenCalledWith(streamError)
     expect(finish).toHaveBeenCalledWith({ status: 200 })
@@ -397,15 +408,17 @@ describe('evlogHandlerPlugin', () => {
     const plugin = new EvlogHandlerPlugin({ logAbort: true })
     const { interceptor } = getPluginHooks(plugin)
 
-    await expect(interceptor({
-      next: vi.fn(async () => {
-        controller.abort('manual')
-        return 'pong'
+    await expect(
+      interceptor({
+        next: vi.fn(async () => {
+          controller.abort('manual')
+          return 'pong'
+        }),
+        context: { [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger },
+        path: ['nested', 'ping'],
+        request: createRequest('/ping', { signal: controller.signal }),
       }),
-      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
-      path: ['nested', 'ping'],
-      request: createRequest('/ping', { signal: controller.signal }),
-    })).resolves.toBe('pong')
+    ).resolves.toBe('pong')
 
     expect(logger.set).toHaveBeenNthCalledWith(1, {
       rpc: { system: ORPC_NAME, method: 'nested.ping' },
@@ -420,12 +433,14 @@ describe('evlogHandlerPlugin', () => {
     const alreadyAborted = new AbortController()
     alreadyAborted.abort('before')
 
-    await expect(interceptor({
-      next: vi.fn().mockResolvedValue('done'),
-      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
-      path: ['ping'],
-      request: createRequest('/ping', { signal: alreadyAborted.signal }),
-    })).resolves.toBe('done')
+    await expect(
+      interceptor({
+        next: vi.fn().mockResolvedValue('done'),
+        context: { [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger },
+        path: ['ping'],
+        request: createRequest('/ping', { signal: alreadyAborted.signal }),
+      }),
+    ).resolves.toBe('done')
 
     expect(logger.set).toHaveBeenCalledWith({
       abort: {
@@ -441,12 +456,14 @@ describe('evlogHandlerPlugin', () => {
     const { interceptor } = getPluginHooks(plugin)
     const businessError = new ORPCError('UNAUTHORIZED')
 
-    await expect(interceptor({
-      next: vi.fn().mockRejectedValue(businessError),
-      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
-      path: ['ping'],
-      request: createRequest('/ping'),
-    })).rejects.toThrow(businessError)
+    await expect(
+      interceptor({
+        next: vi.fn().mockRejectedValue(businessError),
+        context: { [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger },
+        path: ['ping'],
+        request: createRequest('/ping'),
+      }),
+    ).rejects.toThrow(businessError)
 
     expect(logger.error).toHaveBeenCalledWith(businessError)
     expect(logger.setLevel).toHaveBeenCalledWith('warn')
@@ -456,12 +473,14 @@ describe('evlogHandlerPlugin', () => {
 
     const unexpectedError = new Error('boom')
 
-    await expect(interceptor({
-      next: vi.fn().mockRejectedValue(unexpectedError),
-      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
-      path: ['ping'],
-      request: createRequest('/ping'),
-    })).rejects.toThrow(unexpectedError)
+    await expect(
+      interceptor({
+        next: vi.fn().mockRejectedValue(unexpectedError),
+        context: { [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger },
+        path: ['ping'],
+        request: createRequest('/ping'),
+      }),
+    ).rejects.toThrow(unexpectedError)
 
     expect(logger.error).toHaveBeenCalledWith(unexpectedError)
     expect(logger.setLevel).not.toHaveBeenCalled()
@@ -471,12 +490,14 @@ describe('evlogHandlerPlugin', () => {
 
     const abortError = new AbortError('reason')
 
-    await expect(interceptor({
-      next: vi.fn().mockRejectedValue(abortError),
-      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
-      path: ['ping'],
-      request: createRequest('/ping'),
-    })).rejects.toThrow(abortError)
+    await expect(
+      interceptor({
+        next: vi.fn().mockRejectedValue(abortError),
+        context: { [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger },
+        path: ['ping'],
+        request: createRequest('/ping'),
+      }),
+    ).rejects.toThrow(abortError)
 
     expect(logger.error).toHaveBeenCalledWith(abortError)
     expect(logger.setLevel).toHaveBeenCalledWith('info')
@@ -486,12 +507,14 @@ describe('evlogHandlerPlugin', () => {
 
     const internalError = new ORPCError('INTERNAL_SERVER_ERROR')
 
-    await expect(interceptor({
-      next: vi.fn().mockRejectedValue(internalError),
-      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
-      path: ['ping'],
-      request: createRequest('/ping'),
-    })).rejects.toThrow(internalError)
+    await expect(
+      interceptor({
+        next: vi.fn().mockRejectedValue(internalError),
+        context: { [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger },
+        path: ['ping'],
+        request: createRequest('/ping'),
+      }),
+    ).rejects.toThrow(internalError)
 
     expect(logger.error).toHaveBeenCalledWith(internalError)
     expect(logger.setLevel).not.toHaveBeenCalled()
@@ -503,32 +526,35 @@ describe('evlogHandlerPlugin', () => {
     const { interceptor } = getPluginHooks(plugin)
     const error = new Error('boom')
 
-    await expect(interceptor({
-      next: vi.fn().mockRejectedValue(error),
-      context: {},
-      path: ['ping'],
-      request: createRequest('/ping'),
-    })).rejects.toThrow(error)
+    await expect(
+      interceptor({
+        next: vi.fn().mockRejectedValue(error),
+        context: {},
+        path: ['ping'],
+        request: createRequest('/ping'),
+      }),
+    ).rejects.toThrow(error)
 
     expect(procedureErrorLevel).not.toHaveBeenCalled()
   })
 
   it('honors the procedureErrorLevel option, passing the error and its default level', async () => {
     const logger = createLogger()
-    const procedureErrorLevel = vi.fn(
-      (error: unknown, level: 'info' | 'error' | 'warn' | 'debug') =>
-        error instanceof ORPCError && error.code === 'UNAUTHORIZED' ? 'debug' as const : level,
+    const procedureErrorLevel = vi.fn((error: unknown, level: LogLevel) =>
+      error instanceof ORPCError && error.code === 'UNAUTHORIZED' ? ('debug' as const) : level,
     )
     const plugin = new EvlogHandlerPlugin({ procedureErrorLevel })
     const { interceptor } = getPluginHooks(plugin)
     const businessError = new ORPCError('UNAUTHORIZED')
 
-    await expect(interceptor({
-      next: vi.fn().mockRejectedValue(businessError),
-      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
-      path: ['ping'],
-      request: createRequest('/ping'),
-    })).rejects.toThrow(businessError)
+    await expect(
+      interceptor({
+        next: vi.fn().mockRejectedValue(businessError),
+        context: { [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger },
+        path: ['ping'],
+        request: createRequest('/ping'),
+      }),
+    ).rejects.toThrow(businessError)
 
     expect(procedureErrorLevel).toHaveBeenCalledWith(businessError, 'warn')
     expect(logger.error).toHaveBeenCalledWith(businessError)
@@ -539,12 +565,14 @@ describe('evlogHandlerPlugin', () => {
 
     const otherError = new ORPCError('CONFLICT')
 
-    await expect(interceptor({
-      next: vi.fn().mockRejectedValue(otherError),
-      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
-      path: ['ping'],
-      request: createRequest('/ping'),
-    })).rejects.toThrow(otherError)
+    await expect(
+      interceptor({
+        next: vi.fn().mockRejectedValue(otherError),
+        context: { [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger },
+        path: ['ping'],
+        request: createRequest('/ping'),
+      }),
+    ).rejects.toThrow(otherError)
 
     expect(procedureErrorLevel).toHaveBeenCalledWith(otherError, 'warn')
     expect(logger.setLevel).toHaveBeenCalledWith('warn')
@@ -554,10 +582,12 @@ describe('evlogHandlerPlugin', () => {
     const plugin = new EvlogHandlerPlugin()
     const { client } = getPluginHooks(plugin)
 
-    await expect(client({
-      next: vi.fn().mockResolvedValue('pong'),
-      context: {},
-    })).resolves.toBe('pong')
+    await expect(
+      client({
+        next: vi.fn().mockResolvedValue('pong'),
+        context: {},
+      }),
+    ).resolves.toBe('pong')
   })
 
   it('logs client AsyncIteratorObject errors', async () => {
@@ -572,7 +602,7 @@ describe('evlogHandlerPlugin', () => {
 
     const output = await client({
       next: vi.fn().mockResolvedValue(source()),
-      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+      context: { [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger },
     })
 
     await expect(collectIterator(output as AsyncIterable<unknown>)).rejects.toThrow(streamError)
@@ -587,12 +617,14 @@ describe('evlogHandlerPlugin', () => {
     const abortError = new AbortError('stream-abort')
 
     const output = await client({
-      next: vi.fn().mockResolvedValue(new ReadableStream({
-        start(controller) {
-          controller.error(abortError)
-        },
-      })),
-      context: { [LOGGER_CONTEXT_SYMBOL]: logger },
+      next: vi.fn().mockResolvedValue(
+        new ReadableStream({
+          start(controller) {
+            controller.error(abortError)
+          },
+        }),
+      ),
+      context: { [EVLOG_LOGGER_CONTEXT_SYMBOL]: logger },
     })
 
     await expect(collectStream(output as ReadableStream<unknown>)).rejects.toThrow(abortError)

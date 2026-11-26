@@ -1,10 +1,12 @@
+import type { Public } from '@orpc/shared'
+import { isNonPrimitive, NullProtoObj } from '@orpc/shared'
 import type { StandardHeaders } from '@standard-server/core'
-import type { OpenAPISerializer } from '../../openapi-serializer'
-import { isTypescriptObject, NullProtoObj } from '@orpc/shared'
+
+import type { OpenAPIJsonSerializer } from '../../openapi-json-serializer'
 
 export function serializeHeaders(
   headers: object,
-  serializer: Pick<OpenAPISerializer, 'serialize'>,
+  serializer: Public<OpenAPIJsonSerializer>,
 ): StandardHeaders {
   const result = new NullProtoObj<Record<string, string | string[]>>()
 
@@ -41,25 +43,26 @@ export function serializeHeaders(
 
 function serializeHeaderValue(
   value: unknown,
-  serializer: Pick<OpenAPISerializer, 'serialize'>,
+  serializer: Public<OpenAPIJsonSerializer>,
 ): string | undefined {
-  const serialized = serializer.serialize(value)
+  const serialized = serializer.serializeJson(value).json
 
   if (Array.isArray(serialized)) {
     return serialized
-      .filter(item => item !== undefined && item !== null)
+      .filter((item) => item !== undefined && item !== null)
       .map(String)
       .join(',')
   }
 
-  if (isTypescriptObject(serialized)) {
+  if (isNonPrimitive(serialized)) {
     return Object.entries(serialized)
       .filter(([, val]) => val !== undefined && val !== null)
-      .map(([key, val]) => `${String(key)},${String(val)}`)
+      .map(([key, val]) => `${key},${String(val)}`)
       .join(',')
   }
 
   if (serialized !== undefined && serialized !== null) {
+    // oxlint-disable-next-line typescript/no-base-to-string
     return String(serialized)
   }
 

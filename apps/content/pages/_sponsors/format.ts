@@ -1,4 +1,8 @@
-const wholeUsd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 })
+const wholeUsd = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 0,
+})
 const centsUsd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 
 export function usd(value: number): string {
@@ -7,15 +11,31 @@ export function usd(value: number): string {
 
 // UTC, or a sponsorship that started near midnight lands in a different month
 // depending on the build machine's zone.
-const monthYearFormat = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' })
+const monthYearFormat = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+})
 
 export function monthYear(iso: string): string {
   return monthYearFormat.format(new Date(iso))
+}
+
+const yearsFormat = new Intl.NumberFormat('en-US', {
+  style: 'unit',
+  unit: 'year',
+  unitDisplay: 'long',
+})
+
+export function years(count: number): string {
+  return yearsFormat.format(count)
 }
 
 export function linkLabel(link: string): string {
   const url = new URL(link)
   const host = url.hostname.replace(/^www\./u, '')
 
-  return host === 'opencollective.com' ? 'Open Collective' : `${host}${url.pathname.replace(/\/$/u, '')}`
+  return host === 'opencollective.com'
+    ? 'Open Collective'
+    : `${host}${url.pathname.replace(/\/$/u, '')}`
 }

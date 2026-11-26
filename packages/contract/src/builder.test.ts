@@ -1,8 +1,9 @@
-import type { ErrorMap } from './error'
-import type { AnyMetaPlugin } from './meta'
-import z from 'zod'
+import * as z from 'zod'
+
 import { ContractBuilder, oc } from './builder'
+import type { ErrorMap } from './error'
 import * as ErrorUtilsModule from './error-utils'
+import type { AnyMetaPlugin } from './meta'
 import { setHiddenMetaPlugins } from './meta'
 import * as MetaUtilsModule from './meta-utils'
 import { ProcedureContract } from './procedure'
@@ -10,7 +11,7 @@ import * as RouterUtilsModule from './router-utils'
 
 const resolveMetaPluginsSpy = vi.spyOn(MetaUtilsModule, 'resolveMetaPlugins')
 const mergeErrorMapSpy = vi.spyOn(ErrorUtilsModule, 'mergeErrorMap')
-const augmentContractRouterSpy = vi.spyOn(RouterUtilsModule, 'augmentContractRouter')
+const augmentRouterContractSpy = vi.spyOn(RouterUtilsModule, 'augmentRouterContract')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -22,26 +23,22 @@ describe('contractBuilder', () => {
     errorMap: {
       BASE: { status: 400 },
     },
-    inputSchemas: [
-      z.object({ init: z.string() }),
-    ],
-    outputSchemas: [
-      z.object({ init: z.string() }),
-    ],
+    inputSchemas: [z.object({ init: z.string() })],
+    outputSchemas: [z.object({ init: z.string() })],
     meta: {
       base: true,
     },
     metaPlugins: [
       {
         name: 'test1',
-        init: m => m,
+        init: (m) => m,
       },
     ],
   }
 
   const metaPlugin: AnyMetaPlugin = {
     name: 'test2',
-    init: m => ({ ...m, metaPlugin: true }),
+    init: (m) => ({ ...m, metaPlugin: true }),
   }
 
   it('is a procedure contract', () => {
@@ -86,10 +83,7 @@ describe('contractBuilder', () => {
       expect(applied).not.toBe(builder)
 
       expect(mergeErrorMapSpy).toHaveBeenCalledOnce()
-      expect(mergeErrorMapSpy).toHaveBeenCalledWith(
-        builder['~orpc'].errorMap,
-        errors,
-      )
+      expect(mergeErrorMapSpy).toHaveBeenCalledWith(builder['~orpc'].errorMap, errors)
 
       expect(applied['~orpc']).toEqual({
         ...builder['~orpc'],
@@ -109,10 +103,7 @@ describe('contractBuilder', () => {
       expect(applied).not.toBe(builder)
 
       expect(mergeErrorMapSpy).toHaveBeenCalledOnce()
-      expect(mergeErrorMapSpy).toHaveBeenCalledWith(
-        builder['~orpc'].errorMap,
-        errors,
-      )
+      expect(mergeErrorMapSpy).toHaveBeenCalledWith(builder['~orpc'].errorMap, errors)
 
       expect(resolveMetaPluginsSpy).toHaveBeenCalledOnce()
       expect(resolveMetaPluginsSpy).toHaveBeenCalledWith(
@@ -212,8 +203,8 @@ describe('contractBuilder', () => {
     }
 
     const applied = builder.router(router)
-    expect(applied).toBe(augmentContractRouterSpy.mock.results[0]?.value)
-    expect(augmentContractRouterSpy).toHaveBeenCalledOnce()
-    expect(augmentContractRouterSpy).toHaveBeenCalledWith(router, builder['~orpc'])
+    expect(applied).toBe(augmentRouterContractSpy.mock.results[0]?.value)
+    expect(augmentRouterContractSpy).toHaveBeenCalledOnce()
+    expect(augmentRouterContractSpy).toHaveBeenCalledWith(router, builder['~orpc'])
   })
 })

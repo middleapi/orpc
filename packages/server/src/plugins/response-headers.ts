@@ -1,7 +1,8 @@
-import type { StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard'
 import { toArray } from '@orpc/shared'
 import { mergeStandardHeaders } from '@standard-server/core'
 import { toStandardHeaders } from '@standard-server/fetch'
+
+import type { StandardHandlerOptions, StandardHandlerPlugin } from '../adapters/standard/index'
 
 /**
  * The context shape into which the Response Headers Plugin injects `resHeaders`.
@@ -20,14 +21,20 @@ export interface ResponseHeadersHandlerPluginContext {
  * The Response Headers Plugin allows you to set response headers in oRPC.
  * It injects a resHeaders instance into the context, enabling you to modify response headers easily.
  *
+ * @remarks
+ * **Warning**: In a `streaming` batch, only the cookies of the first procedure to respond reach the client.
+ *
  * @see {@link https://orpc.dev/docs/plugins/response-headers | Response Headers Plugin}
  */
-export class ResponseHeadersHandlerPlugin<T extends ResponseHeadersHandlerPluginContext> implements StandardHandlerPlugin<T> {
-  name = '~response-headers'
+export class ResponseHeadersHandlerPlugin<
+  T extends ResponseHeadersHandlerPluginContext,
+> implements StandardHandlerPlugin<T> {
+  readonly name = '~response-headers'
+
   /**
-   * Interceptors should run after batch interceptors so headers are applied to each sub-response.
+   * Runs inside batch, so headers apply to each sub-response.
    */
-  before = ['~batch']
+  readonly before: readonly string[] = ['~batch']
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
     return {

@@ -1,59 +1,58 @@
 {
   "name": "@orpc/pino",
-  "type": "module",
-  "version": "2.0.0-beta.42",
+  "version": "2.0.0-beta.53",
   "description": "Pino integration for oRPC: structured logging for typesafe APIs",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "logger",
+    "logging",
+    "observability",
+    "orpc",
+    "pino",
+    "typescript"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/pino"
   },
-  "keywords": [
-    "orpc",
-    "pino",
-    "logging",
-    "logger",
-    "observability",
-    "typescript"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
-  "publishConfig": {
-    "exports": {
-      "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
-      }
-    }
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts"
   },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "prepack": "unbuild",
-    "type:check": "tsc -b"
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      }
+    }
   },
-  "peerDependencies": {
-    "pino": ">=10.1.0"
+  "scripts": {
+    "prepack": "tsdown"
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
     "@orpc/server": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.10.1"
+    "@standard-server/core": "~0.16.0"
   },
   "devDependencies": {
-    "pino": "^10.3.1"
+    "pino": "^10.4.0"
+  },
+  "peerDependencies": {
+    "pino": ">=10.1.0"
   }
 }

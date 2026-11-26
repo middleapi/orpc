@@ -1,9 +1,14 @@
-import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '../adapters/standard'
-import type { Context } from '../context'
 import { ORPCError } from '@orpc/client'
-import { toArray } from '@orpc/shared'
-import { flattenStandardHeader } from '@standard-server/core'
+import { isCompressionEncoding, parseContentEncodings, toArray } from '@orpc/shared'
+import { flattenStandardHeader, resolveStandardBodyHint } from '@standard-server/core'
 import { toFetchHeaders, toStandardBody } from '@standard-server/fetch'
+
+import type {
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+  StandardHandlerRoutingInterceptor,
+} from '../adapters/standard/index'
+import type { Context } from '../context'
 
 /**
  * Each coding adds a decompressor to the chain, so an unbounded list lets a tiny
@@ -17,21 +22,27 @@ const MAX_CONTENT_ENCODINGS = 5
  *
  * @see {@link https://orpc.dev/docs/plugins/request-compression | Request Compression Plugin}
  */
-export class RequestCompressionHandlerPlugin<T extends Context> implements StandardHandlerPlugin <T> {
-  name = '~request-compression'
+export class RequestCompressionHandlerPlugin<
+  T extends Context,
+> implements StandardHandlerPlugin<T> {
+  readonly name = '~request-compression'
 
   /**
-   * Should decompress the original batch request body instead of sub-requests.
+   * Wraps batch: decompresses the original request body, not sub-requests.
    */
-  after = ['~batch']
+  readonly after: readonly string[] = ['~batch']
 
   init(options: StandardHandlerOptions<T>): StandardHandlerOptions<T> {
-    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({ next, ...interceptorOptions }) => {
+    // oxlint-disable-next-line unicorn/consistent-function-scoping
+    const routingInterceptor: StandardHandlerRoutingInterceptor<T> = async ({
+      next,
+      ...interceptorOptions
+    }) => {
       const encodings = parseContentEncodings(
         flattenStandardHeader(interceptorOptions.request.headers['content-encoding']),
       )
 
-      if (encodings.length === 0 || !encodings.every(isSupportedEncoding)) {
+      if (encodings.length === 0 || !encodings.every(isCompressionEncoding)) {
         return next()
       }
 
@@ -55,7 +66,9 @@ export class RequestCompressionHandlerPlugin<T extends Context> implements Stand
             }
 
             if (encodings.length > MAX_CONTENT_ENCODINGS) {
-              throw new ORPCError('UNSUPPORTED_MEDIA_TYPE', { message: 'Too many content encodings.' })
+              throw new ORPCError('UNSUPPORTED_MEDIA_TYPE', {
+                message: 'Too many content encodings.',
+              })
             }
 
             let decompressedStream = stream
@@ -69,7 +82,9 @@ export class RequestCompressionHandlerPlugin<T extends Context> implements Stand
               headers: toFetchHeaders(decompressedHeaders),
             })
 
-            return toStandardBody(response, { hint })
+            return toStandardBody(response, {
+              hint: hint ?? resolveStandardBodyHint(interceptorOptions.request.headers),
+            })
           },
         },
       })
@@ -77,31 +92,7 @@ export class RequestCompressionHandlerPlugin<T extends Context> implements Stand
 
     return {
       ...options,
-      routingInterceptors: [
-        routingInterceptor,
-        ...toArray(options.routingInterceptors),
-      ],
+      routingInterceptors: [routingInterceptor, ...toArray(options.routingInterceptors)],
     }
   }
-}
-
-const SUPPORTED_ENCODINGS = ['gzip', 'deflate', 'deflate-raw'] as const
-type SupportedEncoding = (typeof SUPPORTED_ENCODINGS)[number]
-function isSupportedEncoding(encoding: string): encoding is SupportedEncoding {
-  return (SUPPORTED_ENCODINGS as readonly string[]).includes(encoding)
-}
-
-/**
- * Parse Content-Encoding into ordered codings (order applied).
- *
- * @see https://www.rfc-editor.org/rfc/rfc9110.html#name-content-encoding
- */
-function parseContentEncodings(header: string | undefined): string[] {
-  if (header === undefined) {
-    return []
-  }
-
-  return header
-    .split(',')
-    .map(part => part.trim().toLowerCase())
 }

@@ -1,9 +1,9 @@
 import type { Segment } from '@orpc/shared'
 import { copyOnWrite, isPlainObject, NullProtoObj } from '@orpc/shared'
 
-export type OpenAPIJsonSerialization
-  = | { json: unknown, maps?: undefined, blobs?: undefined }
-    | { json: unknown, maps: Segment[][], blobs: Blob[] }
+export type OpenAPIJsonSerialization =
+  | { json: unknown; maps?: undefined; blobs?: undefined }
+  | { json: unknown; maps: Segment[][]; blobs: Blob[] }
 
 export interface OpenAPIJsonSerializerHandler {
   condition(value: unknown): boolean
@@ -16,7 +16,7 @@ export interface OpenAPIJsonSerializerHandler {
    *
    * @default false
    */
-  isTerminal?: boolean
+  isTerminal?: boolean | undefined
 }
 
 const DEFAULT_OPEN_API_JSON_SERIALIZER_HANDLERS: Record<string, OpenAPIJsonSerializerHandler> = {
@@ -133,23 +133,19 @@ export interface OpenAPIJsonSerializerOptions {
    * Built-in type keys: `undefined`, `bigint`, `date`, `nan`, `infinity`, `url`, `set`, `map`.
    */
   handlers?: Record<string, undefined | OpenAPIJsonSerializerHandler> | undefined
-
-  /**
-   * If true, properties with undefined values will be omitted during serialization.
-   *
-   * @default true
-   */
-  omitUndefinedProperties?: boolean | undefined
 }
 
+/**
+ * The JSON layer behind `OpenAPISerializer`: one-way serialization of types like `Date`, `BigInt`,
+ * and `Set` into JSON-friendly values, for places that only accept JSON.
+ *
+ * @see {@link https://orpc.dev/docs/openapi/serializer#openapi-json-serializer | OpenAPI Serializer - OpenAPI JSON Serializer}
+ */
 export class OpenAPIJsonSerializer {
   private readonly inlineBuiltInHandlers: boolean
   private readonly handlerEntries: OpenAPIJsonSerializerHandler[] | undefined
-  private readonly omitUndefinedProperties: boolean
 
   constructor(options: OpenAPIJsonSerializerOptions = {}) {
-    this.omitUndefinedProperties = options.omitUndefinedProperties !== false
-
     const customHandlers = options.handlers
 
     if (customHandlers === undefined) {
@@ -175,7 +171,10 @@ export class OpenAPIJsonSerializer {
 
     if (!inlineBuiltInHandlers) {
       handlerEntries = []
-      for (const handler of Object.values({ ...DEFAULT_OPEN_API_JSON_SERIALIZER_HANDLERS, ...customHandlers })) {
+      for (const handler of Object.values({
+        ...DEFAULT_OPEN_API_JSON_SERIALIZER_HANDLERS,
+        ...customHandlers,
+      })) {
         if (handler !== undefined) {
           handlerEntries.push(handler)
         }
@@ -183,10 +182,11 @@ export class OpenAPIJsonSerializer {
     }
 
     this.inlineBuiltInHandlers = inlineBuiltInHandlers
-    this.handlerEntries = handlerEntries
+    // undefined = no handlers to check, so the inline path can return primitives early
+    this.handlerEntries = handlerEntries.length === 0 ? undefined : handlerEntries
   }
 
-  serialize(data: unknown): OpenAPIJsonSerialization {
+  serializeJson(data: unknown): OpenAPIJsonSerialization {
     const maps: Segment[][] = []
     const blobs: Blob[] = []
 
@@ -199,26 +199,46 @@ export class OpenAPIJsonSerializer {
    * `segments` is a shared mutable stack (push/pop while walking),
    * so it must be copied before being stored in `maps`.
    */
-  private serializeValue(data: unknown, segments: Segment[], maps: Segment[][], blobs: Blob[]): unknown {
+  private serializeValue(
+    data: unknown,
+    segments: Segment[],
+    maps: Segment[][],
+    blobs: Blob[],
+  ): unknown {
+    const handlerEntries = this.handlerEntries
+
     /**
      * Inlined version of DEFAULT_OPEN_API_JSON_SERIALIZER_HANDLERS: primitives
      * are dispatched on typeof and skip every handler condition check.
      * Must match the built-in handlers exactly.
+     * Primitives without a built-in handler return early unless custom handlers must see them.
      */
     if (this.inlineBuiltInHandlers) {
       switch (typeof data) {
         case 'string':
         case 'boolean':
-          return data
+          if (handlerEntries === undefined) {
+            return data
+          }
+          break
         case 'number':
-          return Number.isFinite(data) ? data : null
+          if (!Number.isFinite(data)) {
+            return null
+          }
+          if (handlerEntries === undefined) {
+            return data
+          }
+          break
         case 'undefined':
           return null
         case 'bigint':
           return data.toString()
         case 'object': {
           if (data === null) {
-            return data
+            if (handlerEntries === undefined) {
+              return data
+            }
+            break
           }
           if (data instanceof Date) {
             return Number.isNaN(data.getTime()) ? null : data.toISOString()
@@ -236,7 +256,6 @@ export class OpenAPIJsonSerializer {
       }
     }
 
-    const handlerEntries = this.handlerEntries
     if (handlerEntries) {
       for (let i = 0; i < handlerEntries.length; i++) {
         const handler = handlerEntries[i]!
@@ -256,6 +275,10 @@ export class OpenAPIJsonSerializer {
           return this.serializeValue(serialized, segments, maps, blobs)
         }
       }
+    }
+
+    if (typeof data !== 'object' || data === null) {
+      return data
     }
 
     if (data instanceof Blob) {
@@ -290,7 +313,7 @@ export class OpenAPIJsonSerializer {
           continue
         }
 
-        if (v === undefined && this.omitUndefinedProperties) {
+        if (v === undefined) {
           continue
         }
 
@@ -305,7 +328,7 @@ export class OpenAPIJsonSerializer {
     return data
   }
 
-  deserialize(serialized: OpenAPIJsonSerialization): unknown {
+  deserializeJson(serialized: OpenAPIJsonSerialization): unknown {
     const ref = { json: serialized.json }
 
     if (serialized.blobs?.length) {
@@ -328,7 +351,9 @@ export class OpenAPIJsonSerializer {
           preSegment = segments[j]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
-            throw new TypeError(`Invalid OpenAPI serialized data: segment "${preSegment}" does not exist.`)
+            throw new TypeError(
+              `Invalid OpenAPI serialized data: segment "${preSegment}" does not exist.`,
+            )
           }
         }
 

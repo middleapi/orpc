@@ -1,8 +1,8 @@
 ---
-title: "Valibot Integration"
-description: "Use Valibot schemas directly in oRPC via Standard Schema, with a dedicated JSON Schema converter for OpenAPI generation and Smart Coercion."
+title: 'Valibot Integration'
+description: 'Use Valibot schemas directly in oRPC via Standard Schema, with a dedicated JSON Schema converter for OpenAPI generation and Smart Coercion.'
 sidebar:
-  label: "Valibot"
+  label: 'Valibot'
 ---
 
 :::info
@@ -17,7 +17,7 @@ npm install @orpc/valibot@beta valibot
 
 ## JSON Schema Converter
 
-`ValibotToJsonSchemaConverter` wraps [Valibot's built-in toJsonSchema](https://github.com/open-circle/valibot/blob/main/packages/to-json-schema/README.md) and adds support for additional types such as `v.bigint()`, `v.date()`, `v.set()`, and `v.map()`. Use it with tools such as the [OpenAPI Generator](/docs/openapi/specification#openapi-generator) and [Smart Coercion](/docs/plugins/smart-coercion). It accepts the same options as Valibot's `toJsonSchema`, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/valibot/src/converter.ts) for implementation details.
+`ValibotToJsonSchemaConverter` wraps [Valibot's built-in toJsonSchema](https://github.com/open-circle/valibot/blob/main/packages/to-json-schema/README.md) and adds support for additional types such as `v.bigint()`, `v.date()`, `v.set()`, `v.map()`, `v.file()`, and `v.blob()`. File schemas take their `contentMediaType` from a `v.mimeType()` action. Use it with tools such as the [OpenAPI Generator](/docs/openapi/specification#openapi-generator) and [Smart Coercion](/docs/plugins/smart-coercion). It accepts the same options as Valibot's `toJsonSchema`, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/valibot/src/converter.ts) for implementation details.
 
 ```ts
 import { OpenAPIGenerator } from '@orpc/openapi'

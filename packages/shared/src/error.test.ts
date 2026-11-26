@@ -1,5 +1,6 @@
 import { AbortError } from '@standard-server/shared'
-import { isAbortError } from './error'
+
+import { isAbortError, TimeoutError } from './error'
 
 describe('isAbortError', () => {
   it('returns true for AbortError', () => {
@@ -32,10 +33,28 @@ describe('isAbortError', () => {
     expect(isAbortError({ name: 'AbortError' })).toBe(false)
   })
 
+  it('returns false for TimeoutError', () => {
+    expect(isAbortError(new TimeoutError('timed out'))).toBe(false)
+    expect(isAbortError(new DOMException('timed out', 'TimeoutError'))).toBe(false)
+  })
+
   it('returns true for any Error whose name contains Abort', () => {
     const error = new Error('test')
     error.name = 'NotReallyAnAbortButContainsAbort'
 
     expect(isAbortError(error)).toBe(true)
+  })
+})
+
+describe('timeoutError', () => {
+  it('uses the same name as AbortSignal.timeout', () => {
+    const cause = new Error('cause')
+    const error = new TimeoutError('timed out', { cause })
+
+    expect(error).toBeInstanceOf(Error)
+    expect(error.name).toBe('TimeoutError')
+    expect(error.name).toBe(new DOMException('', 'TimeoutError').name)
+    expect(error.message).toBe('timed out')
+    expect(error.cause).toBe(cause)
   })
 })

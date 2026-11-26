@@ -1,4 +1,5 @@
 import type { ProcedureContract, RouterContract } from '@orpc/contract'
+
 import type { Implementer } from './implementer'
 import type { RouterImplementer } from './implementer-router'
 
@@ -38,6 +39,8 @@ describe('Implementer', () => {
       Implementer<TContract['ping'], { auth: string } & object>
     >()
 
-    expectTypeOf(implementer).toExtend<RouterImplementer<TContract['ping'], { auth: boolean } & object>>()
+    expectTypeOf(implementer).toExtend<
+      RouterImplementer<TContract['ping'], { auth: boolean } & object>
+    >()
   })
 })

@@ -1,17 +1,32 @@
 import type { ErrorMap, MergedErrorMap } from '@orpc/contract'
-import type { IntersectPick } from '@orpc/shared'
-import type { Context, MergedContext, MergedInitialContext } from './context'
-import type { AnyMiddleware, Middleware, MiddlewareNextOptions, MiddlewareResult } from './middleware'
 import { mergeErrorMap } from '@orpc/contract'
+import type { IntersectPick } from '@orpc/shared'
 import { toArray } from '@orpc/shared'
 
-export interface DecoratedMiddleware<
+import type { Context, MergedContext, MergedInitialContext } from './context'
+import type {
+  AnyMiddleware,
+  Middleware,
+  MiddlewareNextOptions,
+  MiddlewareResult,
+} from './middleware'
+
+export type DecoratedMiddleware<
   TInContext extends Context,
   TOutContext extends Context,
   TInput,
   TOutput,
   TErrorMap extends ErrorMap,
-> extends Middleware<TInContext, TOutContext, TInput, TOutput, TErrorMap> {
+> = Middleware<TInContext, TOutContext, TInput, TOutput, TErrorMap> &
+  DecoratedMiddlewareMethods<TInContext, TOutContext, TInput, TOutput, TErrorMap>
+
+export interface DecoratedMiddlewareMethods<
+  TInContext extends Context,
+  TOutContext extends Context,
+  TInput,
+  TOutput,
+  TErrorMap extends ErrorMap,
+> {
   adaptInput<T>(
     adapt: (input: T) => TInput,
   ): DecoratedMiddleware<TInContext, TOutContext, T, TOutput, TErrorMap>
@@ -51,7 +66,13 @@ export function decorateMiddleware<
 >(
   middleware: Middleware<TInContext, TOutContext, TInput, TOutput, TErrorMap>,
 ): DecoratedMiddleware<TInContext, TOutContext, TInput, TOutput, TErrorMap> {
-  const decorated = ((...args) => middleware(...args)) as DecoratedMiddleware<TInContext, TOutContext, TInput, TOutput, TErrorMap>
+  const decorated = ((...args) => middleware(...args)) as DecoratedMiddleware<
+    TInContext,
+    TOutContext,
+    TInput,
+    TOutput,
+    TErrorMap
+  >
 
   decorated['~orpc'] = middleware['~orpc']
   Object.defineProperty(decorated, 'name', {
@@ -59,11 +80,9 @@ export function decorateMiddleware<
   })
 
   decorated.adaptInput = (adapt) => {
-    const mapped = decorateMiddleware(
-      (opts: any, input: any, ...args: [any]) => {
-        return middleware(opts, adapt(input), ...args)
-      },
-    )
+    const mapped = decorateMiddleware((opts: any, input: any, ...args: [any]) => {
+      return middleware(opts, adapt(input), ...args)
+    })
 
     mapped['~orpc'] = decorated['~orpc']
     Object.defineProperty(mapped, 'name', {
@@ -90,19 +109,28 @@ export function decorateMiddleware<
         {
           ...opts,
           async next(nextOpts1: undefined | MiddlewareNextOptions<any>) {
-            const result: MiddlewareResult<Context, unknown> = await usedMiddleware({
-              ...opts,
-              context: { ...opts.context, ...nextOpts1?.context },
-              next(nextOpts2: undefined | MiddlewareNextOptions<any>, ...args: []) {
-                return opts.next({
-                  ...opts,
-                  context: {
-                    ...nextOpts1?.context,
-                    ...nextOpts2?.context,
-                  },
-                }, ...args)
-              },
-            } as any, ...args)
+            const signal = nextOpts1?.signal ?? opts.signal
+
+            const result: MiddlewareResult<Context, unknown> = await usedMiddleware(
+              {
+                ...opts,
+                context: { ...opts.context, ...nextOpts1?.context },
+                signal,
+                next(nextOpts2: undefined | MiddlewareNextOptions<any>, ...args: []) {
+                  return opts.next(
+                    {
+                      context: {
+                        ...nextOpts1?.context,
+                        ...nextOpts2?.context,
+                      },
+                      signal: nextOpts2?.signal ?? signal,
+                    },
+                    ...args,
+                  )
+                },
+              } as any,
+              ...args,
+            )
 
             return {
               ...result,

@@ -1,4 +1,5 @@
 export * from './batch'
+export * from './cookie-jar'
 export * from './dedupe'
 export {
   /**

@@ -1,26 +1,30 @@
 import type { AnyMetaPlugin, ErrorMap, ORPCErrorConstructorMap } from '@orpc/contract'
-import type { MaybeOptionalOptions, Promisable } from '@orpc/shared'
+import type { MaybeOptionalOptions } from '@orpc/shared'
+
 import type { Context } from './context'
 import type { AnyProcedure } from './procedure'
 
-export type MiddlewareResult<TOutContext extends Context, TOutput> = Promisable<{
+export interface MiddlewareResult<TOutContext extends Context, TOutput> {
   output: TOutput
   context: TOutContext
-}>
+}
 
-export type MiddlewareNextOptions<TOutContext extends Context> = object extends TOutContext
-  ? { context?: TOutContext }
-  : { context: TOutContext }
+export type MiddlewareNextOptions<TOutContext extends Context> = ({} extends TOutContext
+  ? { context?: TOutContext | undefined }
+  : { context: TOutContext }) & {
+  /** Overrides the signal for the rest of the chain. */
+  signal?: AbortSignal | undefined
+}
 
 export interface MiddlewareNext<TOutput> {
   <T extends Context = object>(
     ...rest: MaybeOptionalOptions<MiddlewareNextOptions<T>>
-  ): MiddlewareResult<T, TOutput>
+  ): Promise<MiddlewareResult<T, TOutput>>
 }
 
-export type MiddlewareDoneOptions<TOutContext, TOutput>
-  = & (object extends TOutContext ? { context?: TOutContext } : { context: TOutContext })
-    & { output: TOutput }
+export type MiddlewareDoneOptions<TOutContext, TOutput> = ({} extends TOutContext
+  ? { context?: TOutContext | undefined }
+  : { context: TOutContext }) & { output: TOutput }
 
 export interface MiddlewareDone<TOutput> {
   /**
@@ -37,10 +41,10 @@ export interface MiddlewareOptions<
   TErrorConstructorMap extends ORPCErrorConstructorMap<any>,
 > {
   context: TInContext
-  path: string[]
+  path: readonly string[]
   procedure: AnyProcedure
   signal?: AbortSignal | undefined
-  lastEventId: string | undefined
+  lastEventId?: string | undefined
   /**
    * Invoke to continue the middleware chain.
    */
@@ -67,9 +71,7 @@ export interface Middleware<
     opts: MiddlewareOptions<TInContext, TOutput, ORPCErrorConstructorMap<TErrorMap>>,
     input: TInput,
     done: MiddlewareDone<TOutput>,
-  ): Promisable<
-    MiddlewareResult<TOutContext, TOutput>
-  >
+  ): Promise<MiddlewareResult<TOutContext, TOutput>> | MiddlewareResult<TOutContext, TOutput>
 }
 
 export type AnyMiddleware = Middleware<any, any, any, any, any>

@@ -1,12 +1,22 @@
-import type { StandardBodyHint } from '@standard-server/core'
-import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
-import type { ClientContext } from '../types'
-import { isAsyncIteratorObject, isCompressibleContentType, stringifyJSON, toArray } from '@orpc/shared'
+import type { CompressionEncoding } from '@orpc/shared'
+import {
+  estimateUtf8ByteLength,
+  estimateCompressibleFormDataSize,
+  isAsyncIteratorObject,
+  isCompressibleContentType,
+  toArray,
+} from '@orpc/shared'
+import type { StandardBodyHint, StandardHeaders } from '@standard-server/core'
 import { flattenStandardHeader, generateContentDisposition } from '@standard-server/core'
+import { toFetchBody } from '@standard-server/fetch'
 
-// Rough UTF-8 estimate. Mostly ASCII text stays close to 1 byte/char;
-// occasional multi-byte characters increase the average.
-const AVG_BYTES_PER_CHAR = 1.2
+import type {
+  StandardLinkOptions,
+  StandardLinkPlugin,
+  StandardLinkTransportInterceptor,
+  StandardLinkTransportInterceptorOptions,
+} from '../adapters/standard/index'
+import type { ClientContext } from '../types'
 
 export interface RequestCompressionLinkPluginOptions<T extends ClientContext> {
   /**
@@ -14,7 +24,7 @@ export interface RequestCompressionLinkPluginOptions<T extends ClientContext> {
    *
    * @default 'gzip'
    */
-  encoding?: 'gzip' | 'deflate' | 'deflate-raw'
+  encoding?: CompressionEncoding | undefined
 
   /**
    * The minimum request size in bytes required to trigger compression.
@@ -23,7 +33,7 @@ export interface RequestCompressionLinkPluginOptions<T extends ClientContext> {
    *
    * @default 1024 (1KB)
    */
-  threshold?: number
+  threshold?: number | undefined
 
   /**
    * Determines whether a request with the given Content-Type should be compressed.
@@ -32,7 +42,12 @@ export interface RequestCompressionLinkPluginOptions<T extends ClientContext> {
    *
    * @default isCompressibleContentType (covers common text-based formats)
    */
-  isCompressibleContentType?: (contentType: string | null | undefined, options: StandardLinkTransportInterceptorOptions<T>) => boolean
+  isCompressibleContentType?:
+    | ((
+        contentType: string | null | undefined,
+        options: StandardLinkTransportInterceptorOptions<T>,
+      ) => boolean)
+    | undefined
 }
 
 /**
@@ -41,17 +56,25 @@ export interface RequestCompressionLinkPluginOptions<T extends ClientContext> {
  *
  * @see {@link https://orpc.dev/docs/plugins/request-compression | Request Compression Plugin}
  */
-export class RequestCompressionLinkPlugin<T extends ClientContext> implements StandardLinkPlugin<T> {
-  name = '~request-compression'
+export class RequestCompressionLinkPlugin<
+  T extends ClientContext,
+> implements StandardLinkPlugin<T> {
+  readonly name = '~request-compression'
 
   /**
-   * Compression should be done after batching, to compress the final request
+   * Runs inside batch: compresses the final batch request.
    */
-  after = ['~batch']
+  readonly after: readonly string[] = ['~batch']
 
   private readonly encoding: Exclude<RequestCompressionLinkPluginOptions<T>['encoding'], undefined>
-  private readonly threshold: Exclude<RequestCompressionLinkPluginOptions<T>['threshold'], undefined>
-  private readonly isCompressibleContentType: Exclude<RequestCompressionLinkPluginOptions<T>['isCompressibleContentType'], undefined>
+  private readonly threshold: Exclude<
+    RequestCompressionLinkPluginOptions<T>['threshold'],
+    undefined
+  >
+  private readonly isCompressibleContentType: Exclude<
+    RequestCompressionLinkPluginOptions<T>['isCompressibleContentType'],
+    undefined
+  >
 
   constructor(options: RequestCompressionLinkPluginOptions<T> = {}) {
     this.encoding = options.encoding ?? 'gzip'
@@ -60,11 +83,17 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
   }
 
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
-    const transportInterceptor: StandardLinkTransportInterceptor<T> = async ({ next, ...interceptorOptions }) => {
+    const transportInterceptor: StandardLinkTransportInterceptor<T> = async ({
+      next,
+      ...interceptorOptions
+    }) => {
       const request = interceptorOptions.request
 
-      const contentEncoding = flattenStandardHeader(request.headers['content-encoding'])?.trim()?.toLowerCase()
-      if (contentEncoding !== undefined) { // already compressed, do not compress again
+      const contentEncoding = flattenStandardHeader(request.headers['content-encoding'])
+        ?.trim()
+        ?.toLowerCase()
+      if (contentEncoding !== undefined) {
+        // already compressed, do not compress again
         return next()
       }
 
@@ -72,8 +101,11 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
         const contentLength = Number(flattenStandardHeader(request.headers['content-length']))
 
         if (
-          (!Number.isFinite(contentLength) || contentLength >= this.threshold)
-          && this.isCompressibleContentType(flattenStandardHeader(request.headers['content-type']), interceptorOptions)
+          (!Number.isFinite(contentLength) || contentLength >= this.threshold) &&
+          this.isCompressibleContentType(
+            flattenStandardHeader(request.headers['content-type']),
+            interceptorOptions,
+          )
         ) {
           const compressedStream = request.body.pipeThrough(new CompressionStream(this.encoding))
 
@@ -84,24 +116,25 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
               body: compressedStream,
               headers: {
                 ...request.headers,
-                'standard-server': 'octet-stream' satisfies StandardBodyHint,
                 'content-length': [],
                 'content-encoding': this.encoding,
               },
             },
           })
         }
-      }
+      } else if (request.body instanceof Blob) {
+        const contentType = request.headers['content-type'] ?? request.body.type
 
-      else if (request.body instanceof Blob) {
         if (
-          (!Number.isFinite(request.body.size) || request.body.size >= this.threshold)
-          && this.isCompressibleContentType(request.body.type, interceptorOptions)
+          (!Number.isFinite(request.body.size) || request.body.size >= this.threshold) &&
+          this.isCompressibleContentType(flattenStandardHeader(contentType), interceptorOptions)
         ) {
-          const compressedStream = request.body.stream().pipeThrough(new CompressionStream(this.encoding))
-          const contentDisposition = request.headers['content-disposition'] ?? generateContentDisposition(
-            request.body instanceof File ? request.body.name : 'blob',
-          )
+          const compressedStream = request.body
+            .stream()
+            .pipeThrough(new CompressionStream(this.encoding))
+          const contentDisposition =
+            request.headers['content-disposition'] ??
+            generateContentDisposition(request.body instanceof File ? request.body.name : 'blob')
 
           return next({
             ...interceptorOptions,
@@ -110,8 +143,9 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
               body: compressedStream,
               headers: {
                 ...request.headers,
-                'standard-server': 'file' satisfies StandardBodyHint,
-                'content-type': request.body.type,
+                'standard-server':
+                  request.headers['standard-server'] ?? ('file' satisfies StandardBodyHint),
+                'content-type': contentType,
                 'content-length': [],
                 'content-disposition': contentDisposition,
                 'content-encoding': this.encoding,
@@ -119,36 +153,10 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
             },
           })
         }
-      }
-
-      else if (request.body instanceof FormData) {
-        const PART_OVERHEAD = 64 // approx bytes for boundary + Content-Disposition/Content-Type headers per part
-
-        let contentLength = 0
-        for (const [key, value] of request.body) {
-          contentLength += PART_OVERHEAD + key.length
-
-          if (value instanceof Blob) {
-            if (!Number.isFinite(value.size)) { // Bun-s3 can use NaN for size
-              if (!this.isCompressibleContentType(value.type, interceptorOptions)) {
-                // Unknown non-compressible part size makes the estimate unreliable
-                contentLength = -Infinity
-                break
-              }
-
-              // Unknown size for compressible content - still apply compression
-              contentLength = Infinity
-            }
-            else {
-              contentLength += this.isCompressibleContentType(value.type, interceptorOptions)
-                ? value.size
-                : -value.size
-            }
-          }
-          else {
-            contentLength += value.length * AVG_BYTES_PER_CHAR
-          }
-        }
+      } else if (request.body instanceof FormData) {
+        const contentLength = estimateCompressibleFormDataSize(request.body, (contentType) =>
+          this.isCompressibleContentType(contentType, interceptorOptions),
+        )
 
         if (contentLength >= this.threshold) {
           const res = new Response(request.body)
@@ -169,42 +177,46 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
             },
           })
         }
-      }
-
-      else if (request.body instanceof URLSearchParams) {
+      } else if (request.body instanceof URLSearchParams) {
         const string = request.body.toString()
-        if (string.length * AVG_BYTES_PER_CHAR >= this.threshold) {
-          const compressedStream = new Blob([string]).stream().pipeThrough(new CompressionStream(this.encoding))
+        if (estimateUtf8ByteLength(string) >= this.threshold) {
+          const compressedStream = new Blob([string])
+            .stream()
+            .pipeThrough(new CompressionStream(this.encoding))
+          const [, bodyHeaders] = toFetchBody(request.body, request.headers)
+
           return next({
             ...interceptorOptions,
             request: {
               ...interceptorOptions.request,
               body: compressedStream,
               headers: {
-                ...request.headers,
-                'standard-server': [],
-                'content-type': 'application/x-www-form-urlencoded',
+                ...bodyHeaders,
+                // An empty hint rather than none, so the adapter does not hint the compressed stream as `octet-stream`
+                'standard-server': bodyHeaders['standard-server'] ?? [],
                 'content-length': [],
                 'content-encoding': this.encoding,
               },
             },
           })
         }
-      }
-
-      else if (request.body !== undefined && !isAsyncIteratorObject(request.body)) {
-        const string = stringifyJSON(request.body)
-        if (string.length * AVG_BYTES_PER_CHAR >= this.threshold) {
-          const compressedStream = new Blob([string]).stream().pipeThrough(new CompressionStream(this.encoding))
+      } else if (request.body !== undefined && !isAsyncIteratorObject(request.body)) {
+        const [string, bodyHeaders] = toFetchBody(request.body, request.headers) as [
+          string,
+          StandardHeaders,
+        ]
+        if (estimateUtf8ByteLength(string) >= this.threshold) {
+          const compressedStream = new Blob([string])
+            .stream()
+            .pipeThrough(new CompressionStream(this.encoding))
           return next({
             ...interceptorOptions,
             request: {
               ...interceptorOptions.request,
               body: compressedStream,
               headers: {
-                ...request.headers,
-                'standard-server': [],
-                'content-type': 'application/json',
+                ...bodyHeaders,
+                'standard-server': bodyHeaders['standard-server'] ?? [],
                 'content-length': [],
                 'content-encoding': this.encoding,
               },
@@ -218,10 +230,7 @@ export class RequestCompressionLinkPlugin<T extends ClientContext> implements St
 
     return {
       ...options,
-      transportInterceptors: [
-        ...toArray(options.transportInterceptors),
-        transportInterceptor,
-      ],
+      transportInterceptors: [...toArray(options.transportInterceptors), transportInterceptor],
     }
   }
 }

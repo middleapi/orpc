@@ -1,10 +1,36 @@
-import type { EventMeta } from '@standard-server/core'
+import type { PublisherResumeOptions } from '@orpc/publisher'
 import { isPlainObject, stringifyJSON } from '@orpc/shared'
+import type { EventMeta } from '@standard-server/core'
 import { DurableObject } from 'cloudflare:workers'
 
-export interface DurablePublisherObjectResumeOptions {
+/**
+ * Configuration for event resume support. Passing it enables resume.
+ */
+export interface DurablePublisherObjectResumeOptions extends PublisherResumeOptions {
   /**
-   * Whether event resume support is enabled.
+   * Interval between cleanup checks for the Durable Object, in milliseconds.
+   *
+   * At each interval, verify whether the Durable Object is inactive
+   * (no active WebSocket connections and no stored events). If inactive, all
+   * data is deleted to free resources; otherwise, another check is scheduled.
+   *
+   * @default 6 * 60 * 60 * 1000 (6 hours)
+   */
+  cleanupInterval?: number | undefined
+
+  /**
+   * Prefix for the resume storage table schema.
+   * Used to avoid naming conflicts with other tables in the same Durable Object.
+   *
+   * @default 'orpc:'
+   */
+  schemaPrefix?: string | undefined
+}
+
+export interface DurablePublisherObjectOptions {
+  /**
+   * Event resume support. `true` enables it,
+   * {@link DurablePublisherObjectResumeOptions} enables and customizes it.
    *
    * When enabled, published events are temporarily stored so new
    * subscribers can resume from a previous position using `lastEventId`.
@@ -13,48 +39,7 @@ export interface DurablePublisherObjectResumeOptions {
    *
    * @default false
    */
-  enabled: boolean
-
-  /**
-   * How long (in seconds) to retain events for resume.
-   *
-   * Expired events are cleaned up lazily for performance reasons, so
-   * some events may remain available slightly longer than this period.
-   *
-   * @default 300 (5 min)
-   */
-  seconds?: number
-
-  /**
-   * Interval (in seconds) between cleanup checks for the Durable Object.
-   *
-   * At each interval, verify whether the Durable Object is inactive
-   * (no active WebSocket connections and no stored events). If inactive, all
-   * data is deleted to free resources; otherwise, another check is scheduled.
-   *
-   * @default 6 * 60 * 60 (6 hours)
-   */
-  cleanupIntervalSeconds?: number
-
-  /**
-   * Prefix for the resume storage table schema.
-   * Used to avoid naming conflicts with other tables in the same Durable Object.
-   *
-   * @default 'orpc:'
-   */
-  schemaPrefix?: string
-}
-
-export interface DurablePublisherObjectOptions {
-  /**
-   * Configuration for event resume support.
-   *
-   * When enabled, published events are temporarily stored so new
-   * subscribers can resume from a previous position using `lastEventId`.
-   *
-   * @default { enabled: false }
-   */
-  resume?: DurablePublisherObjectResumeOptions
+  resume?: boolean | DurablePublisherObjectResumeOptions | undefined
 }
 
 /**
@@ -63,10 +48,17 @@ export interface DurablePublisherObjectOptions {
  *
  * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
  */
-export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> extends DurableObject<Env, Props> {
+export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> extends DurableObject<
+  Env,
+  Props
+> {
   private readonly resumeStorage: ResumeStorage
 
-  constructor(ctx: DurableObjectState<Props>, env: Env, options: DurablePublisherObjectOptions = {}) {
+  constructor(
+    ctx: DurableObjectState<Props>,
+    env: Env,
+    options: DurablePublisherObjectOptions = {},
+  ) {
     super(ctx, env)
     this.resumeStorage = new ResumeStorage(ctx, options.resume)
   }
@@ -84,8 +76,7 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
 
     try {
       stringifiedPayload = this.resumeStorage.store(stringifiedPayload)
-    }
-    catch (e) {
+    } catch (e) {
       return new Response(String(e), { status: 400 })
     }
 
@@ -118,8 +109,12 @@ export class DurablePublisherObject<Env = Cloudflare.Env, Props = unknown> exten
     })
   }
 
-  override webSocketClose(_ws: WebSocket, _code: number, _reason: string, _wasClean: boolean): void | Promise<void> {
-  }
+  override webSocketClose(
+    _ws: WebSocket,
+    _code: number,
+    _reason: string,
+    _wasClean: boolean,
+  ): void | Promise<void> {}
 
   override async alarm(): Promise<void> {
     await this.resumeStorage.alarm()
@@ -133,8 +128,8 @@ interface SerializedPayload {
 
 class ResumeStorage {
   private readonly enabled: boolean
-  private readonly seconds: number
-  private readonly cleanupIntervalSeconds: number
+  private readonly ttl: number
+  private readonly cleanupInterval: number
   private readonly schemaPrefix: string
 
   private isInitedSchema = false
@@ -143,11 +138,13 @@ class ResumeStorage {
 
   constructor(
     private readonly ctx: DurableObjectState,
-    options: DurablePublisherObjectResumeOptions = { enabled: false },
+    resume: DurablePublisherObjectOptions['resume'],
   ) {
-    this.enabled = options.enabled
-    this.seconds = options.seconds ?? 300
-    this.cleanupIntervalSeconds = options.cleanupIntervalSeconds ?? 6 * 60 * 60
+    const options = typeof resume === 'object' ? resume : {}
+
+    this.enabled = resume !== undefined && resume !== false
+    this.ttl = options.ttl ?? 300_000
+    this.cleanupInterval = options.cleanupInterval ?? 6 * 60 * 60 * 1000
     const schemaPrefix = options.schemaPrefix ?? 'orpc:'
     this.schemaPrefix = schemaPrefix
   }
@@ -186,8 +183,7 @@ class ResumeStorage {
 
     try {
       return insertEvent()
-    }
-    catch (e) {
+    } catch (e) {
       if (!isUnusableTableError(e)) {
         throw e
       }
@@ -222,12 +218,15 @@ class ResumeStorage {
      * The alias must not be `id`: SQLite resolves ORDER BY to an output
      * alias before a table column, which would sort ids as text.
      */
-    const result = this.ctx.storage.sql.exec(`
+    const result = this.ctx.storage.sql.exec(
+      `
       SELECT CAST(id AS TEXT) AS event_id, payload
       FROM "${this.schemaPrefix}events"
       WHERE id > ?
       ORDER BY id ASC
-    `, lastEventId)
+    `,
+      lastEventId,
+    )
 
     const events: string[] = []
     for (const record of result.toArray()) {
@@ -254,9 +253,11 @@ class ResumeStorage {
         return true
       }
 
-      const activePayloadsRow = this.ctx.storage.sql.exec(`
+      const activePayloadsRow = this.ctx.storage.sql
+        .exec(`
         SELECT 1 as has FROM "${this.schemaPrefix}events" LIMIT 1
-      `).toArray()
+      `)
+        .toArray()
       if (activePayloadsRow.length) {
         return true
       }
@@ -296,6 +297,19 @@ class ResumeStorage {
       this.isInitedSchema = true
 
       if (initTableResult.rowsWritten > 0) {
+        /**
+         * Recreating the table (after the idle cleanup or a schema reset) restarts the
+         * AUTOINCREMENT sequence, while subscribers may still hold ids issued before it,
+         * and resuming with one of them would skip newer events (`WHERE id > ?`).
+         * Start the sequence at the current time in microseconds so new ids stay above
+         * every id issued before.
+         */
+        this.ctx.storage.sql.exec(
+          `INSERT INTO sqlite_sequence (name, seq) VALUES (?, CAST(? AS INTEGER))`,
+          `${this.schemaPrefix}events`,
+          Date.now() * 1000,
+        )
+
         this.lastCleanupTime = Date.now() // schema just created, nothing to cleanup
       }
     }
@@ -303,15 +317,19 @@ class ResumeStorage {
     const now = Date.now()
 
     // Defer cleanup to improve performance
-    if (this.lastCleanupTime && this.lastCleanupTime + this.seconds * 1000 > now) {
+    if (this.lastCleanupTime && this.lastCleanupTime + this.ttl > now) {
       return
     }
 
     this.lastCleanupTime = now
 
-    this.ctx.storage.sql.exec(`
+    // `stored_at` is in whole seconds, so round up to never delete an event before its ttl
+    this.ctx.storage.sql.exec(
+      `
       DELETE FROM "${this.schemaPrefix}events" WHERE stored_at < unixepoch() - ?
-    `, this.seconds)
+    `,
+      Math.ceil(this.ttl / 1000),
+    )
   }
 
   private async initAlarm(): Promise<void> {
@@ -321,8 +339,7 @@ class ResumeStorage {
      * An alarm from a previous Durable Object instance may fire before the
      * next cleanup is due. In that case, reschedule it instead of reusing it.
      */
-    const alarmFiresTooEarly = currentAlarm !== null
-      && currentAlarm < Date.now() + this.seconds * 1000
+    const alarmFiresTooEarly = currentAlarm !== null && currentAlarm < Date.now() + this.ttl
 
     if (currentAlarm === null || alarmFiresTooEarly) {
       await this.scheduleAlarm()
@@ -338,7 +355,7 @@ class ResumeStorage {
   }
 
   private scheduleAlarm(): Promise<void> {
-    return this.ctx.storage.setAlarm(Date.now() + this.cleanupIntervalSeconds * 1000)
+    return this.ctx.storage.setAlarm(Date.now() + this.cleanupInterval)
   }
 
   private attachEventId(message: SerializedPayload, id: string): SerializedPayload {
@@ -354,5 +371,7 @@ function isSerializedPayload(value: unknown): value is SerializedPayload {
 }
 
 function isUnusableTableError(error: unknown): boolean {
-  return /SQLITE_(?:FULL|CORRUPT|NOTADB)|no such table|no such column|has no column named/.test(String(error))
+  return /SQLITE_(?:FULL|CORRUPT|NOTADB)|no such table|no such column|has no column named/.test(
+    String(error),
+  )
 }

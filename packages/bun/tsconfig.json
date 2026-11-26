@@ -1,7 +1,9 @@
 {
-  "extends": "../../tsconfig.lib.json",
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["bun"]
   },
-  "include": ["./package.json", "src", "tests"]
+  "include": ["src", "tests"],
+  "exclude": []
 }

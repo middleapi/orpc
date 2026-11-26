@@ -27,10 +27,14 @@ function sweep(): void {
 
 // `error` does not bubble, so it is caught in the capture phase; the sweep
 // covers images that failed before this deferred module ran.
-document.addEventListener('error', (event) => {
-  if (event.target instanceof HTMLImageElement) {
-    useMonogram(event.target)
-  }
-}, true)
+document.addEventListener(
+  'error',
+  (event) => {
+    if (event.target instanceof HTMLImageElement) {
+      useMonogram(event.target)
+    }
+  },
+  true,
+)
 
 sweep()

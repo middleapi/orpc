@@ -11,10 +11,10 @@ import type { AnySchema, MergedSchema } from './schema'
  *
  * @see {@link https://orpc.dev/docs/contract/procedure | Procedure Contract}
  */
-export interface ProcedureContractBuilderWithInput<
+export interface ContractBuilderWithInput<
   TInputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
->extends ProcedureContract<TInputSchema, InitialOutputSchema, TErrorMap> {
+> extends ProcedureContract<TInputSchema, InitialOutputSchema, TErrorMap> {
   /**
    * Applies metadata plugins to contracts built from this builder.
    *
@@ -22,7 +22,7 @@ export interface ProcedureContractBuilderWithInput<
    */
   meta(
     ...plugins: MetaPlugin<TInputSchema, InitialOutputSchema, TErrorMap>[]
-  ): ProcedureContractBuilderWithInput<TInputSchema, TErrorMap>
+  ): ContractBuilderWithInput<TInputSchema, TErrorMap>
 
   /**
    * Defines typesafe errors that implementations of this contract can throw.
@@ -31,7 +31,7 @@ export interface ProcedureContractBuilderWithInput<
    */
   errors<T extends ErrorMap>(
     errors: T,
-  ): ProcedureContractBuilderWithInput<TInputSchema, MergedErrorMap<TErrorMap, T>>
+  ): ContractBuilderWithInput<TInputSchema, MergedErrorMap<TErrorMap, T>>
 
   /**
    * Adds an additional input schema, merged with the previously defined one.
@@ -40,16 +40,14 @@ export interface ProcedureContractBuilderWithInput<
    */
   input<T extends AnySchema>(
     schema: T,
-  ): ProcedureContractBuilderWithInput<MergedSchema<T, TInputSchema>, TErrorMap>
+  ): ContractBuilderWithInput<MergedSchema<T, TInputSchema>, TErrorMap>
 
   /**
    * Defines the output schema used to validate and type the procedure output.
    *
    * @see {@link https://orpc.dev/docs/contract/procedure#inputoutput-validation | Procedure Contract - Input/Output Validation}
    */
-  output<T extends AnySchema>(
-    schema: T,
-  ): ProcedureContractBuilderWithInputOutput<TInputSchema, T, TErrorMap>
+  output<T extends AnySchema>(schema: T): ContractBuilderWithInputOutput<TInputSchema, T, TErrorMap>
 }
 
 /**
@@ -58,10 +56,10 @@ export interface ProcedureContractBuilderWithInput<
  *
  * @see {@link https://orpc.dev/docs/contract/procedure | Procedure Contract}
  */
-export interface ProcedureContractBuilderWithOutput<
+export interface ContractBuilderWithOutput<
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
->extends ProcedureContract<InitialInputSchema, TOutputSchema, TErrorMap> {
+> extends ProcedureContract<InitialInputSchema, TOutputSchema, TErrorMap> {
   /**
    * Applies metadata plugins to contracts built from this builder.
    *
@@ -69,7 +67,7 @@ export interface ProcedureContractBuilderWithOutput<
    */
   meta(
     ...plugins: MetaPlugin<InitialInputSchema, TOutputSchema, TErrorMap>[]
-  ): ProcedureContractBuilderWithOutput<TOutputSchema, TErrorMap>
+  ): ContractBuilderWithOutput<TOutputSchema, TErrorMap>
 
   /**
    * Defines typesafe errors that implementations of this contract can throw.
@@ -78,16 +76,14 @@ export interface ProcedureContractBuilderWithOutput<
    */
   errors<T extends ErrorMap>(
     errors: T,
-  ): ProcedureContractBuilderWithOutput<TOutputSchema, MergedErrorMap<TErrorMap, T>>
+  ): ContractBuilderWithOutput<TOutputSchema, MergedErrorMap<TErrorMap, T>>
 
   /**
    * Defines the input schema used to validate and type the procedure input.
    *
    * @see {@link https://orpc.dev/docs/contract/procedure#inputoutput-validation | Procedure Contract - Input/Output Validation}
    */
-  input<T extends AnySchema>(
-    schema: T,
-  ): ProcedureContractBuilderWithInputOutput<T, TOutputSchema, TErrorMap>
+  input<T extends AnySchema>(schema: T): ContractBuilderWithInputOutput<T, TOutputSchema, TErrorMap>
 
   /**
    * Adds an additional output schema, merged with the previously defined one.
@@ -96,7 +92,7 @@ export interface ProcedureContractBuilderWithOutput<
    */
   output<T extends AnySchema>(
     schema: T,
-  ): ProcedureContractBuilderWithOutput<MergedSchema<T, TOutputSchema>, TErrorMap>
+  ): ContractBuilderWithOutput<MergedSchema<T, TOutputSchema>, TErrorMap>
 }
 
 /**
@@ -106,11 +102,11 @@ export interface ProcedureContractBuilderWithOutput<
  *
  * @see {@link https://orpc.dev/docs/contract/procedure | Procedure Contract}
  */
-export interface ProcedureContractBuilderWithInputOutput<
+export interface ContractBuilderWithInputOutput<
   TInputSchema extends AnySchema,
   TOutputSchema extends AnySchema,
   TErrorMap extends ErrorMap,
->extends ProcedureContract<TInputSchema, TOutputSchema, TErrorMap> {
+> extends ProcedureContract<TInputSchema, TOutputSchema, TErrorMap> {
   /**
    * Applies metadata plugins to contracts built from this builder.
    *
@@ -118,7 +114,7 @@ export interface ProcedureContractBuilderWithInputOutput<
    */
   meta(
     ...plugins: MetaPlugin<TInputSchema, TOutputSchema, TErrorMap>[]
-  ): ProcedureContractBuilderWithInputOutput<TInputSchema, TOutputSchema, TErrorMap>
+  ): ContractBuilderWithInputOutput<TInputSchema, TOutputSchema, TErrorMap>
 
   /**
    * Defines typesafe errors that implementations of this contract can throw.
@@ -127,7 +123,7 @@ export interface ProcedureContractBuilderWithInputOutput<
    */
   errors<T extends ErrorMap>(
     errors: T,
-  ): ProcedureContractBuilderWithInputOutput<TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, T>>
+  ): ContractBuilderWithInputOutput<TInputSchema, TOutputSchema, MergedErrorMap<TErrorMap, T>>
 
   /**
    * Adds an additional input schema, merged with the previously defined one.
@@ -136,7 +132,7 @@ export interface ProcedureContractBuilderWithInputOutput<
    */
   input<T extends AnySchema>(
     schema: T,
-  ): ProcedureContractBuilderWithInputOutput<MergedSchema<T, TInputSchema>, TOutputSchema, TErrorMap>
+  ): ContractBuilderWithInputOutput<MergedSchema<T, TInputSchema>, TOutputSchema, TErrorMap>
 
   /**
    * Adds an additional output schema, merged with the previously defined one.
@@ -145,5 +141,5 @@ export interface ProcedureContractBuilderWithInputOutput<
    */
   output<T extends AnySchema>(
     schema: T,
-  ): ProcedureContractBuilderWithInputOutput<TInputSchema, MergedSchema<T, TOutputSchema>, TErrorMap>
+  ): ContractBuilderWithInputOutput<TInputSchema, MergedSchema<T, TOutputSchema>, TErrorMap>
 }

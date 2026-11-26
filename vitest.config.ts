@@ -1,4 +1,5 @@
 import process from 'node:process'
+
 import codspeedPlugin from '@codspeed/vitest-plugin'
 import { loadEnv } from 'vite'
 import { defaultExclude, defineConfig } from 'vitest/config'
@@ -24,7 +25,7 @@ export default defineConfig(({ mode }) => ({
           exclude: ['**/**'],
           benchmark: {
             include: ['**/*.bench.ts'],
-            exclude: [...defaultExclude, '**/.claude/**'],
+            exclude: [...defaultExclude, '**/.claude/worktrees/**'],
           },
         },
       },
@@ -33,7 +34,29 @@ export default defineConfig(({ mode }) => ({
           globals: true,
           setupFiles: ['./vitest.javascript.ts'],
           include: ['**/*.test.ts'],
-          exclude: [...defaultExclude, '**/.claude/**', './packages/bun/**', './packages/cloudflare/**'],
+          exclude: [
+            ...defaultExclude,
+            '**/.claude/worktrees/**',
+            './packages/bun/**',
+            './packages/cloudflare/**',
+            // MSW v3 requires Node.js 22+, older versions only run the MSW v2 project below
+            ...(Number.parseInt(process.versions.node) < 22 ? ['./packages/msw/**'] : []),
+          ],
+          benchmark: {
+            exclude: ['**/**'],
+          },
+        },
+      },
+      {
+        // also test @orpc/msw against MSW v2
+        resolve: {
+          alias: { msw: 'msw-v2' },
+        },
+        test: {
+          name: 'msw-v2',
+          globals: true,
+          setupFiles: ['./vitest.javascript.ts'],
+          include: ['./packages/msw/**/*.test.ts'],
           benchmark: {
             exclude: ['**/**'],
           },

@@ -1,18 +1,21 @@
 import type { MaybeOptionalOptions } from '@orpc/shared'
-import type { ToFetchResponseOptions } from '@standard-server/fetch'
-import type { Context } from '../../context'
-import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard'
 import { resolveMaybeOptionalOptions } from '@orpc/shared'
+import type { ToFetchResponseOptions } from '@standard-server/fetch'
 import { toFetchResponse, toStandardLazyRequest } from '@standard-server/fetch'
-import { resolveFriendlyStandardHandlerHandleOptions } from '../standard'
 
-export type FetchHandlerHandleResult = { matched: true, response: Response } | { matched: false, response?: undefined }
+import type { Context } from '../../context'
+import type { FriendlyStandardHandlerHandleOptions, StandardHandler } from '../standard/index'
+import { resolveFriendlyStandardHandlerHandleOptions } from '../standard/index'
+
+export type FetchHandlerHandleResult =
+  | { matched: true; response: Response }
+  | { matched: false; response?: undefined }
 
 export interface FetchHandlerOptions<_T extends Context> {
   /**
    * Options for how to convert the Fetch Response to a Standard Response, like event stream options, etc.
    */
-  toFetchResponse?: undefined | ToFetchResponseOptions
+  toFetchResponse?: ToFetchResponseOptions | undefined
 }
 
 export class FetchHandler<T extends Context> {
