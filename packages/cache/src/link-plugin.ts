@@ -13,7 +13,7 @@ import type { CacheHandlerPluginHeader } from './handler-plugin'
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#server-side-clients | Cache Helpers - Server-Side Clients}
  */
-export const CACHE_LINK_PLUGIN_CONTEXT_SYMBOL: unique symbol = Symbol.for(
+export const CACHE_LINK_PLUGIN_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for(
   'ORPC_CACHE_LINK_PLUGIN_CONTEXT',
 )
 
@@ -24,10 +24,8 @@ export const CACHE_LINK_PLUGIN_CONTEXT_SYMBOL: unique symbol = Symbol.for(
  */
 export interface CacheLinkPluginContext {
   /**
-   * Filled with the cache tags of the call's response by `CacheLinkPlugin`,
-   * or by `cacheRouterClientInterceptor` for router clients, and left unset
-   * when neither handles the call. Readers reuse one already in the context
-   * instead of replacing it, so every reader of the call sees the tags.
+   * Filled by `CacheLinkPlugin` or `cacheRouterClientInterceptor`, unset when
+   * neither handles the call. Readers reuse an existing one instead of replacing it.
    */
   [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]?: {
     /**
@@ -45,20 +43,19 @@ export interface CacheLinkPluginContext {
 /**
  * Reads the `orpc-cache-tag` and `orpc-cache-tag-invalidation` response
  * headers set by the cache handler plugin into the calling client context,
- * for client caches to track and revalidate tagged data. Does nothing for
- * calls whose context does not ask for them.
+ * for client caches to track and revalidate tagged data.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#link-plugin | Cache Helpers - Link Plugin}
  */
 export class CacheLinkPlugin<T extends ClientContext> implements StandardLinkPlugin<T> {
-  name = '~cache'
+  readonly name = '~cache'
 
   /**
    * Batched and deduplicated calls share one transport request, so the
    * headers must be read before they merge, while each call still holds its
    * own context.
    */
-  before = ['~batch', '~dedupe']
+  readonly before: readonly string[] = ['~batch', '~dedupe']
 
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
     return {

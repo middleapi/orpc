@@ -69,6 +69,20 @@ export function describeRedisCacheStoreContract(
     expect(fresh.expiresAt).toBeGreaterThan(stale.expiresAt!)
   })
 
+  it('stores entries with a fractional lifetime, and nothing for an empty one', async () => {
+    const { store, prefix } = createStore()
+
+    await store.getOrSet('fraction', async () => 'v', { ttl: 1000.5, swr: 0.25 })
+    await expect(
+      store.getOrSet('fraction', async () => 'other', { ttl: 1000.5, swr: 0.25 }),
+    ).resolves.toMatchObject({ output: 'v' })
+
+    await expect(store.getOrSet('empty', async () => 'v', { ttl: 0 })).resolves.toMatchObject({
+      output: 'v',
+    })
+    expect(await redis.exists(`${prefix}e:empty`)).toBe(0)
+  })
+
   it('stores entries as strings and tag counters under the prefixed key families', async () => {
     const { store, prefix } = createStore()
 

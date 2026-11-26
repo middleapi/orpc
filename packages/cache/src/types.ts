@@ -1,7 +1,4 @@
 export interface CacheEntry {
-  /**
-   * The cached procedure output.
-   */
   output: unknown
 
   /**
@@ -16,9 +13,8 @@ export interface CacheEntry {
   expiresAt?: number | undefined
 
   /**
-   * The time (unix timestamp in milliseconds) after which the entry is no longer
-   * served, once its stale-while-revalidate window has passed. `undefined`
-   * means the entry never expires.
+   * The time (unix timestamp in milliseconds) after which the entry is no
+   * longer served. `undefined` means it never expires.
    */
   evictAt?: number | undefined
 }
@@ -29,14 +25,14 @@ export interface CacheGetOrSetOptions {
    *
    * @default []
    */
-  tags?: readonly string[]
+  tags?: readonly string[] | undefined
 
   /**
    * Fresh lifetime in milliseconds. `undefined` means the entry never expires by time.
    *
    * @default undefined
    */
-  ttl?: number
+  ttl?: number | undefined
 
   /**
    * Extra stale-while-revalidate window in milliseconds after `ttl`.
@@ -45,7 +41,7 @@ export interface CacheGetOrSetOptions {
    *
    * @default 0
    */
-  swr?: number
+  swr?: number | undefined
 
   /**
    * Takes ownership of the background refresh of a stale entry, like
@@ -53,13 +49,10 @@ export interface CacheGetOrSetOptions {
    * refresh fails, so this is also where such failures are handled; without
    * it they surface as unhandled rejections.
    */
-  waitUntil?: (promise: Promise<unknown>) => void
+  waitUntil?: ((promise: Promise<unknown>) => void) | undefined
 }
 
 export interface CacheRevalidateOptions {
-  /**
-   * The tags to revalidate.
-   */
   tags: readonly [string, ...string[]]
 }
 
@@ -71,12 +64,10 @@ export interface CacheRevalidateOptions {
  */
 export interface CacheStore {
   /**
-   * Resolves the entry stored under `key`, filling it through `fill` when
-   * there is none. Concurrent callers of one key fill once and share that
-   * entry. A stale entry, past `expiresAt` but within `swr`, is returned as is
-   * while one caller refreshes it in the background. Keys may be any
-   * serializable value; implementations encode them stably, so structurally
-   * equal keys resolve the same entry.
+   * Resolves the entry under `key`, filling it through `fill` on a miss.
+   * Concurrent callers of one key share one fill, and a stale entry within
+   * `swr` is returned while one caller refreshes it. A lifetime of zero stores
+   * nothing. Keys may be any serializable value.
    */
   getOrSet(
     key: unknown,
@@ -105,5 +96,5 @@ export interface CacheContext {
    * Takes ownership of background work such as stale-while-revalidate
    * refreshes, passed to the store as {@link CacheGetOrSetOptions.waitUntil}.
    */
-  'cache/waitUntil'?: (promise: Promise<unknown>) => void
+  'cache/waitUntil'?: ((promise: Promise<unknown>) => void) | undefined
 }

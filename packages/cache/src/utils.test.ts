@@ -1,6 +1,6 @@
 import { RPCJsonSerializer } from '@orpc/client'
 
-import { encodeCacheKey } from './utils'
+import { createCacheEntry, encodeCacheKey, resolveCacheExpiry } from './utils'
 
 describe('encodeCacheKey', () => {
   const serializer = new RPCJsonSerializer()
@@ -36,5 +36,68 @@ describe('encodeCacheKey', () => {
     expect(encodeCacheKey({ file: new Blob(['a']), id: 1 }, serializer)).toBe(
       encodeCacheKey({ file: new Blob(['b']), id: 1 }, serializer),
     )
+  })
+})
+
+describe('resolveCacheExpiry', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(1000)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('never expires without a ttl', () => {
+    expect(resolveCacheExpiry({ swr: 500 })).toEqual({
+      expiresAt: undefined,
+      evictAt: undefined,
+      retention: undefined,
+    })
+  })
+
+  it('resolves the lifetime from ttl and swr', () => {
+    expect(resolveCacheExpiry({ ttl: 500 })).toEqual({
+      expiresAt: 1500,
+      evictAt: 1500,
+      retention: 500,
+    })
+    expect(resolveCacheExpiry({ ttl: 500, swr: 250 })).toEqual({
+      expiresAt: 1500,
+      evictAt: 1750,
+      retention: 750,
+    })
+  })
+
+  it('rounds the retention up to whole milliseconds', () => {
+    expect(resolveCacheExpiry({ ttl: 0.5, swr: 0.25 }).retention).toBe(1)
+    expect(resolveCacheExpiry({ ttl: 0 }).retention).toBe(0)
+  })
+})
+
+describe('createCacheEntry', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(1000)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('builds the entry with its lifetime and retention', () => {
+    expect(createCacheEntry('v', { tags: ['t'], ttl: 500, swr: 250 })).toEqual({
+      entry: { output: 'v', tags: ['t'], expiresAt: 1500, evictAt: 1750 },
+      retention: 750,
+    })
+  })
+
+  it('leaves tags absent when there are none', () => {
+    expect(createCacheEntry('v', { tags: [] })).toEqual({
+      entry: { output: 'v', tags: undefined, expiresAt: undefined, evictAt: undefined },
+      retention: undefined,
+    })
+    expect(createCacheEntry('v', {}).entry.tags).toBeUndefined()
   })
 })

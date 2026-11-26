@@ -258,25 +258,17 @@ export function isCompressibleContentType(contentType: string | null | undefined
  * the encoding's own syntax, `A-Z` because caches like Cloudflare Workers
  * Caching fold case, and anything outside printable ASCII because it cannot
  * appear in a header value.
- *
- * Safe to share across calls: `String.prototype.replace` resets `lastIndex`
- * on a global regex before it matches.
  */
 const UNSAFE_CACHE_TAG_CHARS = /[^\x21-\x7E]|[%,A-Z]/gu
 
 /**
- * Percent-encodes only {@link UNSAFE_CACHE_TAG_CHARS} in a cache tag, so
- * typical tags stay readable. Uppercase letters are encoded because caches
- * like Cloudflare Workers Caching match tags case-insensitively; the encoded
- * form stays unambiguous under case folding. Reach for this where tags travel
- * one at a time, such as a purge API.
+ * Percent-encodes {@link UNSAFE_CACHE_TAG_CHARS} in a cache tag, so typical
+ * tags stay readable. Use it where tags travel one at a time, such as a purge API.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#handler-plugin | Cache Helpers - Handler Plugin}
  */
 export function encodeCacheTag(tag: string): string {
-  // encodeURIComponent emits the UTF-8 bytes a percent escape needs, but leaves
-  // the URI unreserved set alone, so the uppercase letters in it are escaped by
-  // hand. Those are single-byte ASCII, so the code point is the byte.
+  // encodeURIComponent leaves A-Z alone, so they are escaped by hand.
   return tag.replace(UNSAFE_CACHE_TAG_CHARS, (char) =>
     char >= 'A' && char <= 'Z'
       ? `%${char.charCodeAt(0).toString(16).toUpperCase()}`
@@ -290,7 +282,7 @@ export function encodeCacheTag(tag: string): string {
  * @see {@link https://orpc.dev/docs/helpers/cache#handler-plugin | Cache Helpers - Handler Plugin}
  */
 export function encodeCacheTagHeader(tags: readonly string[]): string {
-  return tags.map((tag) => encodeCacheTag(tag)).join(',')
+  return tags.map(encodeCacheTag).join(',')
 }
 
 /**

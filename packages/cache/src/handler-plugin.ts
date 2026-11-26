@@ -10,7 +10,7 @@ import type { StandardHeaders } from '@standard-server/core'
 import type { CacheLinkPluginContext } from './link-plugin'
 import { CACHE_LINK_PLUGIN_CONTEXT_SYMBOL } from './link-plugin'
 
-export const CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL: unique symbol = Symbol.for(
+export const CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL: unique symbol = /* @__PURE__ */ Symbol.for(
   'ORPC_CACHE_HANDLER_PLUGIN_CONTEXT',
 )
 
@@ -74,15 +74,13 @@ export interface CacheHandlerPluginOptions<_T extends Context> {
 
 /**
  * Reflects the cache activity of the `cache` and `revalidate` middlewares
- * into the configured response headers. Only the first check belonging to
- * the procedure the client called is reflected, so nested procedure calls
- * never leak their tags into the response. Does nothing until headers are
- * configured.
+ * into the configured response headers. Only the procedure the client called
+ * is reflected, never nested calls.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#handler-plugin | Cache Helpers - Handler Plugin}
  */
 export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlugin<T> {
-  name = '~cache'
+  readonly name = '~cache'
 
   private readonly headers: Set<CacheHandlerPluginHeader>
 
@@ -149,11 +147,9 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
 }
 
 /**
- * Fills the `CacheLinkPluginContext` a router client call carries with the
- * tags of the called procedure's cache activity, as the handler and link
- * plugins do over HTTP, for server-side clients such as those rendering
- * TanStack Query on the server. Router clients keep their client context
- * from procedures, so the `context` option must forward it.
+ * Fills the `CacheLinkPluginContext` of a router client call with the called
+ * procedure's cache tags, for server-side clients. The client's `context`
+ * option must forward the client context.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#server-side-clients | Cache Helpers - Server-Side Clients}
  */
@@ -188,9 +184,8 @@ async function nextWithRootCacheActivity<TResult>({
   procedure: AnyProcedure
   path: readonly string[]
 }) {
-  const pluginContext: Exclude<
-    CacheHandlerPluginContext[typeof CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL],
-    undefined
+  const pluginContext: NonNullable<
+    CacheHandlerPluginContext[typeof CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]
   > = { caches: [], revalidations: [] }
 
   const result = await next({

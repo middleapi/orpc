@@ -6,39 +6,40 @@ import type { CacheHandlerPluginContext } from './handler-plugin'
 import { CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
 import type { CacheContext, CacheEntry } from './types'
 
+type MiddlewareValue<T, TInContext extends CacheContext, TInput> = Value<
+  Promisable<T>,
+  [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]
+>
+
 export interface CacheMiddlewareOptions<TInContext extends CacheContext, TInput> {
   /**
-   * The key identifying the cache entry, or any serializable value to derive
-   * it from. Used as given, so procedures sharing a key share an entry;
-   * `undefined` falls back to the default.
+   * The cache key, or any serializable value to derive it from.
+   * Procedures sharing a key share an entry.
    *
    * @default the procedure path and input
    */
   // Spelled out instead of `unknown`, which absorbs the function form and drops its contextual typing.
-  key?: Value<
-    Promisable<string | number | bigint | boolean | object | null | undefined>,
-    [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]
-  >
+  key?:
+    | MiddlewareValue<
+        string | number | bigint | boolean | object | null | undefined,
+        TInContext,
+        TInput
+      >
+    | undefined
 
   /**
    * Tags associated with the entry. Revalidating any of them invalidates the entry.
    *
    * @default []
    */
-  tags?: Value<
-    Promisable<readonly string[]>,
-    [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]
-  >
+  tags?: MiddlewareValue<readonly string[], TInContext, TInput> | undefined
 
   /**
    * Fresh lifetime in milliseconds. `undefined` means the entry never expires by time.
    *
    * @default undefined
    */
-  ttl?: Value<
-    Promisable<number | undefined>,
-    [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]
-  >
+  ttl?: MiddlewareValue<number | undefined, TInContext, TInput> | undefined
 
   /**
    * Extra stale-while-revalidate window in milliseconds after `ttl`.
@@ -46,26 +47,19 @@ export interface CacheMiddlewareOptions<TInContext extends CacheContext, TInput>
    *
    * @default 0
    */
-  swr?: Value<
-    Promisable<number | undefined>,
-    [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]
-  >
+  swr?: MiddlewareValue<number | undefined, TInContext, TInput> | undefined
 
   /**
    * When resolved to `false`, skips both the cache lookup and the store for this request.
    *
    * @default true
    */
-  enabled?: Value<
-    Promisable<boolean>,
-    [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]
-  >
+  enabled?: MiddlewareValue<boolean, TInContext, TInput> | undefined
 }
 
 /**
  * Creates a middleware that caches procedure output in the context's `cache/store`,
  * with tag-based revalidation and optional stale-while-revalidate.
- * By default the key is derived from the procedure path and input.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#cache-middleware | Cache Helpers - Cache Middleware}
  */
@@ -113,15 +107,12 @@ export interface RevalidateMiddlewareOptions<TInContext extends CacheContext, TI
   /**
    * The tags to revalidate. Resolving to `null` or `undefined` skips the revalidation.
    */
-  tags: Value<
-    Promisable<readonly [string, ...string[]] | null | undefined>,
-    [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]
-  >
+  tags: MiddlewareValue<readonly [string, ...string[]] | null | undefined, TInContext, TInput>
 }
 
 /**
  * Creates a middleware that revalidates cache tags in the context's `cache/store`
- * after the procedure succeeds, typically on mutations. Errors skip the revalidation entirely.
+ * after the procedure succeeds, typically on mutations.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#revalidate-middleware | Cache Helpers - Revalidate Middleware}
  */
@@ -151,9 +142,6 @@ export function revalidate<TInContext extends CacheContext, TInput>(
   }
 }
 
-/**
- * What is left of the entry's fresh lifetime and swr window, in milliseconds.
- */
 function remainingLifetime(entry: CacheEntry): {
   ttl: number | undefined
   swr: number | undefined

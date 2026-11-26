@@ -7,20 +7,19 @@ export interface TieredCacheStoreTier {
    * Caps `ttl` in this tier, so a front tier refills from the next one
    * before the entry behind it can change.
    */
-  ttl?: number
+  ttl?: number | undefined
 
   /**
    * Caps `swr` in this tier.
    */
-  swr?: number
+  swr?: number | undefined
 }
 
 /**
- * Cache store layering several stores front to back, such as a memory store
- * in front of a Redis one. A miss in one tier fills from the next, so only
- * the last tier runs the fill, and a revalidation reaches every tier. Each
- * tier measures `ttl` from when it stored its copy, so cap it on front tiers
- * to bound how long they may outlive the entry behind them.
+ * Cache store layering several stores front to back, such as memory in front
+ * of Redis. A miss fills from the next tier, and a revalidation reaches every
+ * tier. Each tier measures `ttl` from when it stored its copy, so cap it on
+ * front tiers.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#tiered-store | Cache Helpers - Tiered Store}
  */

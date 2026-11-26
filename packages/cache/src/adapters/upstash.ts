@@ -7,8 +7,7 @@ export type UpstashCacheStoreOptions = BaseRedisCacheStoreOptions
 
 /**
  * Cache store adapter for Upstash Redis. Shares its key and entry format with
- * `RedisCacheStore`, so both can serve the same database. A good fit for
- * serverless and edge runtimes.
+ * `RedisCacheStore`, so both can serve the same database.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */

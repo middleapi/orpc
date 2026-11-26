@@ -5,12 +5,9 @@ import { deepSortKeys, stringifyJSON } from '@orpc/shared'
 import type { CacheEntry, CacheGetOrSetOptions } from './types'
 
 /**
- * Encodes a cache key into a stable string: strings are used verbatim, while
- * any other value is serialized with the RPC JSON serializer first, so
- * complex values become plain JSON, then canonicalized by sorting object
- * keys and meta entries. Structurally equal keys always encode identically,
- * and unsupported values like blobs are ignored. A string shaped like a
- * serialized key is serialized too, so the two never collide.
+ * Encodes a cache key into a stable string. Strings are used verbatim; other
+ * values are serialized and canonicalized, so structurally equal keys encode
+ * identically. Unsupported values like blobs are ignored.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
@@ -47,13 +44,12 @@ export function isCacheEntryEvicted(entry: Pick<CacheEntry, 'evictAt'>): boolean
 }
 
 /**
- * The entry lifetime an option set describes: when it stops being fresh,
- * when it may be evicted (both unix timestamps in milliseconds), and how long
- * it is retained in milliseconds. All `undefined` when it never expires.
+ * Resolves `ttl` and `swr` into `expiresAt`, `evictAt` and a `retention` in
+ * whole milliseconds, all `undefined` when the entry never expires.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
-export function resolveCacheExpiry({ ttl, swr }: CacheGetOrSetOptions): {
+export function resolveCacheExpiry({ ttl, swr = 0 }: CacheGetOrSetOptions): {
   expiresAt: number | undefined
   evictAt: number | undefined
   retention: number | undefined
@@ -64,5 +60,22 @@ export function resolveCacheExpiry({ ttl, swr }: CacheGetOrSetOptions): {
 
   const expiresAt = Date.now() + ttl
 
-  return { expiresAt, evictAt: expiresAt + (swr ?? 0), retention: ttl + (swr ?? 0) }
+  return { expiresAt, evictAt: expiresAt + swr, retention: Math.ceil(ttl + swr) }
+}
+
+/**
+ * Builds the entry holding `output` under the given options, along with its `retention`.
+ *
+ * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
+ */
+export function createCacheEntry(
+  output: unknown,
+  options: CacheGetOrSetOptions,
+): { entry: CacheEntry; retention: number | undefined } {
+  const { retention, ...expiry } = resolveCacheExpiry(options)
+
+  return {
+    entry: { output, tags: options.tags?.length ? options.tags : undefined, ...expiry },
+    retention,
+  }
 }

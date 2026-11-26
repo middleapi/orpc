@@ -1,12 +1,13 @@
 import type { RPCJsonSerialization } from '@orpc/client'
 import { RPCJsonSerializer } from '@orpc/client'
-import type { Locker } from '@orpc/experimental-lock'
+import type { Locker, LockOptions } from '@orpc/experimental-lock'
 import { LockTimeoutError } from '@orpc/experimental-lock'
 import { MemoryLocker } from '@orpc/experimental-lock/memory'
 import type { Promisable, Public } from '@orpc/shared'
 
 import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions, CacheStore } from '../types'
 import {
+  createCacheEntry,
   encodeCacheKey,
   isCacheEntryEvicted,
   isCacheEntryStale,
@@ -19,11 +20,8 @@ import {
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
-export interface CacheEnvelope {
+export interface CacheEnvelope extends Omit<CacheEntry, 'output'> {
   output: RPCJsonSerialization
-  tags?: readonly string[] | undefined
-  expiresAt?: number | undefined
-  evictAt?: number | undefined
 }
 
 export interface BaseKeyValueCacheStoreOptions {
@@ -33,17 +31,15 @@ export interface BaseKeyValueCacheStoreOptions {
    *
    * @default RPCJsonSerializer
    */
-  serializer?: undefined | Public<RPCJsonSerializer>
+  serializer?: Public<RPCJsonSerializer> | undefined
 
   /**
-   * Coalesces concurrent fills of one key, so a miss runs the fill once. The
-   * default shares locks within the process; a shared locker such as
-   * `RedisLocker` from `@orpc/experimental-lock` shares them across
-   * processes. A caller that times out waiting fills on its own.
+   * Coalesces concurrent fills of one key. The default locks within the
+   * process; a shared locker such as `RedisLocker` coalesces across processes.
    *
    * @default new MemoryLocker({ ttl: 60_000 })
    */
-  locker?: undefined | Locker
+  locker?: Locker | undefined
 }
 
 /**
@@ -69,37 +65,39 @@ export abstract class BaseKeyValueCacheStore implements CacheStore {
     options: CacheGetOrSetOptions = {},
   ): Promise<CacheEntry> {
     const encodedKey = encodeCacheKey(key, this.serializer)
-    const entry = await this.read(encodedKey, options)
+    const entry = live(await this.read(encodedKey, options))
 
-    if (entry === undefined || isCacheEntryEvicted(entry)) {
+    if (entry !== undefined && !isCacheEntryStale(entry)) {
+      return entry
+    }
+
+    const { retention } = resolveCacheExpiry(options)
+
+    // A lifetime that leaves nothing to keep stores nothing: backends reject such writes.
+    if (retention !== undefined && retention <= 0) {
+      return entry ?? createCacheEntry(await compute(), options).entry
+    }
+
+    if (entry === undefined) {
       return this.lock(
         encodedKey,
-        async (waited) => {
-          const current = waited ? await this.read(encodedKey, options) : undefined
-
-          return current === undefined || isCacheEntryEvicted(current)
-            ? this.fill(encodedKey, compute, options)
-            : current
-        },
+        async (waited) =>
+          (waited ? live(await this.read(encodedKey, options)) : undefined) ??
+          this.fill(encodedKey, compute, options),
         () => this.fill(encodedKey, compute, options),
       )
     }
 
-    if (isCacheEntryStale(entry)) {
-      const refresh = this.lock(
-        encodedKey,
-        async (waited) => {
-          const current = waited ? await this.read(encodedKey, options) : undefined
+    const refresh = this.lock(
+      encodedKey,
+      async () => {
+        await this.fill(encodedKey, compute, options)
+      },
+      () => undefined,
+      { timeout: 0 },
+    )
 
-          if (current === undefined || isCacheEntryStale(current)) {
-            await this.fill(encodedKey, compute, options)
-          }
-        },
-        () => undefined,
-      )
-
-      options.waitUntil?.(refresh)
-    }
+    options.waitUntil?.(refresh)
 
     return entry
   }
@@ -119,6 +117,7 @@ export abstract class BaseKeyValueCacheStore implements CacheStore {
   /**
    * Runs `compute` and stores its output. Tag state captured before it runs
    * lets a revalidation that lands during it still invalidate the entry.
+   * Only called for lifetimes that retain the entry.
    */
   protected abstract fill(
     encodedKey: string,
@@ -139,34 +138,26 @@ export abstract class BaseKeyValueCacheStore implements CacheStore {
   }
 
   /**
-   * Builds the envelope storing `output`, with the entry to return and how
-   * long to retain it in milliseconds, `undefined` when it never expires.
+   * Builds the envelope storing `output`, with the entry to return and its `retention`.
    */
   protected encode(
     output: unknown,
     options: CacheGetOrSetOptions,
   ): { envelope: CacheEnvelope; entry: CacheEntry; retention: number | undefined } {
-    const tags = options.tags?.length ? options.tags : undefined
-    const { expiresAt, evictAt, retention } = resolveCacheExpiry(options)
+    const { entry, retention } = createCacheEntry(output, options)
     const { json, meta } = this.serializer.serializeJson(output)
 
-    return {
-      envelope: { output: { json, meta }, tags, expiresAt, evictAt },
-      entry: { output, tags, expiresAt, evictAt },
-      retention,
-    }
+    return { envelope: { ...entry, output: { json, meta } }, entry, retention }
   }
 
-  /**
-   * Runs `fn` under the key's lock, or `onTimeout` once waiting for it timed out.
-   */
   private async lock<T>(
     encodedKey: string,
     fn: (waited: boolean) => Promise<T>,
     onTimeout: () => Promisable<T>,
+    options?: LockOptions,
   ): Promise<T> {
     try {
-      return await this.locker.lock(encodedKey, ({ waited }) => fn(waited))
+      return await this.locker.lock(encodedKey, ({ waited }) => fn(waited), options)
     } catch (error) {
       if (error instanceof LockTimeoutError) {
         return onTimeout()
@@ -175,4 +166,8 @@ export abstract class BaseKeyValueCacheStore implements CacheStore {
       throw error
     }
   }
+}
+
+function live(entry: CacheEntry | undefined): CacheEntry | undefined {
+  return entry === undefined || isCacheEntryEvicted(entry) ? undefined : entry
 }

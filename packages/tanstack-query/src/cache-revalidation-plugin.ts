@@ -125,11 +125,9 @@ function getCacheTags(query: AnyQuery): readonly string[] | undefined {
 }
 
 /**
- * Tracks the cache tags the server reports for queries and infinite queries,
- * keeping them in the query state so they survive dehydration. When a
- * mutation revalidates tags, invalidates the affected queries and waits for
- * the active ones to refetch before the mutation succeeds. Data whose tags are
- * unknown counts as affected until a fetch reveals them. Needs the
+ * Tracks the cache tags the server reports for queries and infinite queries.
+ * When a mutation revalidates tags, invalidates the affected queries and waits
+ * for active ones to refetch; data with unknown tags counts as affected. Needs
  * `CacheLinkPlugin` on the link, or `cacheRouterClientInterceptor` on a
  * server-side client.
  *
@@ -202,23 +200,14 @@ export class experimental_CacheRevalidationUtilsPlugin<
             return output
           }
 
-          /**
-           * Pages are added the way TanStack Query adds them, dropping one
-           * from the other end beyond `maxPages`.
-           */
           const pages = (query.state.data as InfiniteData<unknown> | undefined)?.pages ?? []
           const known = getCacheTagsState(query)?.orpcCachePageTags
           const current = known?.length === pages.length ? known : pages.map(() => null)
+          const limit = maxPages || Infinity
           const pageTags =
-            fetchMore.direction === 'forward' ? [...current, tags] : [tags, ...current]
-
-          if (maxPages && pageTags.length > maxPages) {
-            if (fetchMore.direction === 'forward') {
-              pageTags.shift()
-            } else {
-              pageTags.pop()
-            }
-          }
+            fetchMore.direction === 'forward'
+              ? [...current, tags].slice(-limit)
+              : [tags, ...current].slice(0, limit)
 
           setCacheTagsState(query, { orpcCachePageTags: pageTags })
 

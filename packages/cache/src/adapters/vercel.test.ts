@@ -112,7 +112,7 @@ describe('vercelCacheStore', () => {
       ).resolves.toMatchObject({ output: 'refilled' })
     })
 
-    it('refreshes once for concurrent stale hits, and again when the first refresh failed', async () => {
+    it('refreshes once for concurrent stale hits, and again on a later one when the refresh failed', async () => {
       const cache = createMockedCache()
       const store = new VercelCacheStore({ cache })
       await store.getOrSet('k', async () => 'v', { ttl: 1000, swr: 1000 })
@@ -155,6 +155,10 @@ describe('vercelCacheStore', () => {
 
       await expect(waitUntilAgain.mock.calls[0]![0]).rejects.toThrow('handler down')
       await waitUntilAgain.mock.calls[1]![0]
+      expect(failingFill).toHaveBeenCalledTimes(1)
+
+      await store.getOrSet('k', failingFill, { ttl: 1000, swr: 1000, waitUntil: waitUntilAgain })
+      await waitUntilAgain.mock.calls[2]![0]
       expect(failingFill).toHaveBeenCalledTimes(2)
       await expect(
         store.getOrSet('k', failingFill, { ttl: 1000, swr: 1000 }),

@@ -114,9 +114,12 @@ describe('memoryCacheStore', () => {
     })
     expect(waitUntil).toHaveBeenCalledTimes(2)
 
+    // the second stale hit leaves the refresh to the first instead of waiting for it
+    await expect(waitUntil.mock.calls[1]![0]).resolves.toBeUndefined()
+
     finish('fresh')
-    await Promise.all(waitUntil.mock.calls.map(([refresh]) => refresh))
-    expect(fill).toHaveBeenCalledTimes(1) // the second stale hit found the refreshed entry
+    await waitUntil.mock.calls[0]![0]
+    expect(fill).toHaveBeenCalledTimes(1)
 
     await expect(store.getOrSet('k', fill, { ttl: 1000, swr: 1000 })).resolves.toEqual({
       output: 'fresh',
@@ -148,34 +151,55 @@ describe('memoryCacheStore', () => {
     expect(fill).toHaveBeenCalledTimes(2)
   })
 
-  it('lets a waiting refresh fill when the first one failed', async () => {
-    const store = new MemoryCacheStore()
+  it('runs the fill without storing when the lifetime leaves nothing to keep', async () => {
+    const locker = new MemoryLocker({ ttl: 10_000 })
+    const lock = vi.spyOn(locker, 'lock')
+    const store = new MemoryCacheStore({ locker })
+    const fill = vi.fn(async () => 'v')
+
+    await expect(store.getOrSet('k', fill, { tags: ['t'], ttl: 0 })).resolves.toEqual({
+      output: 'v',
+      tags: ['t'],
+      expiresAt: 0,
+      evictAt: 0,
+    })
+    await expect(store.getOrSet('k', fill, { ttl: 0, swr: 0 })).resolves.toEqual({
+      output: 'v',
+      tags: undefined,
+      expiresAt: 0,
+      evictAt: 0,
+    })
+    expect(fill).toHaveBeenCalledTimes(2)
+    expect((store as any).entries.size).toBe(0)
+    expect(lock).not.toHaveBeenCalled()
+
+    // and never refreshes a stale entry stored with a longer lifetime
+    await store.getOrSet('stale', async () => 'v', { ttl: 1000, swr: 1000 })
+    vi.setSystemTime(1200)
+    lock.mockClear()
+    const waitUntil = vi.fn()
+
+    await expect(store.getOrSet('stale', fill, { ttl: 0, waitUntil })).resolves.toMatchObject({
+      output: 'v',
+    })
+    expect(waitUntil).not.toHaveBeenCalled()
+    expect(lock).not.toHaveBeenCalled()
+  })
+
+  it('refreshes without waiting for the lock', async () => {
+    const locker = new MemoryLocker({ ttl: 10_000 })
+    const lock = vi.spyOn(locker, 'lock')
+    const store = new MemoryCacheStore({ locker })
     await store.getOrSet('k', async () => 'v', { ttl: 1000, swr: 1000 })
 
     vi.setSystemTime(1200)
-    let fail!: (error: Error) => void
-    const fill = vi
-      .fn()
-      .mockImplementationOnce(
-        () =>
-          new Promise<never>((_, reject) => {
-            fail = reject
-          }),
-      )
-      .mockResolvedValue('fresh')
+    lock.mockClear()
     const waitUntil = vi.fn()
+    await store.getOrSet('k', async () => 'fresh', { ttl: 1000, swr: 1000, waitUntil })
+    await waitUntil.mock.calls[0]![0]
 
-    await store.getOrSet('k', fill, { ttl: 1000, swr: 1000, waitUntil })
-    await store.getOrSet('k', fill, { ttl: 1000, swr: 1000, waitUntil })
-    fail(new Error('handler down'))
-
-    await expect(waitUntil.mock.calls[0]![0]).rejects.toThrow('handler down')
-    await waitUntil.mock.calls[1]![0]
-    expect(fill).toHaveBeenCalledTimes(2)
-
-    await expect(store.getOrSet('k', fill, { ttl: 1000, swr: 1000 })).resolves.toMatchObject({
-      output: 'fresh',
-    })
+    expect(lock).toHaveBeenCalledTimes(1)
+    expect(lock).toHaveBeenCalledWith('k', expect.any(Function), { timeout: 0 })
   })
 
   it('drops output computed before a revalidation that landed during its fill', async () => {
@@ -231,7 +255,7 @@ describe('memoryCacheStore', () => {
     })
   })
 
-  it('lets a waiter fill on its own once waiting for the lock times out, and leaves a timed-out refresh to the holder', async () => {
+  it('lets a waiter fill on its own once waiting for the lock times out', async () => {
     const store = new MemoryCacheStore({ locker: new MemoryLocker({ ttl: 10_000, timeout: 50 }) })
     let release!: () => void
     const held = new Promise<void>((resolve) => {
@@ -248,15 +272,6 @@ describe('memoryCacheStore', () => {
     })
     release()
     await expect(holder).resolves.toMatchObject({ output: 'held' })
-
-    await store.getOrSet('stale', async () => 'v', { ttl: 1000, swr: 10_000 })
-    vi.setSystemTime(2000)
-    const refreshFill = vi.fn(() => new Promise<string>(() => {}))
-    const waitUntil = vi.fn()
-    await store.getOrSet('stale', refreshFill, { ttl: 1000, swr: 10_000, waitUntil })
-    await store.getOrSet('stale', async () => 'other', { ttl: 1000, swr: 10_000, waitUntil })
-    await expect(waitUntil.mock.calls[1]![0]).resolves.toBeUndefined()
-    expect(refreshFill).toHaveBeenCalledTimes(1)
   })
 
   it('rethrows other lock errors', async () => {
@@ -289,6 +304,26 @@ describe('memoryCacheStore', () => {
     await store.revalidate({ tags: ['t'] })
     await store.getOrSet('after', async () => 'v')
     expect([...entries.keys()]).toEqual(['kept', 'before', 'at', 'after'])
+  })
+
+  it('sweeps at most once a second', async () => {
+    const store = new MemoryCacheStore()
+    const entries = Reflect.get(store, 'entries') as Map<string, unknown>
+
+    await store.getOrSet('first', async () => 'v', { ttl: 1000 })
+    await store.getOrSet('second', async () => 'v', { ttl: 1500 })
+
+    vi.setSystemTime(1000)
+    await store.getOrSet('a', async () => 'v')
+    expect([...entries.keys()]).toEqual(['second', 'a'])
+
+    vi.setSystemTime(1600)
+    await store.getOrSet('b', async () => 'v')
+    expect([...entries.keys()]).toEqual(['second', 'a', 'b'])
+
+    vi.setSystemTime(2000)
+    await store.getOrSet('c', async () => 'v')
+    expect([...entries.keys()]).toEqual(['a', 'b', 'c'])
   })
 
   it('evicts past ttl + swr, and revalidation drops stale entries too', async () => {

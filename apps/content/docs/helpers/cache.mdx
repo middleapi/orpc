@@ -44,7 +44,7 @@ An entry is fresh for `ttl` milliseconds and kept for a further `swr` window, du
 
 The `cache` helper creates middleware that caches the output of [procedures](/docs/procedure). A hit returns the cached output without running the handler; a miss runs the handler once, even for concurrent callers, and stores the result. The `key`, `tags`, `ttl`, `swr`, and `enabled` options accept static values or functions of the middleware options and input.
 
-`key` defaults to the procedure path and input. When provided, it is used as given, so procedures sharing a key share an entry.
+`key` defaults to the procedure path and input. When provided, it is used as given, so procedures sharing a key share an entry. When `ttl` and `swr` add up to zero, the handler runs and nothing is stored.
 
 ```ts
 import { cache, CacheContext } from '@orpc/experimental-cache'
@@ -82,7 +82,7 @@ An entry is shared by everyone using its key. If output depends on the requester
 
 ### Stale While Revalidate
 
-Past `ttl` but within `swr`, the middleware returns the stale output at once and re-runs the procedure in the background to refresh the entry. Concurrent stale hits refresh once, and nothing older than `ttl + swr` is ever served.
+Past `ttl` but within `swr`, the middleware returns the stale output at once and re-runs the procedure in the background to refresh the entry. Concurrent stale hits refresh once, without waiting for each other, and nothing older than `ttl + swr` is ever served.
 
 On runtimes that stop pending work once the response is sent, such as Cloudflare Workers, pass `cache/waitUntil` through the context so refreshes can finish:
 
@@ -147,6 +147,10 @@ const handler = new RPCHandler(router, {
 With `cache-control` and `cache-tag` listed, a response cache in front serves cached responses without invoking your server. Pair it with a purge-capable store, such as `experimental_WorkersCacheStore`, so revalidations purge the front cache too. Standard HTTP caches only store GET and HEAD responses, so this mainly benefits [OpenAPIHandler](/docs/openapi/handler) routes; RPC requests use POST.
 
 `cache-control` uses `max-age`, not `s-maxage`, because [`s-maxage` carries `proxy-revalidate` semantics](https://www.rfc-editor.org/rfc/rfc9111#section-5.2.2.10) that forbid the stale reuse `swr` asks for. It therefore reaches browser caches too, which no tag purge can invalidate. Set your own `cache-control` when responses must stay out of them.
+:::
+
+:::warning
+A response cache in front stores responses by URL, not by `key`, and `cache-control` is sent as `public`. List `cache-control` only when no cached procedure behind the handler depends on the requester.
 :::
 
 :::info

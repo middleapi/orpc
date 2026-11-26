@@ -4,7 +4,7 @@ import type {
   CacheRevalidateOptions,
   CacheStore,
 } from '@orpc/experimental-cache'
-import { resolveCacheExpiry } from '@orpc/experimental-cache'
+import { createCacheEntry } from '@orpc/experimental-cache'
 import { encodeCacheTag, toArray } from '@orpc/shared'
 import * as workers from 'cloudflare:workers'
 
@@ -37,15 +37,12 @@ export class experimental_WorkersCacheStore implements CacheStore {
     fill: () => Promise<unknown>,
     options: CacheGetOrSetOptions = {},
   ): Promise<CacheEntry> {
-    const output = await fill()
-    const { expiresAt, evictAt } = resolveCacheExpiry(options)
-
-    return { output, tags: options.tags, expiresAt, evictAt }
+    return createCacheEntry(await fill(), options).entry
   }
 
   async revalidate({ tags }: CacheRevalidateOptions): Promise<void> {
     const result = await this.cache.purge({
-      tags: tags.map((tag) => encodeCacheTag(tag)),
+      tags: tags.map(encodeCacheTag),
     })
 
     if (!result.success) {

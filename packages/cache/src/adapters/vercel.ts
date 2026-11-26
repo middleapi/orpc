@@ -11,7 +11,7 @@ export interface VercelCacheStoreOptions extends BaseKeyValueCacheStoreOptions {
    *
    * @default getCache()
    */
-  cache?: RuntimeCache
+  cache?: RuntimeCache | undefined
 }
 
 /**

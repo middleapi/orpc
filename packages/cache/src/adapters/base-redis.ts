@@ -22,18 +22,15 @@ export interface BaseRedisCacheStoreOptions extends BaseKeyValueCacheStoreOption
    *
    * @default ''
    */
-  prefix?: string
+  prefix?: string | undefined
 }
 
 /**
- * Base class for Redis-backed cache store adapters. Entries are JSON strings
- * retained for `ttl + swr`, and each tag is a counter that revalidation
- * increments; an entry records the counters of its tags when its fill
- * starts and is dropped once one moved. Only single-key commands are used,
- * so it works on Redis Cluster, and every adapter built on it shares the
- * same key and entry format. Fills are coalesced through the `locker`, in
- * the process by default; tag counters have no expiry since expiring one
- * would resurrect stale entries.
+ * Base class for Redis-backed cache store adapters, which share one key and
+ * entry format. Each tag is a counter that revalidation increments; an entry
+ * records its tags' counters when its fill starts and is dropped once one
+ * moved. Only single-key commands are used, so it works on Redis Cluster.
+ * Tag counters never expire, since expiring one would resurrect stale entries.
  *
  * Extend it and implement the abstract methods to support another Redis client.
  *
