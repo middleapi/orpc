@@ -1,11 +1,13 @@
 import { cache } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
+
 import { experimental_WorkersCacheStore } from './workers-cache'
 
 describe('experimental_WorkersCacheStore', () => {
-  const createPurger = () => ({
-    purge: vi.fn(async () => ({ success: true })),
-  }) as any
+  const createPurger = () =>
+    ({
+      purge: vi.fn(async () => ({ success: true })),
+    }) as any
 
   it('fills every time and stores nothing', async () => {
     const purger = createPurger()
@@ -17,7 +19,11 @@ describe('experimental_WorkersCacheStore', () => {
     expect(entry.tags).toEqual(['t'])
     expect(entry.expiresAt).toBeGreaterThan(Date.now())
 
-    await expect(store.getOrSet('k', fill)).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: undefined })
+    await expect(store.getOrSet('k', fill)).resolves.toEqual({
+      output: 'v',
+      tags: undefined,
+      expiresAt: undefined,
+    })
     expect(fill).toHaveBeenCalledTimes(2)
     expect(purger.purge).not.toHaveBeenCalled()
   })
@@ -26,10 +32,14 @@ describe('experimental_WorkersCacheStore', () => {
     const store = new experimental_WorkersCacheStore({ cache: createPurger() })
     const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000_000_000)
 
-    const entry = await store.getOrSet('k', async () => {
-      now.mockReturnValue(1_000_000_005_000)
-      return 'v'
-    }, { ttl: 10_000 })
+    const entry = await store.getOrSet(
+      'k',
+      async () => {
+        now.mockReturnValue(1_000_000_005_000)
+        return 'v'
+      },
+      { ttl: 10_000 },
+    )
 
     expect(entry.expiresAt).toBe(1_000_000_015_000)
     now.mockRestore()
@@ -66,7 +76,10 @@ describe('experimental_WorkersCacheStore', () => {
   it('throws when the purge fails, including error messages', async () => {
     const store = new experimental_WorkersCacheStore({
       cache: {
-        purge: vi.fn(async () => ({ success: false, errors: [{ code: 429, message: 'Rate limited' }] })),
+        purge: vi.fn(async () => ({
+          success: false,
+          errors: [{ code: 429, message: 'Rate limited' }],
+        })),
       },
     })
 

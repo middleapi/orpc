@@ -1,4 +1,5 @@
 import type { RedisClientType, RedisClusterType } from 'redis'
+
 import type { BaseRedisCacheStoreOptions } from './base-redis'
 import { BaseRedisCacheStore } from './base-redis'
 
@@ -14,7 +15,9 @@ export type RedisCacheStoreOptions = BaseRedisCacheStoreOptions
  */
 export class RedisCacheStore extends BaseRedisCacheStore {
   constructor(
-    private readonly redis: RedisClientType<any, any, any, any, any> | RedisClusterType<any, any, any, any, any>,
+    private readonly redis:
+      | RedisClientType<any, any, any, any, any>
+      | RedisClusterType<any, any, any, any, any>,
     options: RedisCacheStoreOptions = {},
   ) {
     super(options)
@@ -27,7 +30,7 @@ export class RedisCacheStore extends BaseRedisCacheStore {
   protected async getMany(keys: string[]): Promise<unknown[]> {
     const client = await this.client()
 
-    return Promise.all(keys.map(key => client.get(key)))
+    return Promise.all(keys.map((key) => client.get(key)))
   }
 
   protected async set(key: string, value: string, px: number | undefined): Promise<unknown> {

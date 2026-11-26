@@ -1,14 +1,21 @@
 import type { ClientContext } from '@orpc/client'
-import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor } from '@orpc/client/standard'
-import type { CacheHandlerPluginHeader } from './handler-plugin'
+import type {
+  StandardLinkOptions,
+  StandardLinkPlugin,
+  StandardLinkTransportInterceptor,
+} from '@orpc/client/standard'
 import { decodeCacheTagHeader, toArray } from '@orpc/shared'
+
+import type { CacheHandlerPluginHeader } from './handler-plugin'
 
 /**
  * The client context key under which callers receive the cache tags of a call.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#server-side-clients | Cache Helpers - Server-Side Clients}
  */
-export const CACHE_LINK_PLUGIN_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_CACHE_LINK_PLUGIN_CONTEXT')
+export const CACHE_LINK_PLUGIN_CONTEXT_SYMBOL: unique symbol = Symbol.for(
+  'ORPC_CACHE_LINK_PLUGIN_CONTEXT',
+)
 
 /**
  * The client context through which callers receive the cache tags of a call.
@@ -54,27 +61,27 @@ export class CacheLinkPlugin<T extends ClientContext> implements StandardLinkPlu
   before = ['~batch', '~dedupe']
 
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
-    const interceptor: StandardLinkTransportInterceptor<T> = async (interceptorOptions) => {
-      const pluginContext = (interceptorOptions.context as CacheLinkPluginContext)[CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]
-
-      const response = await interceptorOptions.next()
-
-      if (pluginContext !== undefined) {
-        const decode = (header: CacheHandlerPluginHeader) => toArray(response.headers[header]).flatMap(decodeCacheTagHeader)
-
-        pluginContext.tags = decode('orpc-cache-tag')
-        pluginContext.revalidatedTags = decode('orpc-cache-tag-invalidation')
-      }
-
-      return response
-    }
-
     return {
       ...options,
-      transportInterceptors: [
-        ...toArray(options.transportInterceptors),
-        interceptor,
-      ],
+      transportInterceptors: [...toArray(options.transportInterceptors), readCacheTagHeaders],
     }
   }
+}
+
+const readCacheTagHeaders: StandardLinkTransportInterceptor<any> = async (options) => {
+  const pluginContext = (options.context as CacheLinkPluginContext)[
+    CACHE_LINK_PLUGIN_CONTEXT_SYMBOL
+  ]
+
+  const response = await options.next()
+
+  if (pluginContext !== undefined) {
+    const decode = (header: CacheHandlerPluginHeader) =>
+      toArray(response.headers[header]).flatMap(decodeCacheTagHeader)
+
+    pluginContext.tags = decode('orpc-cache-tag')
+    pluginContext.revalidatedTags = decode('orpc-cache-tag-invalidation')
+  }
+
+  return response
 }

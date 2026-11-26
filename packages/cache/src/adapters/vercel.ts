@@ -1,7 +1,8 @@
 import type { RuntimeCache } from '@vercel/functions'
+import { getCache } from '@vercel/functions'
+
 import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions } from '../types'
 import type { BaseKeyValueCacheStoreOptions, CacheEnvelope } from './base-key-value'
-import { getCache } from '@vercel/functions'
 import { BaseKeyValueCacheStore } from './base-key-value'
 
 export interface VercelCacheStoreOptions extends BaseKeyValueCacheStoreOptions {
@@ -35,12 +36,16 @@ export class VercelCacheStore extends BaseKeyValueCacheStore {
   }
 
   protected async read(encodedKey: string): Promise<CacheEntry | undefined> {
-    const envelope = await this.cache.get(encodedKey) as CacheEnvelope | null | undefined
+    const envelope = (await this.cache.get(encodedKey)) as CacheEnvelope | null | undefined
 
-    return envelope == null ? undefined : this.decode(envelope)
+    return envelope === null || envelope === undefined ? undefined : this.decode(envelope)
   }
 
-  protected async fill(encodedKey: string, compute: () => Promise<unknown>, options: CacheGetOrSetOptions): Promise<CacheEntry> {
+  protected async fill(
+    encodedKey: string,
+    compute: () => Promise<unknown>,
+    options: CacheGetOrSetOptions,
+  ): Promise<CacheEntry> {
     const { envelope, entry, retention } = this.encode(await compute(), options)
 
     await this.cache.set(encodedKey, envelope, {

@@ -1,6 +1,6 @@
 import type { BaseRedisCacheStoreOptions } from '@orpc/experimental-cache/base-redis'
-import type { RedisClient } from 'bun'
 import { BaseRedisCacheStore } from '@orpc/experimental-cache/base-redis'
+import type { RedisClient } from 'bun'
 
 export type experimental_BunRedisCacheStoreOptions = BaseRedisCacheStoreOptions
 

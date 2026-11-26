@@ -1,74 +1,37 @@
 {
   "name": "@orpc/experimental-cache",
-  "type": "module",
-  "version": "2.0.0-beta.42",
+  "version": "2.0.0-beta.53",
   "description": "Tag-based caching and revalidation for oRPC procedures, with memory, Redis, Upstash, Vercel, and Cacheable adapters",
-  "license": "MIT",
-  "funding": [
-    "https://github.com/sponsors/dinwwwh",
-    "https://opencollective.com/middleapi"
+  "keywords": [
+    "api",
+    "cache",
+    "cacheable",
+    "caching",
+    "middleware",
+    "orpc",
+    "redis",
+    "revalidation",
+    "stale-while-revalidate",
+    "typescript",
+    "upstash",
+    "vercel"
   ],
   "homepage": "https://orpc.dev",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/middleapi/orpc.git",
     "directory": "packages/cache"
   },
-  "keywords": [
-    "orpc",
-    "cache",
-    "caching",
-    "revalidation",
-    "stale-while-revalidate",
-    "redis",
-    "upstash",
-    "vercel",
-    "cacheable",
-    "middleware",
-    "api",
-    "typescript"
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
   ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
-  "publishConfig": {
-    "exports": {
-      "./package.json": "./package.json",
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
-      },
-      "./base-redis": {
-        "types": "./dist/adapters/base-redis.d.mts",
-        "import": "./dist/adapters/base-redis.mjs",
-        "default": "./dist/adapters/base-redis.mjs"
-      },
-      "./cacheable": {
-        "types": "./dist/adapters/cacheable.d.mts",
-        "import": "./dist/adapters/cacheable.mjs",
-        "default": "./dist/adapters/cacheable.mjs"
-      },
-      "./memory": {
-        "types": "./dist/adapters/memory.d.mts",
-        "import": "./dist/adapters/memory.mjs",
-        "default": "./dist/adapters/memory.mjs"
-      },
-      "./redis": {
-        "types": "./dist/adapters/redis.d.mts",
-        "import": "./dist/adapters/redis.mjs",
-        "default": "./dist/adapters/redis.mjs"
-      },
-      "./upstash": {
-        "types": "./dist/adapters/upstash.d.mts",
-        "import": "./dist/adapters/upstash.mjs",
-        "default": "./dist/adapters/upstash.mjs"
-      },
-      "./vercel": {
-        "types": "./dist/adapters/vercel.d.mts",
-        "import": "./dist/adapters/vercel.mjs",
-        "default": "./dist/adapters/vercel.mjs"
-      }
-    }
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts",
@@ -79,12 +42,61 @@
     "./upstash": "./src/adapters/upstash.ts",
     "./vercel": "./src/adapters/vercel.ts"
   },
-  "files": [
-    "dist"
-  ],
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      },
+      "./base-redis": {
+        "types": "./dist/adapters/base-redis.d.ts",
+        "import": "./dist/adapters/base-redis.js",
+        "default": "./dist/adapters/base-redis.js"
+      },
+      "./cacheable": {
+        "types": "./dist/adapters/cacheable.d.ts",
+        "import": "./dist/adapters/cacheable.js",
+        "default": "./dist/adapters/cacheable.js"
+      },
+      "./memory": {
+        "types": "./dist/adapters/memory.d.ts",
+        "import": "./dist/adapters/memory.js",
+        "default": "./dist/adapters/memory.js"
+      },
+      "./redis": {
+        "types": "./dist/adapters/redis.d.ts",
+        "import": "./dist/adapters/redis.js",
+        "default": "./dist/adapters/redis.js"
+      },
+      "./upstash": {
+        "types": "./dist/adapters/upstash.d.ts",
+        "import": "./dist/adapters/upstash.js",
+        "default": "./dist/adapters/upstash.js"
+      },
+      "./vercel": {
+        "types": "./dist/adapters/vercel.d.ts",
+        "import": "./dist/adapters/vercel.js",
+        "default": "./dist/adapters/vercel.js"
+      }
+    }
+  },
   "scripts": {
-    "prepack": "unbuild",
-    "type:check": "tsc -b"
+    "prepack": "tsdown"
+  },
+  "dependencies": {
+    "@orpc/client": "workspace:*",
+    "@orpc/experimental-lock": "workspace:*",
+    "@orpc/server": "workspace:*",
+    "@orpc/shared": "workspace:*",
+    "@standard-server/core": "~0.16.0"
+  },
+  "devDependencies": {
+    "@upstash/redis": "^1.41.0",
+    "@vercel/functions": "^3.9.5",
+    "cacheable": "^2.5.0",
+    "redis": "^6.3.1"
   },
   "peerDependencies": {
     "@upstash/redis": ">=1.35.6",
@@ -105,18 +117,5 @@
     "redis": {
       "optional": true
     }
-  },
-  "dependencies": {
-    "@orpc/client": "workspace:*",
-    "@orpc/experimental-lock": "workspace:*",
-    "@orpc/server": "workspace:*",
-    "@orpc/shared": "workspace:*",
-    "@standard-server/core": "~0.10.1"
-  },
-  "devDependencies": {
-    "@upstash/redis": "^1.38.2",
-    "@vercel/functions": "^3.9.5",
-    "cacheable": "^2.5.0",
-    "redis": "^6.2.1"
   }
 }

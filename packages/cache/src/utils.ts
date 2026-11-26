@@ -1,7 +1,8 @@
 import type { RPCJsonSerializer } from '@orpc/client'
 import type { Public } from '@orpc/shared'
-import type { CacheEntry, CacheGetOrSetOptions } from './types'
 import { deepSortKeys, stringifyJSON } from '@orpc/shared'
+
+import type { CacheEntry, CacheGetOrSetOptions } from './types'
 
 /**
  * Encodes a cache key into a stable string: strings are used verbatim, while
@@ -18,11 +19,12 @@ export function encodeCacheKey(key: unknown, serializer: Public<RPCJsonSerialize
     return key
   }
 
-  const { json, meta } = serializer.serialize(key)
+  const { json, meta } = serializer.serializeJson(key)
 
   return stringifyJSON({
     j: deepSortKeys(json),
-    m: meta?.map(entry => stringifyJSON(entry)).sort(),
+    // oxlint-disable-next-line unicorn/no-array-sort
+    m: meta?.map((entry) => stringifyJSON(entry)).sort(),
   })
 }
 
@@ -51,7 +53,11 @@ export function isCacheEntryEvicted(entry: Pick<CacheEntry, 'evictAt'>): boolean
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
-export function resolveCacheExpiry({ ttl, swr }: CacheGetOrSetOptions): { expiresAt: number | undefined, evictAt: number | undefined, retention: number | undefined } {
+export function resolveCacheExpiry({ ttl, swr }: CacheGetOrSetOptions): {
+  expiresAt: number | undefined
+  evictAt: number | undefined
+  retention: number | undefined
+} {
   if (ttl === undefined) {
     return { expiresAt: undefined, evictAt: undefined, retention: undefined }
   }

@@ -1,4 +1,9 @@
-import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions, CacheStore } from '@orpc/experimental-cache'
+import type {
+  CacheEntry,
+  CacheGetOrSetOptions,
+  CacheRevalidateOptions,
+  CacheStore,
+} from '@orpc/experimental-cache'
 import { resolveCacheExpiry } from '@orpc/experimental-cache'
 import { encodeCacheTag, toArray } from '@orpc/shared'
 import * as workers from 'cloudflare:workers'
@@ -9,7 +14,7 @@ export interface experimental_WorkersCacheStoreOptions {
    *
    * @default cache from `cloudflare:workers`
    */
-  cache?: typeof workers.cache
+  cache?: Pick<typeof workers.cache, 'purge'> | undefined
 }
 
 /**
@@ -21,13 +26,17 @@ export interface experimental_WorkersCacheStoreOptions {
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
 export class experimental_WorkersCacheStore implements CacheStore {
-  private readonly cache: typeof workers.cache
+  private readonly cache: Pick<typeof workers.cache, 'purge'>
 
   constructor(options: experimental_WorkersCacheStoreOptions = {}) {
     this.cache = options.cache ?? workers.cache
   }
 
-  async getOrSet(_key: unknown, fill: () => Promise<unknown>, options: CacheGetOrSetOptions = {}): Promise<CacheEntry> {
+  async getOrSet(
+    _key: unknown,
+    fill: () => Promise<unknown>,
+    options: CacheGetOrSetOptions = {},
+  ): Promise<CacheEntry> {
     const output = await fill()
     const { expiresAt, evictAt } = resolveCacheExpiry(options)
 
@@ -36,12 +45,17 @@ export class experimental_WorkersCacheStore implements CacheStore {
 
   async revalidate({ tags }: CacheRevalidateOptions): Promise<void> {
     const result = await this.cache.purge({
-      tags: tags.map(tag => encodeCacheTag(tag)),
+      tags: tags.map((tag) => encodeCacheTag(tag)),
     })
 
     if (!result.success) {
-      const messages = toArray(result.errors).map(error => error.message).filter(Boolean).join('; ')
-      throw new Error(`experimental_WorkersCacheStore failed to purge tags${messages ? `: ${messages}` : ''}`)
+      const messages = toArray(result.errors)
+        .map((error) => error.message)
+        .filter(Boolean)
+        .join('; ')
+      throw new Error(
+        `experimental_WorkersCacheStore failed to purge tags${messages ? `: ${messages}` : ''}`,
+      )
     }
   }
 }

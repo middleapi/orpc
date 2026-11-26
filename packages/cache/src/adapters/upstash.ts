@@ -1,4 +1,5 @@
 import type { Redis } from '@upstash/redis'
+
 import type { BaseRedisCacheStoreOptions } from './base-redis'
 import { BaseRedisCacheStore } from './base-redis'
 
@@ -28,9 +29,7 @@ export class UpstashCacheStore extends BaseRedisCacheStore {
   }
 
   protected set(key: string, value: string, px: number | undefined): Promise<unknown> {
-    return px === undefined
-      ? this.redis.set(key, value)
-      : this.redis.set(key, value, { px })
+    return px === undefined ? this.redis.set(key, value) : this.redis.set(key, value, { px })
   }
 
   protected increment(key: string): Promise<unknown> {

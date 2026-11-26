@@ -1,11 +1,11 @@
-import type { CacheContext, CacheStore } from './types'
 import { os, type } from '@orpc/server'
+
 import { cache, revalidate } from './middleware'
+import type { CacheContext, CacheStore } from './types'
 
 describe('cache', () => {
   it('can infer context & input types', () => {
-    os
-      .$context<{ 'userId': string, 'cache/store': CacheStore }>()
+    os.$context<{ 'userId': string; 'cache/store': CacheStore }>()
       .input(type<{ id: number }>())
       .use(({ next }) => {
         return next({
@@ -80,8 +80,7 @@ describe('cache', () => {
 
 describe('revalidate', () => {
   it('can infer context & input types', () => {
-    os
-      .$context<{ 'userId': string, 'cache/store': CacheStore }>()
+    os.$context<{ 'userId': string; 'cache/store': CacheStore }>()
       .input(type<{ id: number }>())
       .use(
         revalidate({

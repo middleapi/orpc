@@ -1,9 +1,10 @@
-import type { Locker } from '@orpc/experimental-lock'
-import type { CacheStore } from '../../src'
-import type { BaseRedisCacheStoreOptions } from '../../src/adapters/base-redis'
 import { RPCJsonSerializer } from '@orpc/client'
+import type { Locker } from '@orpc/experimental-lock'
 import { sleep, stringifyJSON } from '@orpc/shared'
 import { expect, it, vi } from 'vitest'
+
+import type { CacheStore } from '../../src'
+import type { BaseRedisCacheStoreOptions } from '../../src/adapters/base-redis'
 
 export interface RedisCacheStoreContractClient {
   exists: (key: string) => Promise<number>
@@ -12,7 +13,7 @@ export interface RedisCacheStoreContractClient {
   /**
    * A locker sharing locks under `prefix` across stores, as `RedisLocker` does.
    */
-  createLocker: (options: { prefix: string, ttl: number, timeout: number }) => Locker
+  createLocker: (options: { prefix: string; ttl: number; timeout: number }) => Locker
 }
 
 /**
@@ -21,18 +22,20 @@ export interface RedisCacheStoreContractClient {
  * given options over a fresh prefix, or the given one.
  */
 export function describeRedisCacheStoreContract(
-  createStore: (options?: BaseRedisCacheStoreOptions) => { store: CacheStore, prefix: string },
+  createStore: (options?: BaseRedisCacheStoreOptions) => { store: CacheStore; prefix: string },
   redis: RedisCacheStoreContractClient,
 ): void {
   it('supports a custom serializer', async () => {
     const serializer = new RPCJsonSerializer()
-    const serializeSpy = vi.spyOn(serializer, 'serialize')
-    const deserializeSpy = vi.spyOn(serializer, 'deserialize')
+    const serializeSpy = vi.spyOn(serializer, 'serializeJson')
+    const deserializeSpy = vi.spyOn(serializer, 'deserializeJson')
     const { store } = createStore({ serializer })
 
     await store.getOrSet('k', async () => ({ a: 1 }))
 
-    await expect(store.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: { a: 1 } })
+    await expect(store.getOrSet('k', async () => 'other')).resolves.toMatchObject({
+      output: { a: 1 },
+    })
     expect(serializeSpy).toHaveBeenCalled()
     expect(deserializeSpy).toHaveBeenCalled()
   })
@@ -45,10 +48,16 @@ export function describeRedisCacheStoreContract(
 
     await sleep(1500)
 
-    await expect(store.getOrSet('no-swr', async () => 'refilled', { ttl: 1000 })).resolves.toMatchObject({ output: 'refilled' })
+    await expect(
+      store.getOrSet('no-swr', async () => 'refilled', { ttl: 1000 }),
+    ).resolves.toMatchObject({ output: 'refilled' })
 
     const waitUntil = vi.fn()
-    const stale = await store.getOrSet('swr', async () => 'fresh', { ttl: 1000, swr: 10_000, waitUntil })
+    const stale = await store.getOrSet('swr', async () => 'fresh', {
+      ttl: 1000,
+      swr: 10_000,
+      waitUntil,
+    })
     expect(stale.output).toBe('v')
     expect(stale.expiresAt).toBeLessThanOrEqual(Date.now())
 
@@ -86,19 +95,32 @@ export function describeRedisCacheStoreContract(
 
     await redis.set(`${prefix}e:k`, stringifyJSON({ output: { json: 'v' }, tags: ['stored'] })!)
 
-    await expect(store.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: 'v', tags: ['stored'] })
-    await expect(store.getOrSet('k', async () => 'other', { tags: ['other'] })).resolves.toMatchObject({ output: 'v', tags: ['stored'] })
+    await expect(store.getOrSet('k', async () => 'other')).resolves.toMatchObject({
+      output: 'v',
+      tags: ['stored'],
+    })
+    await expect(
+      store.getOrSet('k', async () => 'other', { tags: ['other'] }),
+    ).resolves.toMatchObject({ output: 'v', tags: ['stored'] })
 
     await store.revalidate({ tags: ['stored'] })
-    await expect(store.getOrSet('k', async () => 'refilled', { tags: ['other'] })).resolves.toMatchObject({ output: 'refilled', tags: ['other'] })
+    await expect(
+      store.getOrSet('k', async () => 'refilled', { tags: ['other'] }),
+    ).resolves.toMatchObject({ output: 'refilled', tags: ['other'] })
   })
 
   it('evicts entries past evictAt that the server still holds', async () => {
     const { store, prefix } = createStore()
 
-    await redis.set(`${prefix}e:k`, stringifyJSON({ output: { json: 'v' }, expiresAt: 1, evictAt: 1 })!)
+    await redis.set(
+      `${prefix}e:k`,
+      stringifyJSON({ output: { json: 'v' }, expiresAt: 1, evictAt: 1 })!,
+    )
 
-    await expect(store.getOrSet('k', async () => 'refilled')).resolves.toMatchObject({ output: 'refilled', expiresAt: undefined })
+    await expect(store.getOrSet('k', async () => 'refilled')).resolves.toMatchObject({
+      output: 'refilled',
+      expiresAt: undefined,
+    })
   })
 
   it('rejects entries it cannot parse', async () => {
@@ -117,18 +139,24 @@ export function describeRedisCacheStoreContract(
       started = resolve
     })
 
-    const first = store.getOrSet('k', () => {
-      started()
-      return new Promise<string>((resolve) => {
-        finish = resolve
-      })
-    }, { tags: ['t'] })
+    const first = store.getOrSet(
+      'k',
+      () => {
+        started()
+        return new Promise<string>((resolve) => {
+          finish = resolve
+        })
+      },
+      { tags: ['t'] },
+    )
     await filling
     await store.revalidate({ tags: ['t'] })
     finish('outdated')
 
     await expect(first).resolves.toMatchObject({ output: 'outdated' })
-    await expect(store.getOrSet('k', async () => 'fresh', { tags: ['t'] })).resolves.toMatchObject({ output: 'fresh' })
+    await expect(store.getOrSet('k', async () => 'fresh', { tags: ['t'] })).resolves.toMatchObject({
+      output: 'fresh',
+    })
   })
 
   it('stays consistent under concurrent pending and a revalidation on a shared tag', async () => {
@@ -136,20 +164,33 @@ export function describeRedisCacheStoreContract(
     const keys = Array.from({ length: 20 }, (_, index) => `k${index}`)
 
     await Promise.all([
-      ...keys.map(key => store.getOrSet(key, async () => key, { tags: ['t'] })),
+      ...keys.map((key) => store.getOrSet(key, async () => key, { tags: ['t'] })),
       store.revalidate({ tags: ['t'] }),
     ])
 
-    const entries = await Promise.all(keys.map(key => store.getOrSet(key, async () => key, { tags: ['t'] })))
-    expect(entries.map(entry => entry.output)).toEqual(keys)
+    const entries = await Promise.all(
+      keys.map((key) => store.getOrSet(key, async () => key, { tags: ['t'] })),
+    )
+    expect(entries.map((entry) => entry.output)).toEqual(keys)
   })
 
   it('coalesces fills across stores sharing a locker, and lets a waiter fill once its wait times out', async () => {
-    const { store: holderStore, prefix } = createStore({ locker: redis.createLocker({ prefix: `${crypto.randomUUID()}:`, ttl: 5000, timeout: 5000 }) })
-    const { store: waiterStore } = createStore({ prefix, locker: redis.createLocker({ prefix: `${crypto.randomUUID()}:`, ttl: 5000, timeout: 5000 }) })
+    const { store: holderStore, prefix } = createStore({
+      locker: redis.createLocker({ prefix: `${crypto.randomUUID()}:`, ttl: 5000, timeout: 5000 }),
+    })
+    const { store: waiterStore } = createStore({
+      prefix,
+      locker: redis.createLocker({ prefix: `${crypto.randomUUID()}:`, ttl: 5000, timeout: 5000 }),
+    })
     const lockPrefix = `${crypto.randomUUID()}:`
-    const { store: first } = createStore({ prefix, locker: redis.createLocker({ prefix: lockPrefix, ttl: 5000, timeout: 5000 }) })
-    const { store: second } = createStore({ prefix, locker: redis.createLocker({ prefix: lockPrefix, ttl: 5000, timeout: 300 }) })
+    const { store: first } = createStore({
+      prefix,
+      locker: redis.createLocker({ prefix: lockPrefix, ttl: 5000, timeout: 5000 }),
+    })
+    const { store: second } = createStore({
+      prefix,
+      locker: redis.createLocker({ prefix: lockPrefix, ttl: 5000, timeout: 300 }),
+    })
     let release!: () => void
     const held = new Promise<void>((resolve) => {
       release = resolve
@@ -162,16 +203,20 @@ export function describeRedisCacheStoreContract(
     // Separate lockers never wait for each other.
     const unshared = holderStore.getOrSet('unshared', fill)
     await vi.waitFor(() => expect(fill).toHaveBeenCalledTimes(1))
-    await expect(waiterStore.getOrSet('unshared', async () => 'waiter')).resolves.toMatchObject({ output: 'waiter' })
+    await expect(waiterStore.getOrSet('unshared', async () => 'waiter')).resolves.toMatchObject({
+      output: 'waiter',
+    })
 
     // A shared locker makes the second store wait, then fill itself once its timeout passes.
     const holder = first.getOrSet('shared', fill)
     await vi.waitFor(() => expect(fill).toHaveBeenCalledTimes(2))
     let settled = false
-    const waiter = second.getOrSet('shared', async () => 'waiter').then((entry) => {
-      settled = true
-      return entry
-    })
+    const waiter = second
+      .getOrSet('shared', async () => 'waiter')
+      .then((entry) => {
+        settled = true
+        return entry
+      })
     await sleep(100)
     expect(settled).toBe(false)
     await expect(waiter).resolves.toMatchObject({ output: 'waiter' })
@@ -183,8 +228,13 @@ export function describeRedisCacheStoreContract(
 
   it('serves a shared-locker waiter the entry the holder stored', async () => {
     const lockPrefix = `${crypto.randomUUID()}:`
-    const { store: first, prefix } = createStore({ locker: redis.createLocker({ prefix: lockPrefix, ttl: 5000, timeout: 5000 }) })
-    const { store: second } = createStore({ prefix, locker: redis.createLocker({ prefix: lockPrefix, ttl: 5000, timeout: 5000 }) })
+    const { store: first, prefix } = createStore({
+      locker: redis.createLocker({ prefix: lockPrefix, ttl: 5000, timeout: 5000 }),
+    })
+    const { store: second } = createStore({
+      prefix,
+      locker: redis.createLocker({ prefix: lockPrefix, ttl: 5000, timeout: 5000 }),
+    })
     let release!: () => void
     const held = new Promise<void>((resolve) => {
       release = resolve

@@ -1,4 +1,5 @@
 import { safeDecodeURIComponent } from '@standard-server/shared'
+
 import {
   decodeCacheTagHeader,
   encodeCacheTag,
@@ -353,7 +354,7 @@ describe('isNoTransformCacheControl', () => {
 describe('encodeCacheTag', () => {
   it.each([
     ['leaves plain tags alone', 'planets', 'planets'],
-    ['leaves other printable ASCII alone', 'a1!~*\'()-_.:/?', 'a1!~*\'()-_.:/?'],
+    ['leaves other printable ASCII alone', "a1!~*'()-_.:/?", "a1!~*'()-_.:/?"],
     ['escapes the comma separator', 'a,b', 'a%2Cb'],
     ['escapes the percent escape', '100%', '100%25'],
     ['escapes uppercase letters by code point', 'Planets', '%50lanets'],
@@ -369,7 +370,9 @@ describe('encodeCacheTag', () => {
 
   it('keeps case-folded tags distinct', () => {
     expect(encodeCacheTag('Planets')).not.toBe(encodeCacheTag('planets'))
-    expect(encodeCacheTag('Planets').toLowerCase()).not.toBe(encodeCacheTag('planets').toLowerCase())
+    expect(encodeCacheTag('Planets').toLowerCase()).not.toBe(
+      encodeCacheTag('planets').toLowerCase(),
+    )
   })
 
   it('encodes identically across calls, since the pattern is shared', () => {
@@ -383,7 +386,7 @@ describe('encodeCacheTagHeader & decodeCacheTagHeader', () => {
     const tags = ['plain', 'a,b', '100%', 'CamelCase', 'tiếng việt', 'sp ace']
 
     expect(encodeCacheTagHeader(['a', 'b'])).toBe('a,b')
-    expect(encodeCacheTagHeader(tags)).toBe(tags.map(tag => encodeCacheTag(tag)).join(','))
+    expect(encodeCacheTagHeader(tags)).toBe(tags.map((tag) => encodeCacheTag(tag)).join(','))
     expect(decodeCacheTagHeader(encodeCacheTagHeader(tags))).toEqual(tags)
   })
 

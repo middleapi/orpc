@@ -1,4 +1,5 @@
 import type { Cacheable } from 'cacheable'
+
 import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions } from '../types'
 import type { BaseKeyValueCacheStoreOptions, CacheEnvelope } from './base-key-value'
 import { BaseKeyValueCacheStore } from './base-key-value'
@@ -34,7 +35,11 @@ export class CacheableCacheStore extends BaseKeyValueCacheStore {
     return envelope === undefined ? undefined : this.decode(envelope)
   }
 
-  protected async fill(encodedKey: string, compute: () => Promise<unknown>, options: CacheGetOrSetOptions): Promise<CacheEntry> {
+  protected async fill(
+    encodedKey: string,
+    compute: () => Promise<unknown>,
+    options: CacheGetOrSetOptions,
+  ): Promise<CacheEntry> {
     const { envelope, entry, retention } = this.encode(await compute(), options)
 
     await this.cacheable.set(encodedKey, envelope, {

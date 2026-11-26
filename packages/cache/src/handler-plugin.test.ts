@@ -1,18 +1,26 @@
 import type { AnyProcedure } from '@orpc/server'
-import type { StandardHandlerPlugin } from '@orpc/server/standard'
-import type { StandardHeaders } from '@standard-server/core'
-import type { CacheHandlerPluginContext, CacheHandlerPluginHeader } from './handler-plugin'
-import type { CacheLinkPluginContext } from './link-plugin'
-import type { CacheContext } from './types'
 import { call, createRouterClient, ORPCError, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
+import type { StandardHandlerPlugin } from '@orpc/server/standard'
 import { decodeCacheTagHeader, toArray } from '@orpc/shared'
+import type { StandardHeaders } from '@standard-server/core'
+
 import { MemoryCacheStore } from './adapters/memory'
-import { CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL, CacheHandlerPlugin, cacheRouterClientInterceptor } from './handler-plugin'
+import type { CacheHandlerPluginContext, CacheHandlerPluginHeader } from './handler-plugin'
+import {
+  CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL,
+  CacheHandlerPlugin,
+  cacheRouterClientInterceptor,
+} from './handler-plugin'
+import type { CacheLinkPluginContext } from './link-plugin'
 import { CACHE_LINK_PLUGIN_CONTEXT_SYMBOL } from './link-plugin'
 import { cache, revalidate } from './middleware'
+import type { CacheContext } from './types'
 
-type RecordedChecks = Exclude<CacheHandlerPluginContext[typeof CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL], undefined>
+type RecordedChecks = Exclude<
+  CacheHandlerPluginContext[typeof CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL],
+  undefined
+>
 type PartialCheck = Partial<RecordedChecks['caches'][number]> & { tags: readonly string[] }
 
 /**
@@ -22,24 +30,30 @@ type PartialCheck = Partial<RecordedChecks['caches'][number]> & { tags: readonly
 function presetHeadersPlugin(preset: StandardHeaders): StandardHandlerPlugin<any> {
   return {
     name: '~preset-headers',
-    init: options => ({
+    init: (options) => ({
       ...options,
-      interceptors: [...toArray(options.interceptors), async (interceptorOptions) => {
-        const response = await interceptorOptions.next()
-        return { ...response, headers: { ...response.headers, ...preset } }
-      }],
+      interceptors: [
+        ...toArray(options.interceptors),
+        async (interceptorOptions) => {
+          const response = await interceptorOptions.next()
+          return { ...response, headers: { ...response.headers, ...preset } }
+        },
+      ],
     }),
   }
 }
 
-function createTestingHandler(headers?: readonly CacheHandlerPluginHeader[], preset?: StandardHeaders) {
+function createTestingHandler(
+  headers?: readonly CacheHandlerPluginHeader[],
+  preset?: StandardHeaders,
+) {
   const handlerFn = vi.fn()
   const handler = new RPCHandler(os.handler(handlerFn), {
     allowMethods: ['GET', 'POST'],
     plugins: [
       new CacheHandlerPlugin({ headers: headers ?? [] }),
       // Registered last so its interceptor runs innermost, before the plugin looks.
-      ...preset ? [presetHeadersPlugin(preset)] : [],
+      ...(preset ? [presetHeadersPlugin(preset)] : []),
     ],
   })
 
@@ -51,11 +65,15 @@ function createTestingHandler(headers?: readonly CacheHandlerPluginHeader[], pre
      * middlewares do, then runs `then` inside the same handler call. Each
      * check may override either field to simulate a nested call.
      */
-    record(checks: { caches?: PartialCheck[], revalidations?: PartialCheck[] }, then?: () => void) {
+    record(checks: { caches?: PartialCheck[]; revalidations?: PartialCheck[] }, then?: () => void) {
       handlerFn.mockImplementationOnce(({ context, path, procedure }) => {
         const recorded: RecordedChecks = context[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]
-        recorded.caches.push(...toArray(checks.caches).map(check => ({ path, procedure, ...check })))
-        recorded.revalidations.push(...toArray(checks.revalidations).map(check => ({ path, procedure, ...check })))
+        recorded.caches.push(
+          ...toArray(checks.caches).map((check) => ({ path, procedure, ...check })),
+        )
+        recorded.revalidations.push(
+          ...toArray(checks.revalidations).map((check) => ({ path, procedure, ...check })),
+        )
         then?.()
       })
     },
@@ -183,7 +201,9 @@ describe('cacheHandlerPlugin', () => {
 
       expect(response.headers.get('orpc-cache-tag')).toBe(null) // only configured headers are set
       expect(response.headers.get('cache-tag')).toBe('planets,a%2Cb')
-      expect(response.headers.get('cache-control')).toBe('public, max-age=2, stale-while-revalidate=1')
+      expect(response.headers.get('cache-control')).toBe(
+        'public, max-age=2, stale-while-revalidate=1',
+      )
     })
 
     it('holds entries without a ttl for a year, and skips Cache-Tag without tags', async () => {
@@ -197,7 +217,10 @@ describe('cacheHandlerPlugin', () => {
     })
 
     it('sets its headers over ones already on the response', async () => {
-      const { record, handle } = createTestingHandler(headers, { 'cache-control': 'private, no-store', 'cache-tag': 'stale' })
+      const { record, handle } = createTestingHandler(headers, {
+        'cache-control': 'private, no-store',
+        'cache-tag': 'stale',
+      })
       record({ caches: [{ tags: ['planets'], ttl: 2000 }] })
 
       const response = await handle()
@@ -240,10 +263,15 @@ describe('cacheHandlerPlugin', () => {
       .use(revalidate({ tags: ['outer-revalidated'] }))
       .handler(async ({ context }) => `outer:${await call(inner, undefined, { context })}`)
 
-    const handler = new RPCHandler({ outer, inner }, {
-      allowMethods: ['GET'],
-      plugins: [new CacheHandlerPlugin({ headers: ['orpc-cache-tag', 'orpc-cache-tag-invalidation'] })],
-    })
+    const handler = new RPCHandler(
+      { outer, inner },
+      {
+        allowMethods: ['GET'],
+        plugins: [
+          new CacheHandlerPlugin({ headers: ['orpc-cache-tag', 'orpc-cache-tag-invalidation'] }),
+        ],
+      },
+    )
 
     const { response } = await handler.handle(new Request('http://localhost:3000/outer'), {
       context: { 'cache/store': new MemoryCacheStore() },
@@ -267,7 +295,9 @@ describe('cacheRouterClientInterceptor', () => {
       .use(cache({ key: 'outer', tags: ['outer-tag'] }))
       .use(revalidate({ tags: ['outer-revalidated'] }))
       .handler(async ({ context }) => `outer:${await call(inner, undefined, { context })}`),
-    nesting: base.handler(async ({ context }) => `nesting:${await call(inner, undefined, { context })}`),
+    nesting: base.handler(
+      async ({ context }) => `nesting:${await call(inner, undefined, { context })}`,
+    ),
     failing: base.use(cache({ key: 'failing', tags: ['failing-tag'] })).handler(() => {
       throw new ORPCError('NOT_FOUND')
     }),
@@ -283,14 +313,18 @@ describe('cacheRouterClientInterceptor', () => {
 
   it('fills the forwarded cache link plugin context with the tags of the procedure called', async () => {
     const linkContext = {}
-    await expect(client.outer(undefined, { context: { [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]: linkContext } })).resolves.toBe('outer:inner')
+    await expect(
+      client.outer(undefined, { context: { [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]: linkContext } }),
+    ).resolves.toBe('outer:inner')
 
     expect(linkContext).toEqual({ tags: ['outer-tag'], revalidatedTags: ['outer-revalidated'] })
   })
 
   it('never reports the tags of nested calls', async () => {
     const linkContext = {}
-    await expect(client.nesting(undefined, { context: { [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]: linkContext } })).resolves.toBe('nesting:inner')
+    await expect(
+      client.nesting(undefined, { context: { [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]: linkContext } }),
+    ).resolves.toBe('nesting:inner')
 
     expect(linkContext).toEqual({ tags: [], revalidatedTags: [] })
   })
@@ -301,7 +335,9 @@ describe('cacheRouterClientInterceptor', () => {
 
   it('leaves the forwarded context untouched when the call fails', async () => {
     const linkContext = {}
-    await expect(client.failing(undefined, { context: { [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]: linkContext } })).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    await expect(
+      client.failing(undefined, { context: { [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]: linkContext } }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' })
 
     expect(linkContext).toEqual({})
   })

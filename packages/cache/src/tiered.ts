@@ -27,7 +27,11 @@ export interface TieredCacheStoreTier {
 export class TieredCacheStore implements CacheStore {
   constructor(private readonly tiers: readonly [TieredCacheStoreTier, ...TieredCacheStoreTier[]]) {}
 
-  getOrSet(key: unknown, fill: () => Promise<unknown>, options: CacheGetOrSetOptions = {}): Promise<CacheEntry> {
+  getOrSet(
+    key: unknown,
+    fill: () => Promise<unknown>,
+    options: CacheGetOrSetOptions = {},
+  ): Promise<CacheEntry> {
     return this.getOrSetFrom(0, key, fill, options)
   }
 
@@ -35,11 +39,17 @@ export class TieredCacheStore implements CacheStore {
     await Promise.all(this.tiers.map(({ store }) => store.revalidate(options)))
   }
 
-  private getOrSetFrom(index: number, key: unknown, fill: () => Promise<unknown>, options: CacheGetOrSetOptions): Promise<CacheEntry> {
+  private getOrSetFrom(
+    index: number,
+    key: unknown,
+    fill: () => Promise<unknown>,
+    options: CacheGetOrSetOptions,
+  ): Promise<CacheEntry> {
     const { store, ttl, swr } = this.tiers[index]!
-    const next = index + 1 < this.tiers.length
-      ? async () => (await this.getOrSetFrom(index + 1, key, fill, options)).output
-      : fill
+    const next =
+      index + 1 < this.tiers.length
+        ? async () => (await this.getOrSetFrom(index + 1, key, fill, options)).output
+        : fill
 
     return store.getOrSet(key, next, {
       ...options,

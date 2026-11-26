@@ -1,7 +1,8 @@
-import type { CacheContext } from '../src'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { z } from 'zod'
+
+import type { CacheContext } from '../src'
 import { cache, CacheHandlerPlugin, revalidate } from '../src'
 import { MemoryCacheStore } from '../src/adapters/memory'
 
@@ -23,9 +24,7 @@ it('works', async () => {
       update: os
         .$context<CacheContext>()
         .input(z.object({ id: z.number(), name: z.string() }))
-        .use(
-          revalidate({ tags: (_, input) => ['planets', `planet:${input.id}`] }),
-        )
+        .use(revalidate({ tags: (_, input) => ['planets', `planet:${input.id}`] }))
         .handler(({ input }) => input),
     },
   }
@@ -38,17 +37,19 @@ it('works', async () => {
 
   const store = new MemoryCacheStore()
 
-  const request = (path: string, body: unknown) => new Request(`https://example.com/${path}`, {
-    method: 'POST',
-    body: JSON.stringify({ json: body }),
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  })
+  const request = (path: string, body: unknown) =>
+    new Request(`https://example.com/${path}`, {
+      method: 'POST',
+      body: JSON.stringify({ json: body }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
 
-  const find = () => handler.handle(request('planet/find', { id: 1 }), {
-    context: { 'cache/store': store },
-  })
+  const find = () =>
+    handler.handle(request('planet/find', { id: 1 }), {
+      context: { 'cache/store': store },
+    })
 
   // miss: the handler runs and the response carries the cache tags
   const first = await find()

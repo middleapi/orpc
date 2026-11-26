@@ -1,5 +1,6 @@
 import { RPCJsonSerializer } from '@orpc/client'
 import { Cacheable, Keyv } from 'cacheable'
+
 import { describeCacheStoreContract } from '../../tests/__shared__/store-contract'
 import { CacheableCacheStore } from './cacheable'
 
@@ -9,7 +10,9 @@ describe('cacheableCacheStore', () => {
   })
 
   describe('against a primary with a Keyv secondary', () => {
-    describeCacheStoreContract(() => new CacheableCacheStore(new Cacheable({ secondary: new Keyv() })))
+    describeCacheStoreContract(
+      () => new CacheableCacheStore(new Cacheable({ secondary: new Keyv() })),
+    )
   })
 
   it('enables the tag service, and revalidates through it', async () => {
@@ -30,7 +33,10 @@ describe('cacheableCacheStore', () => {
     const store = new CacheableCacheStore(cacheable)
 
     await store.getOrSet('k', async () => 'v', { tags: ['t'], ttl: 1000, swr: 1000 })
-    expect(set).toHaveBeenCalledWith('k', expect.objectContaining({ tags: ['t'] }), { tags: ['t'], ttl: 2000 })
+    expect(set).toHaveBeenCalledWith('k', expect.objectContaining({ tags: ['t'] }), {
+      tags: ['t'],
+      ttl: 2000,
+    })
 
     await store.getOrSet('forever', async () => 'v')
     expect(set).toHaveBeenCalledWith('forever', expect.objectContaining({ tags: undefined }), {})
@@ -41,20 +47,28 @@ describe('cacheableCacheStore', () => {
     const store = new CacheableCacheStore(cacheable)
     await store.getOrSet('k', async () => 'v')
 
-    vi.spyOn(cacheable, 'get').mockResolvedValueOnce({ output: { json: 'v' }, expiresAt: 1, evictAt: 1 })
+    vi.spyOn(cacheable, 'get').mockResolvedValueOnce({
+      output: { json: 'v' },
+      expiresAt: 1,
+      evictAt: 1,
+    })
 
-    await expect(store.getOrSet('k', async () => 'refilled')).resolves.toMatchObject({ output: 'refilled' })
+    await expect(store.getOrSet('k', async () => 'refilled')).resolves.toMatchObject({
+      output: 'refilled',
+    })
   })
 
   it('supports a custom serializer', async () => {
     const serializer = new RPCJsonSerializer()
-    const serializeSpy = vi.spyOn(serializer, 'serialize')
-    const deserializeSpy = vi.spyOn(serializer, 'deserialize')
+    const serializeSpy = vi.spyOn(serializer, 'serializeJson')
+    const deserializeSpy = vi.spyOn(serializer, 'deserializeJson')
     const store = new CacheableCacheStore(new Cacheable(), { serializer })
 
     await store.getOrSet('k', async () => ({ date: new Date(1) }))
 
-    await expect(store.getOrSet('k', async () => 'other')).resolves.toMatchObject({ output: { date: new Date(1) } })
+    await expect(store.getOrSet('k', async () => 'other')).resolves.toMatchObject({
+      output: { date: new Date(1) },
+    })
     expect(serializeSpy).toHaveBeenCalled()
     expect(deserializeSpy).toHaveBeenCalled()
   })

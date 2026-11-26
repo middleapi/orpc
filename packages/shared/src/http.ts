@@ -277,9 +277,8 @@ export function encodeCacheTag(tag: string): string {
   // encodeURIComponent emits the UTF-8 bytes a percent escape needs, but leaves
   // the URI unreserved set alone, so the uppercase letters in it are escaped by
   // hand. Those are single-byte ASCII, so the code point is the byte.
-  return tag.replace(
-    UNSAFE_CACHE_TAG_CHARS,
-    char => char >= 'A' && char <= 'Z'
+  return tag.replace(UNSAFE_CACHE_TAG_CHARS, (char) =>
+    char >= 'A' && char <= 'Z'
       ? `%${char.charCodeAt(0).toString(16).toUpperCase()}`
       : safeEncodeURIComponent(char),
   )
@@ -291,7 +290,7 @@ export function encodeCacheTag(tag: string): string {
  * @see {@link https://orpc.dev/docs/helpers/cache#handler-plugin | Cache Helpers - Handler Plugin}
  */
 export function encodeCacheTagHeader(tags: readonly string[]): string {
-  return tags.map(tag => encodeCacheTag(tag)).join(',')
+  return tags.map((tag) => encodeCacheTag(tag)).join(',')
 }
 
 /**

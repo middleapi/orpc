@@ -1,8 +1,8 @@
 ---
-title: "Cache Helpers"
-description: "Cache oRPC procedure output with tag-based revalidation, stale-while-revalidate, storage adapters, and a handler plugin that reflects cache tags in HTTP headers."
+title: 'Cache Helpers'
+description: 'Cache oRPC procedure output with tag-based revalidation, stale-while-revalidate, storage adapters, and a handler plugin that reflects cache tags in HTTP headers.'
 sidebar:
-  label: "Cache"
+  label: 'Cache'
 ---
 
 ## Installation
@@ -15,15 +15,15 @@ npm install @orpc/experimental-cache@beta
 
 Everything builds on the `CacheStore` interface: `getOrSet` returns the entry under a key and fills it when there is none, and `revalidate` invalidates entries by tag. A router shares one store, passed through the request context as `cache/store`, as the `CacheContext` interface describes. Use one of these adapters or write your own:
 
-| Name                                                             | Adapter for                                                                                |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| [`MemoryCacheStore`](#memory)                                    | In-memory storage                                                                          |
-| [`RedisCacheStore`](#redis)                                      | [Redis](https://github.com/redis/redis)                                                    |
-| [`UpstashCacheStore`](#upstash)                                  | [Upstash Redis](https://github.com/upstash/redis-js)                                       |
-| [`experimental_BunRedisCacheStore`](#bun)                        | [Bun's Redis](https://bun.com/docs/runtime/redis)                                          |
-| [`VercelCacheStore`](#vercel)                                    | [Vercel Runtime Cache](https://vercel.com/docs/caching/runtime-cache)                      |
-| [`CacheableCacheStore`](#cacheable)                              | [Cacheable](https://cacheable.org)                                                         |
-| [`experimental_WorkersCacheStore`](#cloudflare-workers-caching)  | [Cloudflare Workers Caching](https://developers.cloudflare.com/workers/cache/), purge only |
+| Name                                                            | Adapter for                                                                                |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| [`MemoryCacheStore`](#memory)                                   | In-memory storage                                                                          |
+| [`RedisCacheStore`](#redis)                                     | [Redis](https://github.com/redis/redis)                                                    |
+| [`UpstashCacheStore`](#upstash)                                 | [Upstash Redis](https://github.com/upstash/redis-js)                                       |
+| [`experimental_BunRedisCacheStore`](#bun)                       | [Bun's Redis](https://bun.com/docs/runtime/redis)                                          |
+| [`VercelCacheStore`](#vercel)                                   | [Vercel Runtime Cache](https://vercel.com/docs/caching/runtime-cache)                      |
+| [`CacheableCacheStore`](#cacheable)                             | [Cacheable](https://cacheable.org)                                                         |
+| [`experimental_WorkersCacheStore`](#cloudflare-workers-caching) | [Cloudflare Workers Caching](https://developers.cloudflare.com/workers/cache/), purge only |
 
 ```ts twoslash
 import { MemoryCacheStore } from '@orpc/experimental-cache/memory'
@@ -113,9 +113,7 @@ import { revalidate } from '@orpc/experimental-cache'
 const updatePlanet = os
   .$context<CacheContext>()
   .input(z.object({ id: z.number(), name: z.string() }))
-  .use(
-    revalidate({ tags: (_, input) => ['planets', `planet:${input.id}`] }),
-  )
+  .use(revalidate({ tags: (_, input) => ['planets', `planet:${input.id}`] }))
   .handler(({ input }) => {
     return input
   })
@@ -179,9 +177,7 @@ import { CacheLinkPlugin } from '@orpc/experimental-cache'
 
 const link = new RPCLink({
   url: '/rpc',
-  plugins: [
-    new CacheLinkPlugin(),
-  ],
+  plugins: [new CacheLinkPlugin()],
 })
 ```
 
@@ -195,7 +191,10 @@ The `link` can be any supported oRPC link, such as [RPCLink](/docs/rpc/link), [O
 
 ```ts
 import type { CacheLinkPluginContext } from '@orpc/experimental-cache'
-import { CACHE_LINK_PLUGIN_CONTEXT_SYMBOL, cacheRouterClientInterceptor } from '@orpc/experimental-cache'
+import {
+  CACHE_LINK_PLUGIN_CONTEXT_SYMBOL,
+  cacheRouterClientInterceptor,
+} from '@orpc/experimental-cache'
 
 const client = createRouterClient(router, {
   context: async (clientContext: CacheLinkPluginContext) => ({
@@ -270,7 +269,7 @@ const store = new RedisCacheStore(client, {
   /**
    * Coalesces concurrent fills of one key. A caller that times out waiting fills on its own.
    *
-   * @default new MemoryLocker()
+   * @default new MemoryLocker({ ttl: 60_000 })
    */
   locker: new RedisLocker(client, { prefix: 'cache-lock:', ttl: 10_000 }),
 })
@@ -307,7 +306,7 @@ const store = new UpstashCacheStore(redis, {
   /**
    * Coalesces concurrent fills of one key. A caller that times out waiting fills on its own.
    *
-   * @default new MemoryLocker()
+   * @default new MemoryLocker({ ttl: 60_000 })
    */
   locker: new UpstashLocker(redis, { prefix: 'cache-lock:', ttl: 10_000 }),
 })
@@ -339,7 +338,7 @@ const store = new experimental_BunRedisCacheStore(redis, {
   /**
    * Coalesces concurrent fills of one key. A caller that times out waiting fills on its own.
    *
-   * @default new MemoryLocker()
+   * @default new MemoryLocker({ ttl: 60_000 })
    */
   locker: new experimental_BunRedisLocker(redis, { prefix: 'cache-lock:', ttl: 10_000 }),
 })
@@ -371,7 +370,7 @@ const store = new VercelCacheStore({
   /**
    * Coalesces concurrent fills of one key within the process. A caller that times out waiting fills on its own.
    *
-   * @default new MemoryLocker()
+   * @default new MemoryLocker({ ttl: 60_000 })
    */
   locker: undefined,
 })
@@ -400,7 +399,7 @@ const store = new CacheableCacheStore(cacheable, {
   /**
    * Coalesces concurrent fills of one key within the process. A caller that times out waiting fills on its own.
    *
-   * @default new MemoryLocker()
+   * @default new MemoryLocker({ ttl: 60_000 })
    */
   locker: undefined,
 })

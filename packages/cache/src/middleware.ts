@@ -1,14 +1,12 @@
 import type { Middleware, MiddlewareOptions } from '@orpc/server'
 import type { Promisable, Value } from '@orpc/shared'
-import type { CacheHandlerPluginContext } from './handler-plugin'
-import type { CacheContext, CacheEntry } from './types'
 import { value } from '@orpc/shared'
-import { CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
 
-export interface CacheMiddlewareOptions<
-  TInContext extends CacheContext,
-  TInput,
-> {
+import type { CacheHandlerPluginContext } from './handler-plugin'
+import { CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
+import type { CacheContext, CacheEntry } from './types'
+
+export interface CacheMiddlewareOptions<TInContext extends CacheContext, TInput> {
   /**
    * The key identifying the cache entry, or any serializable value to derive
    * it from. Used as given, so procedures sharing a key share an entry;
@@ -17,21 +15,30 @@ export interface CacheMiddlewareOptions<
    * @default the procedure path and input
    */
   // Spelled out instead of `unknown`, which absorbs the function form and drops its contextual typing.
-  key?: Value<Promisable<string | number | bigint | boolean | object | null | undefined>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
+  key?: Value<
+    Promisable<string | number | bigint | boolean | object | null | undefined>,
+    [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]
+  >
 
   /**
    * Tags associated with the entry. Revalidating any of them invalidates the entry.
    *
    * @default []
    */
-  tags?: Value<Promisable<readonly string[]>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
+  tags?: Value<
+    Promisable<readonly string[]>,
+    [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]
+  >
 
   /**
    * Fresh lifetime in milliseconds. `undefined` means the entry never expires by time.
    *
    * @default undefined
    */
-  ttl?: Value<Promisable<number | undefined>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
+  ttl?: Value<
+    Promisable<number | undefined>,
+    [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]
+  >
 
   /**
    * Extra stale-while-revalidate window in milliseconds after `ttl`.
@@ -39,14 +46,20 @@ export interface CacheMiddlewareOptions<
    *
    * @default 0
    */
-  swr?: Value<Promisable<number | undefined>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
+  swr?: Value<
+    Promisable<number | undefined>,
+    [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]
+  >
 
   /**
    * When resolved to `false`, skips both the cache lookup and the store for this request.
    *
    * @default true
    */
-  enabled?: Value<Promisable<boolean>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
+  enabled?: Value<
+    Promisable<boolean>,
+    [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]
+  >
 }
 
 /**
@@ -56,14 +69,11 @@ export interface CacheMiddlewareOptions<
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#cache-middleware | Cache Helpers - Cache Middleware}
  */
-export function cache<
-  TInContext extends CacheContext,
-  TInput,
->(
+export function cache<TInContext extends CacheContext, TInput>(
   options: CacheMiddlewareOptions<TInContext, TInput> = {},
 ): Middleware<TInContext, object, TInput, any, object> {
   return async function cache(middlewareOptions, input, done) {
-    if (await value(options.enabled, middlewareOptions, input) === false) {
+    if ((await value(options.enabled, middlewareOptions, input)) === false) {
       return middlewareOptions.next()
     }
 
@@ -75,7 +85,9 @@ export function cache<
     ])
 
     const store = middlewareOptions.context['cache/store']
-    const pluginContext = (middlewareOptions.context as CacheHandlerPluginContext)[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]
+    const pluginContext = (middlewareOptions.context as CacheHandlerPluginContext)[
+      CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL
+    ]
     const lookupIndex = pluginContext?.caches.length ?? 0
 
     const entry = await store.getOrSet(key, async () => (await middlewareOptions.next()).output, {
@@ -97,14 +109,14 @@ export function cache<
   }
 }
 
-export interface RevalidateMiddlewareOptions<
-  TInContext extends CacheContext,
-  TInput,
-> {
+export interface RevalidateMiddlewareOptions<TInContext extends CacheContext, TInput> {
   /**
    * The tags to revalidate. Resolving to `null` or `undefined` skips the revalidation.
    */
-  tags: Value<Promisable<readonly [string, ...string[]] | null | undefined>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
+  tags: Value<
+    Promisable<readonly [string, ...string[]] | null | undefined>,
+    [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]
+  >
 }
 
 /**
@@ -113,10 +125,7 @@ export interface RevalidateMiddlewareOptions<
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#revalidate-middleware | Cache Helpers - Revalidate Middleware}
  */
-export function revalidate<
-  TInContext extends CacheContext,
-  TInput,
->(
+export function revalidate<TInContext extends CacheContext, TInput>(
   options: RevalidateMiddlewareOptions<TInContext, TInput>,
 ): Middleware<TInContext, object, TInput, any, object> {
   return async function revalidate(middlewareOptions, input) {
@@ -128,7 +137,9 @@ export function revalidate<
       const store = middlewareOptions.context['cache/store']
       await store.revalidate({ tags })
 
-      const pluginContext = (middlewareOptions.context as CacheHandlerPluginContext)[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]
+      const pluginContext = (middlewareOptions.context as CacheHandlerPluginContext)[
+        CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL
+      ]
       pluginContext?.revalidations.push({
         procedure: middlewareOptions.procedure,
         path: middlewareOptions.path,
@@ -143,7 +154,10 @@ export function revalidate<
 /**
  * What is left of the entry's fresh lifetime and swr window, in milliseconds.
  */
-function remainingLifetime(entry: CacheEntry): { ttl: number | undefined, swr: number | undefined } {
+function remainingLifetime(entry: CacheEntry): {
+  ttl: number | undefined
+  swr: number | undefined
+} {
   if (entry.expiresAt === undefined) {
     return { ttl: undefined, swr: undefined }
   }
@@ -152,6 +166,9 @@ function remainingLifetime(entry: CacheEntry): { ttl: number | undefined, swr: n
 
   return {
     ttl: Math.max(0, entry.expiresAt - now),
-    swr: entry.evictAt === undefined ? undefined : Math.max(0, entry.evictAt - Math.max(now, entry.expiresAt)),
+    swr:
+      entry.evictAt === undefined
+        ? undefined
+        : Math.max(0, entry.evictAt - Math.max(now, entry.expiresAt)),
   }
 }

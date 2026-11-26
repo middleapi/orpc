@@ -78,7 +78,11 @@ export interface CacheStore {
    * serializable value; implementations encode them stably, so structurally
    * equal keys resolve the same entry.
    */
-  getOrSet(key: unknown, fill: () => Promise<unknown>, options?: CacheGetOrSetOptions): Promise<CacheEntry>
+  getOrSet(
+    key: unknown,
+    fill: () => Promise<unknown>,
+    options?: CacheGetOrSetOptions,
+  ): Promise<CacheEntry>
 
   /**
    * Invalidates every entry associated with any of the given tags.

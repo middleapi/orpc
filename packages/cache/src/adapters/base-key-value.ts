@@ -1,11 +1,17 @@
 import type { RPCJsonSerialization } from '@orpc/client'
-import type { Locker } from '@orpc/experimental-lock'
-import type { Promisable, Public } from '@orpc/shared'
-import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions, CacheStore } from '../types'
 import { RPCJsonSerializer } from '@orpc/client'
+import type { Locker } from '@orpc/experimental-lock'
 import { LockTimeoutError } from '@orpc/experimental-lock'
 import { MemoryLocker } from '@orpc/experimental-lock/memory'
-import { encodeCacheKey, isCacheEntryEvicted, isCacheEntryStale, resolveCacheExpiry } from '../utils'
+import type { Promisable, Public } from '@orpc/shared'
+
+import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions, CacheStore } from '../types'
+import {
+  encodeCacheKey,
+  isCacheEntryEvicted,
+  isCacheEntryStale,
+  resolveCacheExpiry,
+} from '../utils'
 
 /**
  * What a backend stores for an entry: the output serialized for JSON, the
@@ -35,7 +41,7 @@ export interface BaseKeyValueCacheStoreOptions {
    * `RedisLocker` from `@orpc/experimental-lock` shares them across
    * processes. A caller that times out waiting fills on its own.
    *
-   * @default new MemoryLocker()
+   * @default new MemoryLocker({ ttl: 60_000 })
    */
   locker?: undefined | Locker
 }
@@ -54,31 +60,43 @@ export abstract class BaseKeyValueCacheStore implements CacheStore {
 
   constructor(options: BaseKeyValueCacheStoreOptions = {}) {
     this.serializer = options.serializer ?? new RPCJsonSerializer()
-    this.locker = options.locker ?? new MemoryLocker()
+    this.locker = options.locker ?? new MemoryLocker({ ttl: 60_000 })
   }
 
-  async getOrSet(key: unknown, compute: () => Promise<unknown>, options: CacheGetOrSetOptions = {}): Promise<CacheEntry> {
+  async getOrSet(
+    key: unknown,
+    compute: () => Promise<unknown>,
+    options: CacheGetOrSetOptions = {},
+  ): Promise<CacheEntry> {
     const encodedKey = encodeCacheKey(key, this.serializer)
     const entry = await this.read(encodedKey, options)
 
     if (entry === undefined || isCacheEntryEvicted(entry)) {
-      return this.lock(encodedKey, async (waited) => {
-        const current = waited ? await this.read(encodedKey, options) : undefined
+      return this.lock(
+        encodedKey,
+        async (waited) => {
+          const current = waited ? await this.read(encodedKey, options) : undefined
 
-        return current === undefined || isCacheEntryEvicted(current)
-          ? this.fill(encodedKey, compute, options)
-          : current
-      }, () => this.fill(encodedKey, compute, options))
+          return current === undefined || isCacheEntryEvicted(current)
+            ? this.fill(encodedKey, compute, options)
+            : current
+        },
+        () => this.fill(encodedKey, compute, options),
+      )
     }
 
     if (isCacheEntryStale(entry)) {
-      const refresh = this.lock(encodedKey, async (waited) => {
-        const current = waited ? await this.read(encodedKey, options) : undefined
+      const refresh = this.lock(
+        encodedKey,
+        async (waited) => {
+          const current = waited ? await this.read(encodedKey, options) : undefined
 
-        if (current === undefined || isCacheEntryStale(current)) {
-          await this.fill(encodedKey, compute, options)
-        }
-      }, () => undefined)
+          if (current === undefined || isCacheEntryStale(current)) {
+            await this.fill(encodedKey, compute, options)
+          }
+        },
+        () => undefined,
+      )
 
       options.waitUntil?.(refresh)
     }
@@ -93,20 +111,27 @@ export abstract class BaseKeyValueCacheStore implements CacheStore {
    * `options` are those of the lookup, so a backend can fetch what it needs
    * to validate the entry alongside it.
    */
-  protected abstract read(encodedKey: string, options: CacheGetOrSetOptions): Promisable<CacheEntry | undefined>
+  protected abstract read(
+    encodedKey: string,
+    options: CacheGetOrSetOptions,
+  ): Promisable<CacheEntry | undefined>
 
   /**
    * Runs `compute` and stores its output. Tag state captured before it runs
    * lets a revalidation that lands during it still invalidate the entry.
    */
-  protected abstract fill(encodedKey: string, compute: () => Promise<unknown>, options: CacheGetOrSetOptions): Promise<CacheEntry>
+  protected abstract fill(
+    encodedKey: string,
+    compute: () => Promise<unknown>,
+    options: CacheGetOrSetOptions,
+  ): Promise<CacheEntry>
 
   /**
    * Restores the entry a backend stored as an envelope.
    */
   protected decode(envelope: CacheEnvelope): CacheEntry {
     return {
-      output: this.serializer.deserialize(envelope.output),
+      output: this.serializer.deserializeJson(envelope.output),
       tags: envelope.tags,
       expiresAt: envelope.expiresAt,
       evictAt: envelope.evictAt,
@@ -117,10 +142,13 @@ export abstract class BaseKeyValueCacheStore implements CacheStore {
    * Builds the envelope storing `output`, with the entry to return and how
    * long to retain it in milliseconds, `undefined` when it never expires.
    */
-  protected encode(output: unknown, options: CacheGetOrSetOptions): { envelope: CacheEnvelope, entry: CacheEntry, retention: number | undefined } {
+  protected encode(
+    output: unknown,
+    options: CacheGetOrSetOptions,
+  ): { envelope: CacheEnvelope; entry: CacheEntry; retention: number | undefined } {
     const tags = options.tags?.length ? options.tags : undefined
     const { expiresAt, evictAt, retention } = resolveCacheExpiry(options)
-    const { json, meta } = this.serializer.serialize(output)
+    const { json, meta } = this.serializer.serializeJson(output)
 
     return {
       envelope: { output: { json, meta }, tags, expiresAt, evictAt },
@@ -132,11 +160,14 @@ export abstract class BaseKeyValueCacheStore implements CacheStore {
   /**
    * Runs `fn` under the key's lock, or `onTimeout` once waiting for it timed out.
    */
-  private async lock<T>(encodedKey: string, fn: (waited: boolean) => Promise<T>, onTimeout: () => Promisable<T>): Promise<T> {
+  private async lock<T>(
+    encodedKey: string,
+    fn: (waited: boolean) => Promise<T>,
+    onTimeout: () => Promisable<T>,
+  ): Promise<T> {
     try {
       return await this.locker.lock(encodedKey, ({ waited }) => fn(waited))
-    }
-    catch (error) {
+    } catch (error) {
       if (error instanceof LockTimeoutError) {
         return onTimeout()
       }

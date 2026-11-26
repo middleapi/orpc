@@ -1,12 +1,13 @@
 import type { AnyNestedClient } from '@orpc/client'
 import type { CacheLinkPluginContext } from '@orpc/experimental-cache'
-import type { InfiniteData, Query, QueryClient, QueryKey } from '@tanstack/query-core'
-import type { RouterUtilsPlugin } from './plugin'
-import type { RouterUtilsOptions } from './router-utils'
 import { CACHE_LINK_PLUGIN_CONTEXT_SYMBOL } from '@orpc/experimental-cache'
 import { toArray } from '@orpc/shared'
+import type { InfiniteData, Query, QueryClient, QueryKey } from '@tanstack/query-core'
 import { partialMatchKey } from '@tanstack/query-core'
+
 import { generateOperationKey } from './key'
+import type { RouterUtilsPlugin } from './plugin'
+import type { RouterUtilsOptions } from './router-utils'
 
 type AnyQuery = Query<any, any, any, any>
 
@@ -38,17 +39,25 @@ interface CacheTagsQueryState {
  * The fetch of all pages each infinite query is in. Its pages arrive in order
  * and share its signal, retries included, which resume from the failed page.
  */
-const INFINITE_QUERY_FETCHES = new WeakMap<AnyQuery, { signal: AbortSignal, pageTags: PageCacheTags[] }>()
+const INFINITE_QUERY_FETCHES = new WeakMap<
+  AnyQuery,
+  { signal: AbortSignal; pageTags: PageCacheTags[] }
+>()
 
 /**
  * Calls `next` with a cache link plugin context, reusing one an outer reader
  * already placed, and returns the output along with the tags the response
  * carried, if anything reported them.
  */
-async function callWithCacheTags<TOutput>(
-  { next, ...options }: { next: (options: any) => Promise<TOutput>, context: object },
-) {
-  const pluginContext = (options.context as CacheLinkPluginContext)[CACHE_LINK_PLUGIN_CONTEXT_SYMBOL] ?? {}
+async function callWithCacheTags<TOutput>({
+  next,
+  ...options
+}: {
+  next: (options: any) => Promise<TOutput>
+  context: object
+}) {
+  const pluginContext =
+    (options.context as CacheLinkPluginContext)[CACHE_LINK_PLUGIN_CONTEXT_SYMBOL] ?? {}
 
   const output = await next({
     ...options,
@@ -68,8 +77,14 @@ function findQuery(client: QueryClient, queryKey: QueryKey): AnyQuery | undefine
 /**
  * Records the tags of the data the running fetch is about to commit.
  */
-function setCacheTagsState(query: AnyQuery, tags: Pick<CacheTagsQueryState, 'orpcCacheTags' | 'orpcCachePageTags'>): void {
-  const state: CacheTagsQueryState = { ...tags, orpcCacheTagsDataUpdateCount: query.state.dataUpdateCount + 1 }
+function setCacheTagsState(
+  query: AnyQuery,
+  tags: Pick<CacheTagsQueryState, 'orpcCacheTags' | 'orpcCachePageTags'>,
+): void {
+  const state: CacheTagsQueryState = {
+    ...tags,
+    orpcCacheTagsDataUpdateCount: query.state.dataUpdateCount + 1,
+  }
 
   query.setState({ ...query.state, ...state })
 }
@@ -99,7 +114,10 @@ function getCacheTags(query: AnyQuery): readonly string[] | undefined {
 
   const pages = (query.state.data as InfiniteData<unknown> | undefined)?.pages ?? []
 
-  if (orpcCachePageTags.length !== pages.length || !orpcCachePageTags.every(tags => tags !== null)) {
+  if (
+    orpcCachePageTags.length !== pages.length ||
+    !orpcCachePageTags.every((tags) => tags !== null)
+  ) {
     return undefined
   }
 
@@ -117,15 +135,21 @@ function getCacheTags(query: AnyQuery): readonly string[] | undefined {
  *
  * @see {@link https://orpc.dev/docs/integrations/tanstack-query#cache-revalidation-plugin | TanStack Query Integration - Cache Revalidation Plugin}
  */
-export class experimental_CacheRevalidationUtilsPlugin<T extends AnyNestedClient> implements RouterUtilsPlugin<T> {
+export class experimental_CacheRevalidationUtilsPlugin<
+  T extends AnyNestedClient,
+> implements RouterUtilsPlugin<T> {
   readonly name = '~cache-revalidation'
 
   init(options: RouterUtilsOptions<T>): RouterUtilsOptions<T> {
     const path = toArray(options.path)
     const queryFilterKey = generateOperationKey(path, { prefix: options.prefix, type: 'query' })
-    const infiniteFilterKey = generateOperationKey(path, { prefix: options.prefix, type: 'infinite' })
+    const infiniteFilterKey = generateOperationKey(path, {
+      prefix: options.prefix,
+      type: 'infinite',
+    })
     const isUtilsQuery = (query: AnyQuery) =>
-      partialMatchKey(query.queryKey, queryFilterKey) || partialMatchKey(query.queryKey, infiniteFilterKey)
+      partialMatchKey(query.queryKey, queryFilterKey) ||
+      partialMatchKey(query.queryKey, infiniteFilterKey)
 
     return {
       ...options,
@@ -133,7 +157,10 @@ export class experimental_CacheRevalidationUtilsPlugin<T extends AnyNestedClient
         ...toArray(options.queryInterceptors),
         async (interceptorOptions) => {
           const { output, tags } = await callWithCacheTags(interceptorOptions)
-          const query = findQuery(interceptorOptions.fnContext.client, interceptorOptions.fnContext.queryKey)
+          const query = findQuery(
+            interceptorOptions.fnContext.client,
+            interceptorOptions.fnContext.queryKey,
+          )
 
           if (query !== undefined) {
             setCacheTagsState(query, { orpcCacheTags: tags ?? null })
@@ -182,13 +209,13 @@ export class experimental_CacheRevalidationUtilsPlugin<T extends AnyNestedClient
           const pages = (query.state.data as InfiniteData<unknown> | undefined)?.pages ?? []
           const known = getCacheTagsState(query)?.orpcCachePageTags
           const current = known?.length === pages.length ? known : pages.map(() => null)
-          const pageTags = fetchMore.direction === 'forward' ? [...current, tags] : [tags, ...current]
+          const pageTags =
+            fetchMore.direction === 'forward' ? [...current, tags] : [tags, ...current]
 
           if (maxPages && pageTags.length > maxPages) {
             if (fetchMore.direction === 'forward') {
               pageTags.shift()
-            }
-            else {
+            } else {
               pageTags.pop()
             }
           }
@@ -212,7 +239,10 @@ export class experimental_CacheRevalidationUtilsPlugin<T extends AnyNestedClient
              * only join that fetch, so let it land and reveal its tags first.
              */
             await client.refetchQueries(
-              { fetchStatus: 'fetching', predicate: query => query.state.data === undefined && isUtilsQuery(query) },
+              {
+                fetchStatus: 'fetching',
+                predicate: (query) => query.state.data === undefined && isUtilsQuery(query),
+              },
               { cancelRefetch: false },
             )
 
@@ -224,7 +254,7 @@ export class experimental_CacheRevalidationUtilsPlugin<T extends AnyNestedClient
                   return query.state.data !== undefined && isUtilsQuery(query)
                 }
 
-                return tags.some(tag => revalidatedTags.includes(tag))
+                return tags.some((tag) => revalidatedTags.includes(tag))
               },
             })
           }

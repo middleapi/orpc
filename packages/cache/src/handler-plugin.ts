@@ -1,11 +1,18 @@
 import type { AnyProcedure, Context, ProcedureClientInterceptor } from '@orpc/server'
-import type { StandardHandlerInterceptor, StandardHandlerOptions, StandardHandlerPlugin } from '@orpc/server/standard'
-import type { StandardHeaders } from '@standard-server/core'
-import type { CacheLinkPluginContext } from './link-plugin'
+import type {
+  StandardHandlerInterceptor,
+  StandardHandlerOptions,
+  StandardHandlerPlugin,
+} from '@orpc/server/standard'
 import { encodeCacheTagHeader, toArray } from '@orpc/shared'
+import type { StandardHeaders } from '@standard-server/core'
+
+import type { CacheLinkPluginContext } from './link-plugin'
 import { CACHE_LINK_PLUGIN_CONTEXT_SYMBOL } from './link-plugin'
 
-export const CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_CACHE_HANDLER_PLUGIN_CONTEXT')
+export const CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL: unique symbol = Symbol.for(
+  'ORPC_CACHE_HANDLER_PLUGIN_CONTEXT',
+)
 
 /**
  * A cache lookup performed during a request. `ttl` carries the remaining
@@ -47,11 +54,11 @@ export interface CacheHandlerPluginContext {
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#handler-plugin | Cache Helpers - Handler Plugin}
  */
-export type CacheHandlerPluginHeader
-  = | 'orpc-cache-tag'
-    | 'orpc-cache-tag-invalidation'
-    | 'cache-control'
-    | 'cache-tag'
+export type CacheHandlerPluginHeader =
+  | 'orpc-cache-tag'
+  | 'orpc-cache-tag-invalidation'
+  | 'cache-control'
+  | 'cache-tag'
 
 export interface CacheHandlerPluginOptions<_T extends Context> {
   /**
@@ -89,7 +96,11 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
     }
 
     const interceptor: StandardHandlerInterceptor<T> = async (interceptorOptions) => {
-      const { result: response, rootCache, rootRevalidation } = await nextWithRootCacheActivity(interceptorOptions)
+      const {
+        result: response,
+        rootCache,
+        rootRevalidation,
+      } = await nextWithRootCacheActivity(interceptorOptions)
 
       if (rootCache === undefined && rootRevalidation === undefined) {
         return response
@@ -105,7 +116,10 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
       const cacheTag = rootCache?.tags?.length ? encodeCacheTagHeader(rootCache.tags) : undefined
       set('orpc-cache-tag', cacheTag)
       set('cache-tag', cacheTag)
-      set('orpc-cache-tag-invalidation', rootRevalidation?.tags.length ? encodeCacheTagHeader(rootRevalidation.tags) : undefined)
+      set(
+        'orpc-cache-tag-invalidation',
+        rootRevalidation?.tags.length ? encodeCacheTagHeader(rootRevalidation.tags) : undefined,
+      )
 
       if (rootCache !== undefined && this.headers.has('cache-control')) {
         /**
@@ -117,7 +131,8 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
          */
         const maxAge = rootCache.ttl === undefined ? 31536000 : Math.floor(rootCache.ttl / 1000)
         const staleWhileRevalidate = Math.floor((rootCache.swr ?? 0) / 1000)
-        headers['cache-control'] = `public, max-age=${maxAge}${staleWhileRevalidate ? `, stale-while-revalidate=${staleWhileRevalidate}` : ''}`
+        headers['cache-control'] =
+          `public, max-age=${maxAge}${staleWhileRevalidate ? `, stale-while-revalidate=${staleWhileRevalidate}` : ''}`
       }
 
       return {
@@ -128,10 +143,7 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
     return {
       ...options,
-      interceptors: [
-        ...toArray(options.interceptors),
-        interceptor,
-      ],
+      interceptors: [...toArray(options.interceptors), interceptor],
     }
   }
 }
@@ -145,7 +157,9 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#server-side-clients | Cache Helpers - Server-Side Clients}
  */
-export const cacheRouterClientInterceptor: ProcedureClientInterceptor<any, any, any> = async (options) => {
+export const cacheRouterClientInterceptor: ProcedureClientInterceptor<any, any, any> = async (
+  options,
+) => {
   const linkContext = (options.context as CacheLinkPluginContext)[CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]
 
   if (linkContext === undefined) {
@@ -154,8 +168,8 @@ export const cacheRouterClientInterceptor: ProcedureClientInterceptor<any, any, 
 
   const { result, rootCache, rootRevalidation } = await nextWithRootCacheActivity(options)
 
-  linkContext.tags = [...rootCache?.tags ?? []]
-  linkContext.revalidatedTags = [...rootRevalidation?.tags ?? []]
+  linkContext.tags = [...(rootCache?.tags ?? [])]
+  linkContext.revalidatedTags = [...(rootRevalidation?.tags ?? [])]
 
   return result
 }
@@ -165,10 +179,19 @@ export const cacheRouterClientInterceptor: ProcedureClientInterceptor<any, any, 
  * the first cache lookup and revalidation of the procedure the client called,
  * so nested procedure calls never leak their tags.
  */
-async function nextWithRootCacheActivity<TResult>(
-  { next, ...options }: { next: (options: any) => Promise<TResult>, context: object, procedure: AnyProcedure, path: readonly string[] },
-) {
-  const pluginContext: Exclude<CacheHandlerPluginContext[typeof CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL], undefined> = { caches: [], revalidations: [] }
+async function nextWithRootCacheActivity<TResult>({
+  next,
+  ...options
+}: {
+  next: (options: any) => Promise<TResult>
+  context: object
+  procedure: AnyProcedure
+  path: readonly string[]
+}) {
+  const pluginContext: Exclude<
+    CacheHandlerPluginContext[typeof CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL],
+    undefined
+  > = { caches: [], revalidations: [] }
 
   const result = await next({
     ...options,
@@ -180,7 +203,9 @@ async function nextWithRootCacheActivity<TResult>(
 
   const { procedure, path } = options
   const isRoot = (check: CacheHandlerPluginRevalidation | CacheHandlerPluginLookup) =>
-    check.procedure === procedure && check.path.length === path.length && check.path.every((segment, index) => segment === path[index])
+    check.procedure === procedure &&
+    check.path.length === path.length &&
+    check.path.every((segment, index) => segment === path[index])
 
   return {
     result,

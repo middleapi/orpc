@@ -1,6 +1,6 @@
 import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions } from '../types'
-import type { BaseKeyValueCacheStoreOptions } from './base-key-value'
 import { resolveCacheExpiry } from '../utils'
+import type { BaseKeyValueCacheStoreOptions } from './base-key-value'
 import { BaseKeyValueCacheStore } from './base-key-value'
 
 export type MemoryCacheStoreOptions = BaseKeyValueCacheStoreOptions
@@ -58,9 +58,13 @@ export class MemoryCacheStore extends BaseKeyValueCacheStore {
     }
   }
 
-  protected async fill(encodedKey: string, compute: () => Promise<unknown>, options: CacheGetOrSetOptions): Promise<CacheEntry> {
+  protected async fill(
+    encodedKey: string,
+    compute: () => Promise<unknown>,
+    options: CacheGetOrSetOptions,
+  ): Promise<CacheEntry> {
     const tags = options.tags?.length ? options.tags : undefined
-    const tagVersions = tags?.map(tag => this.tagVersions.get(tag) ?? 0)
+    const tagVersions = tags?.map((tag) => this.tagVersions.get(tag) ?? 0)
     const output = await compute()
     const { expiresAt, evictAt } = resolveCacheExpiry(options)
 
@@ -75,8 +79,13 @@ export class MemoryCacheStore extends BaseKeyValueCacheStore {
   }
 
   private shouldEvict(entry: MemoryCacheStoreEntry, now: number): boolean {
-    return (entry.evictAt !== undefined && now >= entry.evictAt)
-      || (entry.tags?.some((tag, index) => (this.tagVersions.get(tag) ?? 0) !== entry.tagVersions?.[index]) ?? false)
+    return (
+      (entry.evictAt !== undefined && now >= entry.evictAt) ||
+      (entry.tags?.some(
+        (tag, index) => (this.tagVersions.get(tag) ?? 0) !== entry.tagVersions?.[index],
+      ) ??
+        false)
+    )
   }
 
   /**
@@ -95,8 +104,7 @@ export class MemoryCacheStore extends BaseKeyValueCacheStore {
     for (const [encodedKey, entry] of this.entries) {
       if (this.shouldEvict(entry, now)) {
         this.entries.delete(encodedKey)
-      }
-      else if (entry.evictAt !== undefined) {
+      } else if (entry.evictAt !== undefined) {
         this.nextSweepAt = Math.min(this.nextSweepAt, entry.evictAt)
       }
     }

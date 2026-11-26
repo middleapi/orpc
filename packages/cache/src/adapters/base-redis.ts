@@ -1,6 +1,7 @@
+import { parseEmptyableJSON, stringifyJSON } from '@orpc/shared'
+
 import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions } from '../types'
 import type { BaseKeyValueCacheStoreOptions, CacheEnvelope } from './base-key-value'
-import { parseEmptyableJSON, stringifyJSON } from '@orpc/shared'
 import { BaseKeyValueCacheStore } from './base-key-value'
 
 interface BaseRedisCacheStoreEnvelope extends CacheEnvelope {
@@ -73,23 +74,34 @@ export abstract class BaseRedisCacheStore extends BaseKeyValueCacheStore {
   protected abstract increment(key: string): Promise<unknown>
 
   async revalidate({ tags }: CacheRevalidateOptions): Promise<void> {
-    await Promise.all(tags.map(tag => this.increment(this.tagPrefix + tag)))
+    await Promise.all(tags.map((tag) => this.increment(this.tagPrefix + tag)))
   }
 
-  protected async read(encodedKey: string, options: CacheGetOrSetOptions): Promise<CacheEntry | undefined> {
+  protected async read(
+    encodedKey: string,
+    options: CacheGetOrSetOptions,
+  ): Promise<CacheEntry | undefined> {
     const expectedTags = options.tags ?? []
-    const [raw, expectedVersions] = await Promise.all([this.get(this.entryPrefix + encodedKey), this.versions(expectedTags)])
-    const envelope = (typeof raw === 'string' ? parseEmptyableJSON(raw) : raw) as BaseRedisCacheStoreEnvelope | null | undefined
+    const [raw, expectedVersions] = await Promise.all([
+      this.get(this.entryPrefix + encodedKey),
+      this.versions(expectedTags),
+    ])
+    const envelope = (typeof raw === 'string' ? parseEmptyableJSON(raw) : raw) as
+      | BaseRedisCacheStoreEnvelope
+      | null
+      | undefined
 
-    if (envelope == null) {
+    if (envelope === null || envelope === undefined) {
       return undefined
     }
 
     if (envelope.tags?.length) {
       const { tags } = envelope
-      const versions = tags.length === expectedTags.length && tags.every((tag, index) => tag === expectedTags[index])
-        ? expectedVersions
-        : await this.versions(tags)
+      const versions =
+        tags.length === expectedTags.length &&
+        tags.every((tag, index) => tag === expectedTags[index])
+          ? expectedVersions
+          : await this.versions(tags)
 
       const stored = envelope.tagVersions ?? []
 
@@ -101,7 +113,11 @@ export abstract class BaseRedisCacheStore extends BaseKeyValueCacheStore {
     return this.decode(envelope)
   }
 
-  protected async fill(encodedKey: string, compute: () => Promise<unknown>, options: CacheGetOrSetOptions): Promise<CacheEntry> {
+  protected async fill(
+    encodedKey: string,
+    compute: () => Promise<unknown>,
+    options: CacheGetOrSetOptions,
+  ): Promise<CacheEntry> {
     const tagVersions = options.tags?.length ? await this.versions(options.tags) : undefined
     const output = await compute()
     const { envelope, entry, retention } = this.encode(output, options)
@@ -120,8 +136,8 @@ export abstract class BaseRedisCacheStore extends BaseKeyValueCacheStore {
       return []
     }
 
-    const raw = await this.getMany(tags.map(tag => this.tagPrefix + tag))
+    const raw = await this.getMany(tags.map((tag) => this.tagPrefix + tag))
 
-    return raw.map(version => Number(version ?? 0))
+    return raw.map((version) => Number(version ?? 0))
   }
 }

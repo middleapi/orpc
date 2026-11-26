@@ -1,9 +1,10 @@
-import type { CacheStore } from '../src'
 import { RedisLocker } from '@orpc/experimental-lock/redis'
 import { UpstashLocker } from '@orpc/experimental-lock/upstash'
 import { sleep } from '@orpc/shared'
 import { Redis } from '@upstash/redis'
 import { createClient } from 'redis'
+
+import type { CacheStore } from '../src'
 import { RedisCacheStore } from '../src/adapters/redis'
 import { UpstashCacheStore } from '../src/adapters/upstash'
 
@@ -19,25 +20,43 @@ const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
  * All adapters must connect to the same server.
  */
 describe.concurrent('cache redis adapters compatibility', { timeout: 20_000 }, () => {
-  const stores: Array<{ name: string, store: CacheStore }> = []
+  const stores: Array<{ name: string; store: CacheStore }> = []
   const prefix = `redis-adapters:${crypto.randomUUID()}:`
   const lockPrefix = `${prefix}lock:`
 
   if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
-    const redis = createClient({ url: `rediss://default:${UPSTASH_REDIS_REST_TOKEN}@${new URL(UPSTASH_REDIS_REST_URL).host}:6379` })
-
-    afterAll(() => {
-      redis.close()
+    const redis = createClient({
+      url: `rediss://default:${UPSTASH_REDIS_REST_TOKEN}@${new URL(UPSTASH_REDIS_REST_URL).host}:6379`,
     })
 
-    stores.push({ name: 'redis', store: new RedisCacheStore(redis, { prefix, locker: new RedisLocker(redis, { prefix: lockPrefix, ttl: 10_000 }) }) })
+    afterAll(() => {
+      void redis.close()
+    })
+
+    stores.push({
+      name: 'redis',
+      store: new RedisCacheStore(redis, {
+        prefix,
+        locker: new RedisLocker(redis, { prefix: lockPrefix, ttl: 10_000 }),
+      }),
+    })
   }
 
   // TODO: Upstash is not compatible with Node 26 yet — temporarily disable these tests and revisit in the future.
-  if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN && !process.versions.node.startsWith('26.')) {
+  if (
+    UPSTASH_REDIS_REST_URL &&
+    UPSTASH_REDIS_REST_TOKEN &&
+    !process.versions.node.startsWith('26.')
+  ) {
     const upstashRedis = new Redis({ url: UPSTASH_REDIS_REST_URL, token: UPSTASH_REDIS_REST_TOKEN })
 
-    stores.push({ name: 'upstash', store: new UpstashCacheStore(upstashRedis, { prefix, locker: new UpstashLocker(upstashRedis, { prefix: lockPrefix, ttl: 10_000 }) }) })
+    stores.push({
+      name: 'upstash',
+      store: new UpstashCacheStore(upstashRedis, {
+        prefix,
+        locker: new UpstashLocker(upstashRedis, { prefix: lockPrefix, ttl: 10_000 }),
+      }),
+    })
   }
 
   describe.skipIf(stores.length < 2)('cross-adapter compatibility', () => {
@@ -52,16 +71,27 @@ describe.concurrent('cache redis adapters compatibility', { timeout: 20_000 }, (
           const tag = `tag:${crypto.randomUUID()}`
           const output = { date: new Date('2026-01-02T03:04:05.678Z'), big: 123n }
 
-          await source.store.getOrSet([['planet', 'find'], { b: 2, id }], async () => output, { tags: [tag], ttl: 60_000 })
+          await source.store.getOrSet([['planet', 'find'], { b: 2, id }], async () => output, {
+            tags: [tag],
+            ttl: 60_000,
+          })
 
-          const entry = await target.store.getOrSet([['planet', 'find'], { id, b: 2 }], async () => 'refilled', { tags: [tag], ttl: 60_000 })
+          const entry = await target.store.getOrSet(
+            [['planet', 'find'], { id, b: 2 }],
+            async () => 'refilled',
+            { tags: [tag], ttl: 60_000 },
+          )
           expect(entry.output).toEqual(output)
           expect(entry.tags).toEqual([tag])
           expect(entry.expiresAt).toBeGreaterThan(Date.now())
 
           await target.store.revalidate({ tags: [tag] })
 
-          await expect(source.store.getOrSet([['planet', 'find'], { b: 2, id }], async () => 'refilled', { tags: [tag] })).resolves.toMatchObject({ output: 'refilled' })
+          await expect(
+            source.store.getOrSet([['planet', 'find'], { b: 2, id }], async () => 'refilled', {
+              tags: [tag],
+            }),
+          ).resolves.toMatchObject({ output: 'refilled' })
         })
 
         it(`shares tag counters: ${source.name} → ${target.name}`, async () => {
@@ -71,11 +101,17 @@ describe.concurrent('cache redis adapters compatibility', { timeout: 20_000 }, (
           await source.store.getOrSet(key, async () => 'v1', { tags: [tag] })
           await target.store.revalidate({ tags: [tag] })
 
-          await expect(target.store.getOrSet(key, async () => 'v2', { tags: [tag] })).resolves.toMatchObject({ output: 'v2' })
-          await expect(source.store.getOrSet(key, async () => 'v3', { tags: [tag] })).resolves.toMatchObject({ output: 'v2' })
+          await expect(
+            target.store.getOrSet(key, async () => 'v2', { tags: [tag] }),
+          ).resolves.toMatchObject({ output: 'v2' })
+          await expect(
+            source.store.getOrSet(key, async () => 'v3', { tags: [tag] }),
+          ).resolves.toMatchObject({ output: 'v2' })
 
           await source.store.revalidate({ tags: [tag] })
-          await expect(target.store.getOrSet(key, async () => 'v4', { tags: [tag] })).resolves.toMatchObject({ output: 'v4' })
+          await expect(
+            target.store.getOrSet(key, async () => 'v4', { tags: [tag] }),
+          ).resolves.toMatchObject({ output: 'v4' })
         })
 
         it(`shares retention: ${source.name} → ${target.name}`, async () => {
@@ -87,10 +123,16 @@ describe.concurrent('cache redis adapters compatibility', { timeout: 20_000 }, (
 
           await sleep(1500)
 
-          await expect(target.store.getOrSet(noSwr, async () => 'refilled', { ttl: 1000 })).resolves.toMatchObject({ output: 'refilled' })
+          await expect(
+            target.store.getOrSet(noSwr, async () => 'refilled', { ttl: 1000 }),
+          ).resolves.toMatchObject({ output: 'refilled' })
 
           const waitUntil = (_promise: Promise<unknown>) => {}
-          const stale = await target.store.getOrSet(swr, async () => 'refilled', { ttl: 1000, swr: 10_000, waitUntil })
+          const stale = await target.store.getOrSet(swr, async () => 'refilled', {
+            ttl: 1000,
+            swr: 10_000,
+            waitUntil,
+          })
           expect(stale.output).toBe('v')
           expect(stale.expiresAt).toBeLessThanOrEqual(Date.now())
         })
@@ -114,10 +156,12 @@ describe.concurrent('cache redis adapters compatibility', { timeout: 20_000 }, (
           await holding
 
           let settled = false
-          const waiter = target.store.getOrSet(key, async () => 'refilled').then((entry) => {
-            settled = true
-            return entry
-          })
+          const waiter = target.store
+            .getOrSet(key, async () => 'refilled')
+            .then((entry) => {
+              settled = true
+              return entry
+            })
 
           await sleep(300)
           expect(settled).toBe(false)

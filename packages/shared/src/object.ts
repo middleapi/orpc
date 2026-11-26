@@ -328,6 +328,7 @@ export function deepSortKeys(value: unknown): unknown {
 
   if (isPlainObject(value)) {
     const sorted: Record<PropertyKey, unknown> = new NullProtoObj()
+    // oxlint-disable-next-line unicorn/no-array-sort
     for (const key of Object.keys(value).sort()) {
       sorted[key] = deepSortKeys(value[key])
     }

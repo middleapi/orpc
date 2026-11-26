@@ -1,5 +1,6 @@
-import type { CacheStore } from '../../src'
 import { expect, it, vi } from 'vitest'
+
+import type { CacheStore } from '../../src'
 
 /**
  * The behavior every {@link CacheStore} must share, run against one adapter.
@@ -10,12 +11,24 @@ export function describeCacheStoreContract(createStore: () => CacheStore): void 
     const store = createStore()
     const fill = vi.fn(async () => ({ nested: [1, 2] }))
 
-    await expect(store.getOrSet('k', fill, { tags: ['t'] })).resolves.toEqual({ output: { nested: [1, 2] }, tags: ['t'], expiresAt: undefined })
-    await expect(store.getOrSet('k', fill, { tags: ['t'] })).resolves.toEqual({ output: { nested: [1, 2] }, tags: ['t'], expiresAt: undefined })
+    await expect(store.getOrSet('k', fill, { tags: ['t'] })).resolves.toEqual({
+      output: { nested: [1, 2] },
+      tags: ['t'],
+      expiresAt: undefined,
+    })
+    await expect(store.getOrSet('k', fill, { tags: ['t'] })).resolves.toEqual({
+      output: { nested: [1, 2] },
+      tags: ['t'],
+      expiresAt: undefined,
+    })
     expect(fill).toHaveBeenCalledTimes(1)
 
     await store.getOrSet('u', async () => undefined)
-    await expect(store.getOrSet('u', async () => 'refilled')).resolves.toEqual({ output: undefined, tags: undefined, expiresAt: undefined })
+    await expect(store.getOrSet('u', async () => 'refilled')).resolves.toEqual({
+      output: undefined,
+      tags: undefined,
+      expiresAt: undefined,
+    })
   })
 
   it('fills each key separately', async () => {
@@ -24,7 +37,9 @@ export function describeCacheStoreContract(createStore: () => CacheStore): void 
     await store.getOrSet('a', async () => 'a')
 
     await expect(store.getOrSet('b', async () => 'b')).resolves.toMatchObject({ output: 'b' })
-    await expect(store.getOrSet('a', async () => 'refilled')).resolves.toMatchObject({ output: 'a' })
+    await expect(store.getOrSet('a', async () => 'refilled')).resolves.toMatchObject({
+      output: 'a',
+    })
   })
 
   it('preserves Date, Map, Set, and BigInt outputs', async () => {
@@ -49,8 +64,12 @@ export function describeCacheStoreContract(createStore: () => CacheStore): void 
 
     await store.revalidate({ tags: ['a'] })
 
-    await expect(store.getOrSet('multi', async () => 'refilled', { tags: ['a', 'b'] })).resolves.toMatchObject({ output: 'refilled' })
-    await expect(store.getOrSet('other', async () => 'refilled', { tags: ['c'] })).resolves.toMatchObject({ output: 'v' })
+    await expect(
+      store.getOrSet('multi', async () => 'refilled', { tags: ['a', 'b'] }),
+    ).resolves.toMatchObject({ output: 'refilled' })
+    await expect(
+      store.getOrSet('other', async () => 'refilled', { tags: ['c'] }),
+    ).resolves.toMatchObject({ output: 'v' })
   })
 
   it('revalidates many tags at once', async () => {
@@ -61,8 +80,12 @@ export function describeCacheStoreContract(createStore: () => CacheStore): void 
 
     await store.revalidate({ tags: ['a', 'b'] })
 
-    await expect(store.getOrSet('a', async () => 'refilled', { tags: ['a'] })).resolves.toMatchObject({ output: 'refilled' })
-    await expect(store.getOrSet('b', async () => 'refilled', { tags: ['b'] })).resolves.toMatchObject({ output: 'refilled' })
+    await expect(
+      store.getOrSet('a', async () => 'refilled', { tags: ['a'] }),
+    ).resolves.toMatchObject({ output: 'refilled' })
+    await expect(
+      store.getOrSet('b', async () => 'refilled', { tags: ['b'] }),
+    ).resolves.toMatchObject({ output: 'refilled' })
   })
 
   it('keeps entries filled after a revalidation', async () => {
@@ -72,22 +95,31 @@ export function describeCacheStoreContract(createStore: () => CacheStore): void 
     await store.revalidate({ tags: ['t'] })
     await store.getOrSet('k', async () => 'new', { tags: ['t'] })
 
-    await expect(store.getOrSet('k', async () => 'newer', { tags: ['t'] })).resolves.toMatchObject({ output: 'new' })
+    await expect(store.getOrSet('k', async () => 'newer', { tags: ['t'] })).resolves.toMatchObject({
+      output: 'new',
+    })
   })
 
   it('fills once for concurrent callers of one key', async () => {
     const store = createStore()
     let finish!: (output: string) => void
-    const fill = vi.fn(() => new Promise<string>((resolve) => {
-      finish = resolve
-    }))
+    const fill = vi.fn(
+      () =>
+        new Promise<string>((resolve) => {
+          finish = resolve
+        }),
+    )
 
-    const pending = Promise.all([store.getOrSet('k', fill), store.getOrSet('k', fill), store.getOrSet('k', fill)])
+    const pending = Promise.all([
+      store.getOrSet('k', fill),
+      store.getOrSet('k', fill),
+      store.getOrSet('k', fill),
+    ])
     await vi.waitFor(() => expect(fill).toHaveBeenCalledTimes(1), { timeout: 5000 })
     finish('v')
 
     const entries = await pending
-    expect(entries.map(entry => entry.output)).toEqual(['v', 'v', 'v'])
+    expect(entries.map((entry) => entry.output)).toEqual(['v', 'v', 'v'])
     expect(fill).toHaveBeenCalledTimes(1)
   })
 

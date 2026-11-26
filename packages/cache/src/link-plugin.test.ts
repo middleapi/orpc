@@ -1,20 +1,22 @@
-import type { StandardLinkCodec } from '@orpc/client/standard'
-import type { StandardHeaders, StandardLazyResponse, StandardRequest } from '@standard-server/core'
-import type { CacheLinkPluginContext } from './link-plugin'
 import { DedupeLinkPlugin } from '@orpc/client/plugins'
+import type { StandardLinkCodec } from '@orpc/client/standard'
 import { StandardLink } from '@orpc/client/standard'
 import { encodeCacheTagHeader } from '@orpc/shared'
+import type { StandardHeaders, StandardLazyResponse, StandardRequest } from '@standard-server/core'
+
+import type { CacheLinkPluginContext } from './link-plugin'
 import { CACHE_LINK_PLUGIN_CONTEXT_SYMBOL, CacheLinkPlugin } from './link-plugin'
 
 const codec: StandardLinkCodec<CacheLinkPluginContext> = {
-  encodeInput: async (input, path, { signal }) => ({
-    method: 'GET',
-    url: `/${path.join('/')}` as `/${string}`,
-    headers: {},
-    body: input,
-    signal,
-  } satisfies StandardRequest),
-  decodeResponse: async response => ({ kind: 'output', output: await response.resolveBody() }),
+  encodeInput: async (input, path, { signal }) =>
+    ({
+      method: 'GET',
+      url: `/${path.join('/')}` as `/${string}`,
+      headers: {},
+      body: input,
+      signal,
+    }) satisfies StandardRequest,
+  decodeResponse: async (response) => ({ kind: 'output', output: await response.resolveBody() }),
 }
 
 function createLink(headers: StandardHeaders) {
@@ -24,12 +26,16 @@ function createLink(headers: StandardHeaders) {
     resolveBody: async () => 'output',
   }))
 
-  const link = new StandardLink(codec, { send }, {
-    plugins: [
-      new DedupeLinkPlugin({ groups: [{ condition: () => true, context: {} }] }),
-      new CacheLinkPlugin(),
-    ],
-  })
+  const link = new StandardLink(
+    codec,
+    { send },
+    {
+      plugins: [
+        new DedupeLinkPlugin({ groups: [{ condition: () => true, context: {} }] }),
+        new CacheLinkPlugin(),
+      ],
+    },
+  )
 
   return {
     send,
@@ -49,7 +55,9 @@ describe('cacheLinkPlugin', () => {
     })
 
     const pluginContext = createPluginContext()
-    await expect(call({ [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]: pluginContext })).resolves.toBe('output')
+    await expect(call({ [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]: pluginContext })).resolves.toBe(
+      'output',
+    )
 
     expect(pluginContext).toEqual({
       tags: ['planets', 'planet:Earth', 'a,b'],
@@ -90,7 +98,9 @@ describe('cacheLinkPlugin', () => {
     send.mockRejectedValueOnce(new Error('network'))
 
     const pluginContext = createPluginContext()
-    await expect(call({ [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]: pluginContext })).rejects.toThrow('network')
+    await expect(call({ [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]: pluginContext })).rejects.toThrow(
+      'network',
+    )
     expect(pluginContext).toEqual(createPluginContext())
   })
 

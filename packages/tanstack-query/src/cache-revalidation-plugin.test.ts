@@ -1,12 +1,20 @@
 import type { Client } from '@orpc/client'
-import type { StandardLazyResponse } from '@standard-server/core'
-import type { RouterUtilsOptions } from './router-utils'
 import { createORPCClient } from '@orpc/client'
 import { StandardLink } from '@orpc/client/standard'
 import { CACHE_LINK_PLUGIN_CONTEXT_SYMBOL, CacheLinkPlugin } from '@orpc/experimental-cache'
 import { encodeCacheTagHeader, promiseWithResolvers } from '@orpc/shared'
-import { dehydrate, hydrate, InfiniteQueryObserver, MutationObserver, QueryClient, QueryObserver } from '@tanstack/query-core'
+import type { StandardLazyResponse } from '@standard-server/core'
+import {
+  dehydrate,
+  hydrate,
+  InfiniteQueryObserver,
+  MutationObserver,
+  QueryClient,
+  QueryObserver,
+} from '@tanstack/query-core'
+
 import { experimental_CacheRevalidationUtilsPlugin as CacheRevalidationUtilsPlugin } from './cache-revalidation-plugin'
+import type { RouterUtilsOptions } from './router-utils'
 import { createRouterUtils } from './router-utils'
 
 type TestClient = {
@@ -43,7 +51,11 @@ const handlers = {
   'user.me': vi.fn(async (): Promise<Reply> => ({ output: 'me' })),
 }
 
-function createUtils(options: Pick<RouterUtilsOptions<TestClient>, 'prefix' | 'queryInterceptors' | 'plugins'> & { linkPlugin?: boolean } = {}) {
+function createUtils(
+  options: Pick<RouterUtilsOptions<TestClient>, 'prefix' | 'queryInterceptors' | 'plugins'> & {
+    linkPlugin?: boolean
+  } = {},
+) {
   const link = new StandardLink<object>(
     {
       encodeInput: async (input, path, { signal }) => ({
@@ -53,7 +65,10 @@ function createUtils(options: Pick<RouterUtilsOptions<TestClient>, 'prefix' | 'q
         body: input,
         signal,
       }),
-      decodeResponse: async response => ({ kind: 'output', output: await response.resolveBody() }),
+      decodeResponse: async (response) => ({
+        kind: 'output',
+        output: await response.resolveBody(),
+      }),
     },
     {
       send: async (request, path): Promise<StandardLazyResponse> => {
@@ -62,8 +77,10 @@ function createUtils(options: Pick<RouterUtilsOptions<TestClient>, 'prefix' | 'q
         return {
           status: 200,
           headers: {
-            ...reply.tags && { 'orpc-cache-tag': encodeCacheTagHeader(reply.tags) },
-            ...reply.revalidatedTags && { 'orpc-cache-tag-invalidation': encodeCacheTagHeader(reply.revalidatedTags) },
+            ...(reply.tags && { 'orpc-cache-tag': encodeCacheTagHeader(reply.tags) }),
+            ...(reply.revalidatedTags && {
+              'orpc-cache-tag-invalidation': encodeCacheTagHeader(reply.revalidatedTags),
+            }),
           },
           resolveBody: async () => reply.output,
         }
@@ -81,7 +98,7 @@ function createUtils(options: Pick<RouterUtilsOptions<TestClient>, 'prefix' | 'q
 
 function createListOptions(utils: ReturnType<typeof createUtils>) {
   return utils.planet.list.infiniteOptions({
-    input: cursor => ({ cursor }),
+    input: (cursor) => ({ cursor }),
     initialPageParam: 0,
     getNextPageParam: (_, pages) => pages.length,
   })
@@ -118,8 +135,13 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
       return { output: `planet ${id} v${version}`, tags: [`planet:${id}`] }
     })
 
-    const onSuccess = vi.fn(() => queryClient.getQueryData(utils.planet.find.queryKey({ input: { id: 1 } })))
-    const mutation = new MutationObserver(queryClient, utils.planet.update.mutationOptions({ onSuccess }))
+    const onSuccess = vi.fn(() =>
+      queryClient.getQueryData(utils.planet.find.queryKey({ input: { id: 1 } })),
+    )
+    const mutation = new MutationObserver(
+      queryClient,
+      utils.planet.update.mutationOptions({ onSuccess }),
+    )
     const mutate = mutation.mutate({ id: 1 })
 
     await vi.waitFor(() => expect(handlers['planet.find']).toHaveBeenCalledTimes(3))
@@ -149,7 +171,10 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
       return { output, tags: [`planet:${id}`] }
     })
 
-    const planet1 = new QueryObserver(queryClient, utils.planet.find.queryOptions({ input: { id: 1 } }))
+    const planet1 = new QueryObserver(
+      queryClient,
+      utils.planet.find.queryOptions({ input: { id: 1 } }),
+    )
     planet1.subscribe(() => {})
 
     const mutation = new MutationObserver(queryClient, utils.planet.update.mutationOptions())
@@ -165,13 +190,15 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
   it('shares the response tags with every reader of a call', async () => {
     const seen: string[][] = []
     const utils = createUtils({
-      queryInterceptors: [async ({ next, ...options }) => {
-        const pluginContext = { tags: [], revalidatedTags: [] }
-        const context = { ...options.context, [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]: pluginContext }
-        const output = await next({ ...options, context })
-        seen.push(pluginContext.tags)
-        return output
-      }],
+      queryInterceptors: [
+        async ({ next, ...options }) => {
+          const pluginContext = { tags: [], revalidatedTags: [] }
+          const context = { ...options.context, [CACHE_LINK_PLUGIN_CONTEXT_SYMBOL]: pluginContext }
+          const output = await next({ ...options, context })
+          seen.push(pluginContext.tags)
+          return output
+        },
+      ],
       plugins: [new CacheRevalidationUtilsPlugin(), new CacheRevalidationUtilsPlugin()],
     })
     const queryClient = createQueryClient()
@@ -194,7 +221,9 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     const mutation = new MutationObserver(queryClient, utils.planet.update.mutationOptions())
     await mutation.mutate({ id: 1 })
 
-    expect(queryClient.getQueryState(utils.planet.find.queryKey({ input: { id: 1 } }))?.isInvalidated).toBe(true)
+    expect(
+      queryClient.getQueryState(utils.planet.find.queryKey({ input: { id: 1 } }))?.isInvalidated,
+    ).toBe(true)
     expect(handlers['planet.find']).toHaveBeenCalledTimes(1)
   })
 
@@ -250,15 +279,24 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     await observer.fetchNextPage()
 
     const mutation = new MutationObserver(queryClient, utils.planet.update.mutationOptions())
-    handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['unrelated'] })
+    handlers['planet.update'].mockResolvedValueOnce({
+      output: 'updated',
+      revalidatedTags: ['unrelated'],
+    })
     await mutation.mutate({ id: 1 })
     expect(observer.getCurrentResult().isStale).toBe(false)
 
-    handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['page:0'] })
+    handlers['planet.update'].mockResolvedValueOnce({
+      output: 'updated',
+      revalidatedTags: ['page:0'],
+    })
     await mutation.mutate({ id: 1 })
     expect(handlers['planet.list']).toHaveBeenCalledTimes(4)
 
-    handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['page:1'] })
+    handlers['planet.update'].mockResolvedValueOnce({
+      output: 'updated',
+      revalidatedTags: ['page:1'],
+    })
     await mutation.mutate({ id: 1 })
     expect(handlers['planet.list']).toHaveBeenCalledTimes(6)
   })
@@ -299,9 +337,15 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
       vi.useRealTimers()
     })
 
-    async function revalidateUnrelated(utils: ReturnType<typeof createUtils>, queryClient: QueryClient) {
+    async function revalidateUnrelated(
+      utils: ReturnType<typeof createUtils>,
+      queryClient: QueryClient,
+    ) {
       const mutation = new MutationObserver(queryClient, utils.planet.update.mutationOptions())
-      handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['unrelated'] })
+      handlers['planet.update'].mockResolvedValueOnce({
+        output: 'updated',
+        revalidatedTags: ['unrelated'],
+      })
       await mutation.mutate({ id: 1 })
     }
 
@@ -312,7 +356,9 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
 
       vi.setSystemTime(2000)
       const serverQueryClient = createQueryClient()
-      await serverQueryClient.prefetchQuery(createUtils({ linkPlugin: false }).planet.find.queryOptions({ input: { id: 1 } }))
+      await serverQueryClient.prefetchQuery(
+        createUtils({ linkPlugin: false }).planet.find.queryOptions({ input: { id: 1 } }),
+      )
       hydrate(queryClient, JSON.parse(JSON.stringify(dehydrate(serverQueryClient))))
 
       await revalidateUnrelated(utils, queryClient)
@@ -322,7 +368,10 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     it('when a pending server query is streamed over it', async () => {
       const utils = createUtils()
       const queryClient = createQueryClient()
-      const planet1 = await observe(queryClient, utils.planet.find.queryOptions({ input: { id: 1 } }))
+      const planet1 = await observe(
+        queryClient,
+        utils.planet.find.queryOptions({ input: { id: 1 } }),
+      )
 
       vi.setSystemTime(2000)
       const load = promiseWithResolvers<void>()
@@ -358,14 +407,23 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     const listOptions = { ...createListOptions(utils), maxPages: 2 }
 
     await queryClient.prefetchInfiniteQuery({ ...listOptions, pages: 3 })
-    expect(queryClient.getQueryData(listOptions.queryKey)?.pages).toEqual([['page 1 v0'], ['page 2 v0']])
+    expect(queryClient.getQueryData(listOptions.queryKey)?.pages).toEqual([
+      ['page 1 v0'],
+      ['page 2 v0'],
+    ])
 
     const mutation = new MutationObserver(queryClient, utils.planet.update.mutationOptions())
-    handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['page:0'] })
+    handlers['planet.update'].mockResolvedValueOnce({
+      output: 'updated',
+      revalidatedTags: ['page:0'],
+    })
     await mutation.mutate({ id: 1 })
     expect(queryClient.getQueryState(listOptions.queryKey)?.isInvalidated).toBe(false)
 
-    handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['page:2'] })
+    handlers['planet.update'].mockResolvedValueOnce({
+      output: 'updated',
+      revalidatedTags: ['page:2'],
+    })
     await mutation.mutate({ id: 1 })
     expect(queryClient.getQueryState(listOptions.queryKey)?.isInvalidated).toBe(true)
   })
@@ -379,10 +437,16 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     const planet2Options = utils.planet.find.queryOptions({ input: { id: 2 } })
     const listOptions = createListOptions(utils)
     const streamedKey = utils.planet.find.key({ type: 'streamed' })
-    const otherPrefixKey = createUtils({ prefix: 'other' }).planet.find.queryKey({ input: { id: 1 } })
+    const otherPrefixKey = createUtils({ prefix: 'other' }).planet.find.queryKey({
+      input: { id: 1 },
+    })
 
-    await serverQueryClient.prefetchQuery(serverUtils.planet.find.queryOptions({ input: { id: 1 } }))
-    await serverQueryClient.prefetchQuery(serverUtils.planet.find.queryOptions({ input: { id: 2 } }))
+    await serverQueryClient.prefetchQuery(
+      serverUtils.planet.find.queryOptions({ input: { id: 1 } }),
+    )
+    await serverQueryClient.prefetchQuery(
+      serverUtils.planet.find.queryOptions({ input: { id: 2 } }),
+    )
     await serverQueryClient.prefetchInfiniteQuery(createListOptions(serverUtils))
     serverQueryClient.setQueryData(streamedKey, ['streamed'])
     serverQueryClient.setQueryData(otherPrefixKey, 'other prefix')
@@ -418,13 +482,16 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     const utils = createUtils()
     const queryClient = createQueryClient()
 
-    const observer = new InfiniteQueryObserver(queryClient, utils.planet.list.infiniteOptions({
-      input: cursor => ({ cursor }),
-      initialPageParam: 1,
-      getNextPageParam: (_, __, last) => last + 1,
-      getPreviousPageParam: (_, __, first) => first - 1,
-      maxPages: 2,
-    }))
+    const observer = new InfiniteQueryObserver(
+      queryClient,
+      utils.planet.list.infiniteOptions({
+        input: (cursor) => ({ cursor }),
+        initialPageParam: 1,
+        getNextPageParam: (_, __, last) => last + 1,
+        getPreviousPageParam: (_, __, first) => first - 1,
+        maxPages: 2,
+      }),
+    )
     observer.subscribe(() => {})
     await vi.waitFor(() => expect(observer.getCurrentResult().status).toBe('success'))
     await observer.fetchNextPage()
@@ -432,11 +499,17 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     expect(observer.getCurrentResult().data?.pages).toEqual([['page 0 v0'], ['page 1 v0']])
 
     const mutation = new MutationObserver(queryClient, utils.planet.update.mutationOptions())
-    handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['page:2'] })
+    handlers['planet.update'].mockResolvedValueOnce({
+      output: 'updated',
+      revalidatedTags: ['page:2'],
+    })
     await mutation.mutate({ id: 1 })
     expect(handlers['planet.list']).toHaveBeenCalledTimes(3)
 
-    handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['page:0'] })
+    handlers['planet.update'].mockResolvedValueOnce({
+      output: 'updated',
+      revalidatedTags: ['page:0'],
+    })
     await mutation.mutate({ id: 1 })
     expect(handlers['planet.list']).toHaveBeenCalledTimes(5)
   })
@@ -445,16 +518,25 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     const utils = createUtils()
     const queryClient = createQueryClient()
 
-    const observer = new InfiniteQueryObserver(queryClient, { ...createListOptions(utils), enabled: false })
+    const observer = new InfiniteQueryObserver(queryClient, {
+      ...createListOptions(utils),
+      enabled: false,
+    })
     await observer.fetchNextPage()
     expect(observer.getCurrentResult().data?.pages).toEqual([['page 0 v0']])
 
     const mutation = new MutationObserver(queryClient, utils.planet.update.mutationOptions())
-    handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['unrelated'] })
+    handlers['planet.update'].mockResolvedValueOnce({
+      output: 'updated',
+      revalidatedTags: ['unrelated'],
+    })
     await mutation.mutate({ id: 1 })
     expect(observer.getCurrentResult().isStale).toBe(false)
 
-    handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['page:0'] })
+    handlers['planet.update'].mockResolvedValueOnce({
+      output: 'updated',
+      revalidatedTags: ['page:0'],
+    })
     await mutation.mutate({ id: 1 })
     expect(queryClient.getQueryState(createListOptions(utils).queryKey)?.isInvalidated).toBe(true)
   })
@@ -463,7 +545,10 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     const utils = createUtils()
     const queryClient = createQueryClient()
 
-    const observer = new InfiniteQueryObserver(queryClient, { ...createListOptions(utils), maxPages: 2 })
+    const observer = new InfiniteQueryObserver(queryClient, {
+      ...createListOptions(utils),
+      maxPages: 2,
+    })
     observer.subscribe(() => {})
     await vi.waitFor(() => expect(observer.getCurrentResult().status).toBe('success'))
     await observer.fetchNextPage()
@@ -475,7 +560,10 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     expect(observer.getCurrentResult().data?.pages).toEqual([['page 1 v0'], ['page 2 v0']])
 
     const mutation = new MutationObserver(queryClient, utils.planet.update.mutationOptions())
-    handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['page:1'] })
+    handlers['planet.update'].mockResolvedValueOnce({
+      output: 'updated',
+      revalidatedTags: ['page:1'],
+    })
     await mutation.mutate({ id: 1 })
 
     expect(handlers['planet.list']).toHaveBeenCalledTimes(7)
@@ -483,20 +571,28 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
 
   it('keeps infinite query page tags lined up when a refetch of all pages retries', async () => {
     const utils = createUtils()
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, retryDelay: 0, staleTime: Infinity } } })
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: 1, retryDelay: 0, staleTime: Infinity } },
+    })
 
     const observer = new InfiniteQueryObserver(queryClient, createListOptions(utils))
     observer.subscribe(() => {})
     await vi.waitFor(() => expect(observer.getCurrentResult().status).toBe('success'))
     await observer.fetchNextPage()
 
-    handlers['planet.list'].mockImplementationOnce(async ({ cursor }) => ({ output: [`page ${cursor} v${version}`], tags: [`page:${cursor}`] }))
+    handlers['planet.list'].mockImplementationOnce(async ({ cursor }) => ({
+      output: [`page ${cursor} v${version}`],
+      tags: [`page:${cursor}`],
+    }))
     handlers['planet.list'].mockRejectedValueOnce(new Error('page failed'))
     await observer.refetch()
     expect(handlers['planet.list']).toHaveBeenCalledTimes(5)
 
     const mutation = new MutationObserver(queryClient, utils.planet.update.mutationOptions())
-    handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['unrelated'] })
+    handlers['planet.update'].mockResolvedValueOnce({
+      output: 'updated',
+      revalidatedTags: ['unrelated'],
+    })
     await mutation.mutate({ id: 1 })
 
     expect(handlers['planet.list']).toHaveBeenCalledTimes(5)
@@ -517,7 +613,10 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     expect(observer.getCurrentResult().data?.pages).toEqual([['page 0 v0'], ['page 1 v0']])
 
     const mutation = new MutationObserver(queryClient, utils.planet.update.mutationOptions())
-    handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['page:0'] })
+    handlers['planet.update'].mockResolvedValueOnce({
+      output: 'updated',
+      revalidatedTags: ['page:0'],
+    })
     await mutation.mutate({ id: 1 })
 
     expect(handlers['planet.list']).toHaveBeenCalledTimes(6)
@@ -527,22 +626,31 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     const utils = createUtils()
     const queryClient = createQueryClient()
 
-    const observer = new InfiniteQueryObserver(queryClient, utils.planet.list.infiniteOptions({
-      input: ({ index }: { index: number }) => ({ cursor: index }),
-      initialPageParam: { index: 0 },
-      getNextPageParam: (_, pages) => ({ index: pages.length }),
-    }))
+    const observer = new InfiniteQueryObserver(
+      queryClient,
+      utils.planet.list.infiniteOptions({
+        input: ({ index }: { index: number }) => ({ cursor: index }),
+        initialPageParam: { index: 0 },
+        getNextPageParam: (_, pages) => ({ index: pages.length }),
+      }),
+    )
     observer.subscribe(() => {})
     await vi.waitFor(() => expect(observer.getCurrentResult().status).toBe('success'))
     await observer.fetchNextPage()
 
     // the refetch gets an equal cursor, but structural sharing keeps the earlier one in the data
     const mutation = new MutationObserver(queryClient, utils.planet.update.mutationOptions())
-    handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['page:1'] })
+    handlers['planet.update'].mockResolvedValueOnce({
+      output: 'updated',
+      revalidatedTags: ['page:1'],
+    })
     await mutation.mutate({ id: 1 })
     expect(handlers['planet.list']).toHaveBeenCalledTimes(4)
 
-    handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['unrelated'] })
+    handlers['planet.update'].mockResolvedValueOnce({
+      output: 'updated',
+      revalidatedTags: ['unrelated'],
+    })
     await mutation.mutate({ id: 1 })
     expect(handlers['planet.list']).toHaveBeenCalledTimes(4)
   })
@@ -551,17 +659,23 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     const utils = createUtils()
     const queryClient = createQueryClient()
 
-    const observer = new InfiniteQueryObserver(queryClient, utils.planet.list.infiniteOptions({
-      input: (cursor: Map<string, number>) => ({ cursor: cursor.get('index')! }),
-      initialPageParam: new Map([['index', 0]]),
-      getNextPageParam: (_, pages) => new Map([['index', pages.length]]),
-    }))
+    const observer = new InfiniteQueryObserver(
+      queryClient,
+      utils.planet.list.infiniteOptions({
+        input: (cursor: Map<string, number>) => ({ cursor: cursor.get('index')! }),
+        initialPageParam: new Map([['index', 0]]),
+        getNextPageParam: (_, pages) => new Map([['index', pages.length]]),
+      }),
+    )
     observer.subscribe(() => {})
     await vi.waitFor(() => expect(observer.getCurrentResult().status).toBe('success'))
     await observer.fetchNextPage()
 
     const mutation = new MutationObserver(queryClient, utils.planet.update.mutationOptions())
-    handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['page:0'] })
+    handlers['planet.update'].mockResolvedValueOnce({
+      output: 'updated',
+      revalidatedTags: ['page:0'],
+    })
     await mutation.mutate({ id: 1 })
 
     expect(handlers['planet.list']).toHaveBeenCalledTimes(4)
@@ -571,20 +685,29 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     const utils = createUtils()
     const queryClient = createQueryClient()
 
-    const observer = new InfiniteQueryObserver(queryClient, utils.planet.list.infiniteOptions({
-      input: ({ index }: { index: bigint }) => ({ cursor: Number(index) }),
-      initialPageParam: { index: 0n },
-      getNextPageParam: () => undefined,
-    }))
+    const observer = new InfiniteQueryObserver(
+      queryClient,
+      utils.planet.list.infiniteOptions({
+        input: ({ index }: { index: bigint }) => ({ cursor: Number(index) }),
+        initialPageParam: { index: 0n },
+        getNextPageParam: () => undefined,
+      }),
+    )
     observer.subscribe(() => {})
     await vi.waitFor(() => expect(observer.getCurrentResult().status).toBe('success'))
 
     const mutation = new MutationObserver(queryClient, utils.planet.update.mutationOptions())
-    handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['unrelated'] })
+    handlers['planet.update'].mockResolvedValueOnce({
+      output: 'updated',
+      revalidatedTags: ['unrelated'],
+    })
     await mutation.mutate({ id: 1 })
     expect(handlers['planet.list']).toHaveBeenCalledTimes(1)
 
-    handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['page:0'] })
+    handlers['planet.update'].mockResolvedValueOnce({
+      output: 'updated',
+      revalidatedTags: ['page:0'],
+    })
     await mutation.mutate({ id: 1 })
     expect(handlers['planet.list']).toHaveBeenCalledTimes(2)
   })
@@ -594,7 +717,10 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     const queryClient = createQueryClient()
 
     handlers['planet.find'].mockRejectedValueOnce(new Error('not found'))
-    const planet1 = new QueryObserver(queryClient, utils.planet.find.queryOptions({ input: { id: 1 } }))
+    const planet1 = new QueryObserver(
+      queryClient,
+      utils.planet.find.queryOptions({ input: { id: 1 } }),
+    )
     planet1.subscribe(() => {})
     await vi.waitFor(() => expect(planet1.getCurrentResult().status).toBe('error'))
 
@@ -613,7 +739,10 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     await queryClient.resetQueries({ queryKey: listOptions.queryKey })
 
     const mutation = new MutationObserver(queryClient, utils.planet.update.mutationOptions())
-    handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['page:0'] })
+    handlers['planet.update'].mockResolvedValueOnce({
+      output: 'updated',
+      revalidatedTags: ['page:0'],
+    })
     await mutation.mutate({ id: 1 })
 
     expect(queryClient.getQueryState(listOptions.queryKey)?.isInvalidated).toBe(false)
@@ -631,7 +760,10 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
 
     const list = new InfiniteQueryObserver(queryClient, listOptions)
     list.subscribe(() => {})
-    handlers['planet.list'].mockImplementationOnce(async ({ cursor }) => ({ output: [`page ${cursor} v${version}`], tags: [`page:${cursor}`] }))
+    handlers['planet.list'].mockImplementationOnce(async ({ cursor }) => ({
+      output: [`page ${cursor} v${version}`],
+      tags: [`page:${cursor}`],
+    }))
     handlers['planet.list'].mockRejectedValueOnce(new Error('page failed'))
     await list.refetch()
     expect(list.getCurrentResult().data?.pages).toEqual([['page 0 v0'], ['page 1 v0']])
@@ -650,10 +782,16 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     const utils = createUtils()
     const queryClient = createQueryClient()
 
-    const planet1 = await observe(queryClient, createUtils({ linkPlugin: false }).planet.find.queryOptions({ input: { id: 1 } }))
+    const planet1 = await observe(
+      queryClient,
+      createUtils({ linkPlugin: false }).planet.find.queryOptions({ input: { id: 1 } }),
+    )
 
     const mutation = new MutationObserver(queryClient, utils.planet.update.mutationOptions())
-    handlers['planet.update'].mockResolvedValueOnce({ output: 'updated', revalidatedTags: ['unrelated'] })
+    handlers['planet.update'].mockResolvedValueOnce({
+      output: 'updated',
+      revalidatedTags: ['unrelated'],
+    })
     await mutation.mutate({ id: 1 })
 
     expect(planet1.getCurrentResult().data).toBe('planet 1 v0')
@@ -666,10 +804,19 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     const fnContext = { client: queryClient, signal: new AbortController().signal, meta: undefined }
 
     const query = utils.planet.find.queryOptions({ input: { id: 1 } })
-    await expect(query.queryFn({ ...fnContext, queryKey: query.queryKey })).resolves.toBe('planet 1 v0')
+    await expect(query.queryFn({ ...fnContext, queryKey: query.queryKey })).resolves.toBe(
+      'planet 1 v0',
+    )
 
     const infinite = createListOptions(utils)
-    await expect(infinite.queryFn({ ...fnContext, queryKey: infinite.queryKey, pageParam: 0, direction: 'forward' })).resolves.toEqual(['page 0 v0'])
+    await expect(
+      infinite.queryFn({
+        ...fnContext,
+        queryKey: infinite.queryKey,
+        pageParam: 0,
+        direction: 'forward',
+      }),
+    ).resolves.toEqual(['page 0 v0'])
 
     expect(queryClient.getQueryCache().getAll()).toEqual([])
   })
@@ -679,8 +826,14 @@ describe('experimental_CacheRevalidationUtilsPlugin', () => {
     const queryClient1 = createQueryClient()
     const queryClient2 = createQueryClient()
 
-    const planet1 = await observe(queryClient1, utils.planet.find.queryOptions({ input: { id: 1 } }))
-    const planet2 = await observe(queryClient2, utils.planet.find.queryOptions({ input: { id: 1 } }))
+    const planet1 = await observe(
+      queryClient1,
+      utils.planet.find.queryOptions({ input: { id: 1 } }),
+    )
+    const planet2 = await observe(
+      queryClient2,
+      utils.planet.find.queryOptions({ input: { id: 1 } }),
+    )
 
     const mutation = new MutationObserver(queryClient1, utils.planet.update.mutationOptions())
     await mutation.mutate({ id: 1 })
