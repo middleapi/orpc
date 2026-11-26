@@ -389,7 +389,7 @@ export default [
     "name": "Igor Makowski",
     "login": "Mnigos",
     "avatar": "https://avatars.githubusercontent.com/u/56691628?u=ee8c879478f7c151b9156aef6c74243fa3e247a8&v=4",
-    "link": "https://rigtch.fm/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "link": "https://mnigos.io/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
     "tierLevel": 1,
