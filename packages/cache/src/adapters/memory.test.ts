@@ -302,6 +302,7 @@ describe('memoryCacheStore', () => {
     expect([...entries.keys()]).toEqual(['tagged', 'kept', 'before', 'at'])
 
     await store.revalidate({ tags: ['t'] })
+    vi.setSystemTime(11_000)
     await store.getOrSet('after', async () => 'v')
     expect([...entries.keys()]).toEqual(['kept', 'before', 'at', 'after'])
   })

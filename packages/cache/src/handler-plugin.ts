@@ -4,7 +4,7 @@ import type {
   StandardHandlerOptions,
   StandardHandlerPlugin,
 } from '@orpc/server/standard'
-import { encodeCacheTagHeader, toArray } from '@orpc/shared'
+import { encodeCacheTagHeader, isDeepEqual, toArray } from '@orpc/shared'
 import type { StandardHeaders } from '@standard-server/core'
 
 import type { CacheLinkPluginContext } from './link-plugin'
@@ -198,9 +198,7 @@ async function nextWithRootCacheActivity<TResult>({
 
   const { procedure, path } = options
   const isRoot = (check: CacheHandlerPluginRevalidation | CacheHandlerPluginLookup) =>
-    check.procedure === procedure &&
-    check.path.length === path.length &&
-    check.path.every((segment, index) => segment === path[index])
+    check.procedure === procedure && isDeepEqual(check.path, path)
 
   return {
     result,

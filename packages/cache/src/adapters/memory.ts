@@ -1,5 +1,5 @@
 import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions } from '../types'
-import { createCacheEntry } from '../utils'
+import { createCacheEntry, isCacheEntryEvicted } from '../utils'
 import type { BaseKeyValueCacheStoreOptions } from './base-key-value'
 import { BaseKeyValueCacheStore } from './base-key-value'
 
@@ -14,9 +14,9 @@ interface MemoryCacheStoreEntry {
 }
 
 /**
- * Each sweep scans every entry, so they run at most this often, in milliseconds.
+ * How often a write may sweep the store, in milliseconds. A sweep scans every entry.
  */
-const MIN_SWEEP_INTERVAL = 1000
+const SWEEP_INTERVAL = 1000
 
 /**
  * In-memory cache store with tag-based invalidation, intended for
@@ -29,15 +29,12 @@ const MIN_SWEEP_INTERVAL = 1000
 export class MemoryCacheStore extends BaseKeyValueCacheStore {
   private readonly entries = new Map<string, MemoryCacheStoreEntry>()
   private readonly tagVersions = new Map<string, number>()
-  private nextSweepAt = Infinity
   private lastSweepAt = -Infinity
 
   async revalidate({ tags }: CacheRevalidateOptions): Promise<void> {
     for (const tag of tags) {
       this.tagVersions.set(tag, (this.tagVersions.get(tag) ?? 0) + 1)
     }
-
-    this.nextSweepAt = 0
   }
 
   protected read(encodedKey: string): CacheEntry | undefined {
@@ -47,7 +44,7 @@ export class MemoryCacheStore extends BaseKeyValueCacheStore {
       return undefined
     }
 
-    if (this.shouldEvict(stored, Date.now())) {
+    if (this.shouldEvict(stored)) {
       this.entries.delete(encodedKey)
       return undefined
     }
@@ -65,25 +62,15 @@ export class MemoryCacheStore extends BaseKeyValueCacheStore {
 
     this.sweep()
     this.entries.set(encodedKey, { entry, tagVersions })
-    this.scheduleSweep(entry)
 
     return entry
   }
 
-  private shouldEvict({ entry, tagVersions }: MemoryCacheStoreEntry, now: number): boolean {
+  private shouldEvict({ entry, tagVersions }: MemoryCacheStoreEntry): boolean {
     return (
-      (entry.evictAt !== undefined && now >= entry.evictAt) ||
+      isCacheEntryEvicted(entry) ||
       !!entry.tags?.some((tag, index) => (this.tagVersions.get(tag) ?? 0) !== tagVersions[index])
     )
-  }
-
-  private scheduleSweep({ evictAt }: CacheEntry): void {
-    if (evictAt !== undefined) {
-      this.nextSweepAt = Math.min(
-        this.nextSweepAt,
-        Math.max(evictAt, this.lastSweepAt + MIN_SWEEP_INTERVAL),
-      )
-    }
   }
 
   /**
@@ -92,18 +79,15 @@ export class MemoryCacheStore extends BaseKeyValueCacheStore {
   private sweep(): void {
     const now = Date.now()
 
-    if (now < this.nextSweepAt) {
+    if (now - this.lastSweepAt < SWEEP_INTERVAL) {
       return
     }
 
-    this.nextSweepAt = Infinity
     this.lastSweepAt = now
 
     for (const [encodedKey, stored] of this.entries) {
-      if (this.shouldEvict(stored, now)) {
+      if (this.shouldEvict(stored)) {
         this.entries.delete(encodedKey)
-      } else {
-        this.scheduleSweep(stored.entry)
       }
     }
   }

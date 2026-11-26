@@ -47,7 +47,7 @@ describe('cacheableCacheStore', () => {
     const store = new CacheableCacheStore(cacheable)
     await store.getOrSet('k', async () => 'v')
 
-    vi.spyOn(cacheable, 'get').mockResolvedValueOnce({
+    vi.spyOn(cacheable, 'get').mockResolvedValue({
       output: { json: 'v' },
       expiresAt: 1,
       evictAt: 1,

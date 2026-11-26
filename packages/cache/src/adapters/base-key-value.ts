@@ -64,40 +64,34 @@ export abstract class BaseKeyValueCacheStore implements CacheStore {
     compute: () => Promise<unknown>,
     options: CacheGetOrSetOptions = {},
   ): Promise<CacheEntry> {
-    const encodedKey = encodeCacheKey(key, this.serializer)
-    const entry = live(await this.read(encodedKey, options))
-
-    if (entry !== undefined && !isCacheEntryStale(entry)) {
-      return entry
-    }
-
     const { retention } = resolveCacheExpiry(options)
 
-    // A lifetime that leaves nothing to keep stores nothing: backends reject such writes.
+    // Backends reject writes that keep nothing, so such a lifetime skips the store.
     if (retention !== undefined && retention <= 0) {
-      return entry ?? createCacheEntry(await compute(), options).entry
+      return createCacheEntry(await compute(), options).entry
     }
+
+    const encodedKey = encodeCacheKey(key, this.serializer)
+    const fill = () => this.fill(encodedKey, compute, options)
+    const read = async () => {
+      const entry = await this.read(encodedKey, options)
+
+      return entry === undefined || isCacheEntryEvicted(entry) ? undefined : entry
+    }
+
+    const entry = await read()
 
     if (entry === undefined) {
-      return this.lock(
-        encodedKey,
-        async (waited) =>
-          (waited ? live(await this.read(encodedKey, options)) : undefined) ??
-          this.fill(encodedKey, compute, options),
-        () => this.fill(encodedKey, compute, options),
-      )
+      // Read again under the lock: another caller may have filled the key meanwhile.
+      return this.lock(encodedKey, async () => (await read()) ?? fill(), fill)
     }
 
-    const refresh = this.lock(
-      encodedKey,
-      async () => {
-        await this.fill(encodedKey, compute, options)
-      },
-      () => undefined,
-      { timeout: 0 },
-    )
+    if (isCacheEntryStale(entry)) {
+      // A held lock means a refresh is already running, so this one is skipped.
+      const refresh = this.lock(encodedKey, fill, () => undefined, { timeout: 0 })
 
-    options.waitUntil?.(refresh)
+      options.waitUntil?.(refresh)
+    }
 
     return entry
   }
@@ -150,14 +144,17 @@ export abstract class BaseKeyValueCacheStore implements CacheStore {
     return { envelope: { ...entry, output: { json, meta } }, entry, retention }
   }
 
-  private async lock<T>(
+  /**
+   * Runs `fn` under the key's lock, or `onTimeout` when the lock is not acquired in time.
+   */
+  private async lock<T, U>(
     encodedKey: string,
-    fn: (waited: boolean) => Promise<T>,
-    onTimeout: () => Promisable<T>,
+    fn: () => Promise<T>,
+    onTimeout: () => Promisable<U>,
     options?: LockOptions,
-  ): Promise<T> {
+  ): Promise<T | U> {
     try {
-      return await this.locker.lock(encodedKey, ({ waited }) => fn(waited), options)
+      return await this.locker.lock(encodedKey, fn, options)
     } catch (error) {
       if (error instanceof LockTimeoutError) {
         return onTimeout()
@@ -166,8 +163,4 @@ export abstract class BaseKeyValueCacheStore implements CacheStore {
       throw error
     }
   }
-}
-
-function live(entry: CacheEntry | undefined): CacheEntry | undefined {
-  return entry === undefined || isCacheEntryEvicted(entry) ? undefined : entry
 }

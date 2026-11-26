@@ -203,11 +203,16 @@ export class experimental_CacheRevalidationUtilsPlugin<
           const pages = (query.state.data as InfiniteData<unknown> | undefined)?.pages ?? []
           const known = getCacheTagsState(query)?.orpcCachePageTags
           const current = known?.length === pages.length ? known : pages.map(() => null)
-          const limit = maxPages || Infinity
-          const pageTags =
-            fetchMore.direction === 'forward'
-              ? [...current, tags].slice(-limit)
-              : [tags, ...current].slice(0, limit)
+          const forward = fetchMore.direction === 'forward'
+          const pageTags = forward ? [...current, tags] : [tags, ...current]
+
+          if (maxPages && pageTags.length > maxPages) {
+            if (forward) {
+              pageTags.shift()
+            } else {
+              pageTags.pop()
+            }
+          }
 
           setCacheTagsState(query, { orpcCachePageTags: pageTags })
 

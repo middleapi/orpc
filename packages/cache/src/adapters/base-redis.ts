@@ -1,4 +1,4 @@
-import { parseEmptyableJSON, stringifyJSON } from '@orpc/shared'
+import { isDeepEqual, parseEmptyableJSON, stringifyJSON } from '@orpc/shared'
 
 import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions } from '../types'
 import type { BaseKeyValueCacheStoreOptions, CacheEnvelope } from './base-key-value'
@@ -94,11 +94,9 @@ export abstract class BaseRedisCacheStore extends BaseKeyValueCacheStore {
 
     if (envelope.tags?.length) {
       const { tags } = envelope
-      const versions =
-        tags.length === expectedTags.length &&
-        tags.every((tag, index) => tag === expectedTags[index])
-          ? expectedVersions
-          : await this.versions(tags)
+      const versions = isDeepEqual(tags, expectedTags)
+        ? expectedVersions
+        : await this.versions(tags)
 
       const stored = envelope.tagVersions ?? []
 
