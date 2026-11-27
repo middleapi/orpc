@@ -6,6 +6,7 @@ import {
   isPlainObjectOrArray,
   NullProtoObj,
   parseBigIntString,
+  setOwn,
 } from '@orpc/shared'
 
 export type RPCJsonSerializationMeta = [type: string, ...path: Segment[]]
@@ -51,14 +52,33 @@ function assertSerializedType(ok: boolean, type: string, expected: string): void
   }
 }
 
-function walkInto(parent: any, key: Segment, original: unknown, restored?: Set<unknown>): any {
+function walkInto(
+  parent: any,
+  key: Segment,
+  original: unknown,
+  copies: Map<unknown, unknown>,
+  restored?: Set<unknown>,
+): any {
   const value = parent[key]
 
   if (!isPlainObjectOrArray(value) || restored?.has(value)) {
     throw invalidSerializedData(`segment "${key}" cannot be walked into.`)
   }
 
-  return value === original ? copyOnWrite(parent, key, original) : value
+  if (value !== original) {
+    return value
+  }
+
+  let copy = copies.get(original)
+
+  if (copy === undefined) {
+    copy = copyOnWrite(parent, key, original)
+    copies.set(original, copy)
+  } else {
+    setOwn(parent, key, copy)
+  }
+
+  return copy
 }
 
 const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHandler> = {
@@ -466,6 +486,7 @@ export class RPCJsonSerializer {
 
   deserializeJson(serialized: RPCJsonSerialization): unknown {
     const ref = { json: serialized.json }
+    const copies = new Map<unknown, unknown>()
 
     if (serialized.blobs?.length) {
       for (let i = 0; i < serialized.maps.length; i++) {
@@ -483,7 +504,7 @@ export class RPCJsonSerializer {
 
         for (let j = 0; j < segments.length; j++) {
           original = original[preSegment]
-          currentRef = walkInto(currentRef, preSegment, original)
+          currentRef = walkInto(currentRef, preSegment, original, copies)
           preSegment = segments[j]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
@@ -539,7 +560,7 @@ export class RPCJsonSerializer {
 
         while (d < depth) {
           original = original[preSegment]
-          currentRef = walkInto(currentRef, preSegment, original, restored)
+          currentRef = walkInto(currentRef, preSegment, original, copies, restored)
 
           if (chain !== undefined) {
             chain[3 * d] = preSegment

@@ -580,6 +580,37 @@ describe('rpcJsonSerializer: deserialize', () => {
     })
     expect(JSON.stringify(payload)).toBe(snapshot)
   })
+
+  it('copies a container shared by many slots only once', () => {
+    const size = 100
+    const shared = Array.from({ length: size }, () => '1')
+    const sharedFiles = Array.from({ length: size }, () => null)
+    const blobs = Array.from({ length: size }, () => new Blob(['x']))
+
+    const payload: RPCJsonSerialization = {
+      json: [
+        Array.from({ length: size }, () => shared),
+        Array.from({ length: size }, () => sharedFiles),
+      ],
+      meta: Array.from(
+        { length: size },
+        (_, i) => ['bigint', 0, i, i] as ['bigint', number, number, number],
+      ),
+      maps: Array.from({ length: size }, (_, i) => [1, i, i]),
+      blobs,
+    }
+
+    const result = serializer.deserializeJson(payload) as [unknown[][], unknown[][]]
+
+    expect(new Set(result[0]).size).toBe(1)
+    expect(result[0][0]).toEqual(Array.from({ length: size }, () => 1n))
+    expect(new Set(result[1]).size).toBe(1)
+    expect(result[1][0]).toEqual(blobs)
+
+    expect(shared).toEqual(Array.from({ length: size }, () => '1'))
+    expect(sharedFiles).toEqual(Array.from({ length: size }, () => null))
+    expect((payload.json as unknown[][])[0]!.every((v) => v === shared)).toBe(true)
+  })
 })
 
 describe('rpcJsonSerializer: security', () => {
