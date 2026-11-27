@@ -38,6 +38,18 @@ export default [
     "type": "User"
   },
   {
+    "name": "plancraft",
+    "login": "plancraft",
+    "avatar": "https://avatars.githubusercontent.com/u/46482287?v=4",
+    "link": "https://plancraft.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "rel": "sponsored",
+    "tierTitle": "Organization Sponsor",
+    "tierLevel": 3,
+    "amount": 150,
+    "createdAt": "2026-05-18T11:16:16Z",
+    "type": "Organization"
+  },
+  {
     "name": "LN Markets",
     "login": "ln-markets",
     "avatar": "https://avatars.githubusercontent.com/u/70597625?v=4",
@@ -924,18 +936,6 @@ export default [
     "amount": -1,
     "createdAt": "2026-05-15T07:51:35Z",
     "type": "User"
-  },
-  {
-    "name": "plancraft",
-    "login": "plancraft",
-    "avatar": "https://avatars.githubusercontent.com/u/46482287?v=4",
-    "link": "https://plancraft.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
-    "rel": "sponsored",
-    "tierTitle": "Past Sponsor",
-    "tierLevel": 0,
-    "amount": -1,
-    "createdAt": "2026-05-18T11:16:16Z",
-    "type": "Organization"
   },
   {
     "name": "Nicholas",

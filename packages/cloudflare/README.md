@@ -133,6 +133,7 @@ Like what we build over at [middleapi](https://github.com/middleapi)? You can he
 
 <table>
   <tr>
+   <td align="center"><a href="https://plancraft.com/?ref=middleapi&amp;utm_source=middleapi&amp;utm_medium=sponsor" target="_blank" rel="noopener sponsored" title="plancraft"><img src="https://avatars.githubusercontent.com/u/46482287?v=4" width="209" alt="plancraft"/><br />plancraft</a></td>
    <td align="center"><a href="https://lnmarkets.com/?ref=middleapi&amp;utm_source=middleapi&amp;utm_medium=sponsor" target="_blank" rel="noopener sponsored" title="LN Markets"><img src="https://avatars.githubusercontent.com/u/70597625?v=4" width="209" alt="LN Markets"/><br />LN Markets</a></td>
    <td align="center"><a href="https://ibrahimsaberi.com/?ref=middleapi&amp;utm_source=middleapi&amp;utm_medium=sponsor" target="_blank" rel="noopener sponsored" title="Ibrahim Saberi"><img src="https://avatars.githubusercontent.com/u/2670350?u=31c4db8dcf5d605c612676475543a228884fc74b&amp;v=4" width="209" alt="Ibrahim Saberi"/><br />Ibrahim Saberi</a></td>
   </tr>
@@ -200,7 +201,7 @@ Like what we build over at [middleapi](https://github.com/middleapi)? You can he
   </tr>
 </table>
 
-With thanks to [42 past sponsors](https://orpc.dev/sponsors#past-sponsors) who helped get oRPC here.
+With thanks to [41 past sponsors](https://orpc.dev/sponsors#past-sponsors) who helped get oRPC here.
 
 ## Open Source Programs
 
