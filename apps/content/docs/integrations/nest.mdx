@@ -275,10 +275,6 @@ export class AppModule {}
 
 </CodeGroup>
 
-`ORPCModule.forRootAsync` resolves `inject` within its own dynamic module scope, so the factory only sees providers exported by the modules listed in its `imports` (or global modules).
-
-Controller methods decorated with `@Implement` run on the controller instance, so handlers can access NestJS providers directly through constructor injection (`this`). [oRPC middleware](/docs/middleware) runs outside the controller and only sees `context`, so pass any NestJS provider a middleware needs through the initial `context` factory above.
-
 ### Plugins
 
 Most handler plugins also work in NestJS, for example [Request Headers](/docs/plugins/request-headers), [Response Headers](/docs/plugins/response-headers), [Rethrow](/docs/plugins/rethrow), and [Smart Coercion](/docs/plugins/smart-coercion).
