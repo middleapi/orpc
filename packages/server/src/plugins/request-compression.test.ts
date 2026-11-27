@@ -144,6 +144,27 @@ describe('requestCompressionHandlerPlugin', () => {
     expect(procedureHandler).not.toHaveBeenCalled()
   })
 
+  it('should leave the body unread for a none hint', async () => {
+    const request = new Request('http://localhost', {
+      method: 'POST',
+      headers: { 'content-encoding': 'gzip' },
+      body: compress('input', 'gzip'),
+    })
+    const handler = new RPCHandler(procedure, {
+      plugins: [new RequestCompressionHandlerPlugin()],
+      routingInterceptors: [
+        async ({ request }) => {
+          expect(await request.resolveBody('none')).toBeUndefined()
+          return { matched: false }
+        },
+      ],
+    })
+
+    await handler.handle(request)
+
+    expect(request.body!.locked).toBe(false)
+  })
+
   it('should not decompress when any content-encoding in the list is unsupported', async () => {
     const payload = JSON.stringify({ json: 'input' })
     const body = compress(payload, 'gzip')

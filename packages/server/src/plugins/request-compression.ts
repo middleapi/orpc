@@ -58,6 +58,10 @@ export class RequestCompressionHandlerPlugin<
           ...interceptorOptions.request,
           headers: decompressedHeaders,
           async resolveBody(hint) {
+            if (hint === 'none') {
+              return interceptorOptions.request.resolveBody(hint)
+            }
+
             const stream = await interceptorOptions.request.resolveBody('octet-stream')
 
             // adapter might not support hint (e.g peer adapter)
