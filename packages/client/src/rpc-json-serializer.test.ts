@@ -979,6 +979,21 @@ describe('rpcJsonSerializer: meta cannot descend into restored values', () => {
     ).toThrow('Invalid RPC serialized data: segment "l" cannot be walked into.')
   })
 
+  it('rejects descent into a restored value through another reference to the same object', () => {
+    const shared = { name: '1', id: '2' }
+
+    expect(() =>
+      serializer.deserializeJson({
+        json: [shared, shared],
+        meta: [
+          ['bigint', 0, 'id'],
+          ['identity', 0],
+          ['bigint', 1, 'id'],
+        ],
+      }),
+    ).toThrow('Invalid RPC serialized data: segment "1" cannot be walked into.')
+  })
+
   it('rejects descent into a non-JSON value the handler returned as is', () => {
     // structured clone transports (e.g. MessagePort with experimental_transfer) can deliver non-JSON values
     const bytes = new Uint8Array([1])

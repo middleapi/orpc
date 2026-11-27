@@ -74,10 +74,14 @@ function walkInto(
   if (copy === undefined) {
     copy = copyOnWrite(parent, key, original)
     copies.set(original, copy)
-  } else {
-    setOwn(parent, key, copy)
+    return copy
   }
 
+  if (restored?.has(copy)) {
+    throw invalidSerializedData(`segment "${key}" cannot be walked into.`)
+  }
+
+  setOwn(parent, key, copy)
   return copy
 }
 
