@@ -6,7 +6,6 @@ import {
   isPlainObjectOrArray,
   NullProtoObj,
   parseBigIntString,
-  setOwn,
 } from '@orpc/shared'
 
 export type RPCJsonSerializationMeta = [type: string, ...path: Segment[]]
@@ -56,7 +55,7 @@ function walkInto(
   parent: any,
   key: Segment,
   original: unknown,
-  copies: Map<unknown, unknown>,
+  copied: Set<unknown>,
   restored?: Set<unknown>,
 ): any {
   const value = parent[key]
@@ -69,20 +68,12 @@ function walkInto(
     return value
   }
 
-  let copy = copies.get(original)
-
-  if (copy === undefined) {
-    copy = copyOnWrite(parent, key, original)
-    copies.set(original, copy)
-    return copy
-  }
-
-  if (restored?.has(copy)) {
+  if (copied.has(original)) {
     throw invalidSerializedData(`segment "${key}" cannot be walked into.`)
   }
 
-  setOwn(parent, key, copy)
-  return copy
+  copied.add(original)
+  return copyOnWrite(parent, key, original)
 }
 
 const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHandler> = {
@@ -490,7 +481,7 @@ export class RPCJsonSerializer {
 
   deserializeJson(serialized: RPCJsonSerialization): unknown {
     const ref = { json: serialized.json }
-    const copies = new Map<unknown, unknown>()
+    const copied = new Set<unknown>()
 
     if (serialized.blobs?.length) {
       for (let i = 0; i < serialized.maps.length; i++) {
@@ -508,7 +499,7 @@ export class RPCJsonSerializer {
 
         for (let j = 0; j < segments.length; j++) {
           original = original[preSegment]
-          currentRef = walkInto(currentRef, preSegment, original, copies)
+          currentRef = walkInto(currentRef, preSegment, original, copied)
           preSegment = segments[j]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
@@ -564,7 +555,7 @@ export class RPCJsonSerializer {
 
         while (d < depth) {
           original = original[preSegment]
-          currentRef = walkInto(currentRef, preSegment, original, copies, restored)
+          currentRef = walkInto(currentRef, preSegment, original, copied, restored)
 
           if (chain !== undefined) {
             chain[3 * d] = preSegment

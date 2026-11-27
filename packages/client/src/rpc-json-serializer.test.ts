@@ -581,35 +581,52 @@ describe('rpcJsonSerializer: deserialize', () => {
     expect(JSON.stringify(payload)).toBe(snapshot)
   })
 
-  it('copies a container shared by many slots only once', () => {
-    const size = 100
-    const shared = Array.from({ length: size }, () => '1')
-    const sharedFiles = Array.from({ length: size }, () => null)
-    const blobs = Array.from({ length: size }, () => new Blob(['x']))
+  it('rejects walking into a container shared by several slots', () => {
+    const shared = { x: '1', y: '2', f: null }
 
-    const payload: RPCJsonSerialization = {
-      json: [
-        Array.from({ length: size }, () => shared),
-        Array.from({ length: size }, () => sharedFiles),
-      ],
-      meta: Array.from(
-        { length: size },
-        (_, i) => ['bigint', 0, i, i] as ['bigint', number, number, number],
-      ),
-      maps: Array.from({ length: size }, (_, i) => [1, i, i]),
-      blobs,
-    }
+    expect(() =>
+      serializer.deserializeJson({
+        json: [shared, shared],
+        meta: [
+          ['bigint', 0, 'x'],
+          ['bigint', 1, 'y'],
+        ],
+      }),
+    ).toThrow('Invalid RPC serialized data: segment "1" cannot be walked into.')
 
-    const result = serializer.deserializeJson(payload) as [unknown[][], unknown[][]]
+    expect(() =>
+      serializer.deserializeJson({
+        json: [shared, shared],
+        maps: [
+          [0, 'f'],
+          [1, 'f'],
+        ],
+        blobs: [new Blob(['a']), new Blob(['b'])],
+      }),
+    ).toThrow('Invalid RPC serialized data: segment "1" cannot be walked into.')
 
-    expect(new Set(result[0]).size).toBe(1)
-    expect(result[0][0]).toEqual(Array.from({ length: size }, () => 1n))
-    expect(new Set(result[1]).size).toBe(1)
-    expect(result[1][0]).toEqual(blobs)
+    expect(shared).toEqual({ x: '1', y: '2', f: null })
+  })
 
-    expect(shared).toEqual(Array.from({ length: size }, () => '1'))
-    expect(sharedFiles).toEqual(Array.from({ length: size }, () => null))
-    expect((payload.json as unknown[][])[0]!.every((v) => v === shared)).toBe(true)
+  it('rejects walking into a cycle', () => {
+    const cyclic: any = { id: '1' }
+    cyclic.self = cyclic
+
+    expect(() =>
+      serializer.deserializeJson({ json: cyclic, meta: [['bigint', 'self', 'id']] }),
+    ).toThrow('Invalid RPC serialized data: segment "self" cannot be walked into.')
+  })
+
+  it('still restores through one slot of a shared container', () => {
+    const shared = { x: '1' }
+
+    const result = serializer.deserializeJson({
+      json: [shared, shared],
+      meta: [['bigint', 0, 'x']],
+    }) as any[]
+
+    expect(result).toEqual([{ x: 1n }, { x: '1' }])
+    expect(shared).toEqual({ x: '1' })
   })
 })
 
@@ -977,21 +994,6 @@ describe('rpcJsonSerializer: meta cannot descend into restored values', () => {
         ],
       }),
     ).toThrow('Invalid RPC serialized data: segment "l" cannot be walked into.')
-  })
-
-  it('rejects descent into a restored value through another reference to the same object', () => {
-    const shared = { name: '1', id: '2' }
-
-    expect(() =>
-      serializer.deserializeJson({
-        json: [shared, shared],
-        meta: [
-          ['bigint', 0, 'id'],
-          ['identity', 0],
-          ['bigint', 1, 'id'],
-        ],
-      }),
-    ).toThrow('Invalid RPC serialized data: segment "1" cannot be walked into.')
   })
 
   it('rejects descent into a non-JSON value the handler returned as is', () => {
