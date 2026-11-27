@@ -4,11 +4,13 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { gzipSync } from 'node:zlib'
 
 import { RPCSerializer } from '@orpc/client'
 import type { Context } from '@orpc/server'
 import { ORPCError, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/node'
+import { RequestCompressionHandlerPlugin } from '@orpc/server/plugins'
 import type { StandardBodyHint, StandardLazyRequest } from '@standard-server/core'
 import { generateContentDisposition } from '@standard-server/core'
 import request from 'supertest'
@@ -599,7 +601,10 @@ describe('tmpFileUploadHandlerPlugin', () => {
         method: 'POST',
         url: '/upload',
         headers: {},
-        resolveBody: async () => resolved as never,
+        resolveBody: async (hint) => {
+          expect(hint).toBe('none')
+          return resolved as never
+        },
       },
       next: async (nextOptions) => {
         // A bodiless request resolves to the none hint and stays with the adapter
@@ -1194,6 +1199,30 @@ describe('tmpFileUploadHandlerPlugin', () => {
         }),
       ).rejects.toSatisfy(expectPayloadTooLarge)
 
+      expect(readdirSync(tmpDir)).toHaveLength(0)
+    })
+
+    it('leaves compressed bodies it resolves as none unread', async () => {
+      const procedure = vi.fn()
+      const handler = new RPCHandler(os.handler(procedure), {
+        plugins: [
+          new TmpFileUploadHandlerPlugin({
+            tmpDir,
+            maxBodySize: { memory: 1024, file: 1024, stream: 1024 },
+          }),
+          new RequestCompressionHandlerPlugin(),
+        ],
+      })
+
+      const res = await request((req: IncomingMessage, res: ServerResponse) => {
+        void handler.handle(req, res)
+      })
+        .post('/')
+        .set('content-encoding', 'gzip')
+        .send(gzipSync(Buffer.alloc(64 * 1024, 'a')))
+
+      expect(res.status).toBe(200)
+      expect(procedure.mock.calls[0]![0].input).toBeUndefined()
       expect(readdirSync(tmpDir)).toHaveLength(0)
     })
 
