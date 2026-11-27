@@ -262,7 +262,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
 
     // A body-less request has nothing to limit or spool
     if (resolvedHint === 'none') {
-      return request.resolveBody(hint)
+      return request.resolveBody('none')
     }
 
     const maxBodySize = await value(this.maxBodySize, interceptorOptions)
