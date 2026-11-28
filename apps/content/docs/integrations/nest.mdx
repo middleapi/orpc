@@ -46,6 +46,10 @@ const contract = populateRouterContractOpenAPIPaths({
 })
 ```
 
+:::info
+NestJS matches paths with its platform's router. A param with literal text around it works when the text after it starts with a character like `.` or `-`, as in `/files/{name}.json`, but not `/apps/{id}:publish` or `/files/{name}json`, and how `/{name}-{version}.zip` splits depends on the platform.
+:::
+
 ## Implement Your Contract
 
 To implement your contract in NestJS, use the `@Implement` decorator and the `implement` function. The `@Implement` very similar to NestJS built-in HTTP method decorators (e.g., `@Get`, `@Post`) and can be used to implement either a single procedure contract or an [router contract](/docs/contract/router) or combine with other NestJS decorators.
