@@ -34,6 +34,13 @@ describe.each([
   const router = {
     ping: os.input(z.any()).handler((_, input) => input),
     lastEventId: os.input(z.any()).handler(({ lastEventId }) => lastEventId),
+    collect: os.input(z.any()).handler(async (_, input: AsyncIterable<unknown>) => {
+      const values: unknown[] = []
+      for await (const value of input) {
+        values.push(value)
+      }
+      return values
+    }),
   }
   const client = createClientServer(router)
 
@@ -147,5 +154,15 @@ describe.each([
 
     completion.resolve()
     await expect(result.next()).resolves.toEqual({ value: new Date('2024-01-01'), done: true })
+  })
+
+  it('delivers every value of an input AsyncIteratorObject sent in a burst', async () => {
+    const values = Array.from({ length: 30 }, (_, i) => i)
+
+    const stream = (async function* () {
+      yield* values
+    })()
+
+    await expect(client.collect(stream)).resolves.toEqual(values)
   })
 })
