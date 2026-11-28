@@ -9,7 +9,7 @@ import type {
   StandardLinkTransportInterceptor,
   StandardLinkTransportInterceptorOptions,
 } from '../adapters/standard/index'
-import { COMMON_ERROR_STATUS_MAP } from '../error'
+import { COMMON_ERROR_STATUSES } from '../error'
 import type { ClientContext } from '../types'
 
 export interface RetryAfterLinkPluginOptions<T extends ClientContext> {
@@ -71,8 +71,8 @@ export class RetryAfterLinkPlugin<T extends ClientContext> implements StandardLi
     this.shouldRetry =
       options.shouldRetry ??
       ((response) =>
-        response.status === COMMON_ERROR_STATUS_MAP.TOO_MANY_REQUESTS ||
-        response.status === COMMON_ERROR_STATUS_MAP.SERVICE_UNAVAILABLE)
+        response.status === COMMON_ERROR_STATUSES.TOO_MANY_REQUESTS ||
+        response.status === COMMON_ERROR_STATUSES.SERVICE_UNAVAILABLE)
 
     this.maxAttempts = options.maxAttempts ?? 3
     this.timeout = options.timeout ?? 5 * 60 * 1000 // 5 minutes

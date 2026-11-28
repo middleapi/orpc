@@ -125,7 +125,7 @@ describe('openAPIGenerator e2e: typed errors', () => {
         },
         {
           version,
-          errorStatusMap: { PLANET_NAME_TAKEN: 409, PLANET_QUOTA_EXCEEDED: 409 },
+          errorStatuses: { PLANET_NAME_TAKEN: 409, PLANET_QUOTA_EXCEEDED: 409 },
         },
       )
 
@@ -174,7 +174,7 @@ describe('openAPIGenerator e2e: typed errors', () => {
     ])
   })
 
-  it('supports a custom error status map and a custom error body schema', async () => {
+  it('supports custom error statuses and a custom error body schema', async () => {
     const doc = await generator.generate(
       {
         getPlanet: oc
@@ -183,7 +183,7 @@ describe('openAPIGenerator e2e: typed errors', () => {
           .input(z.object({ id: z.string() })),
       },
       {
-        errorStatusMap: { PLANET_GONE: 410 },
+        errorStatuses: { PLANET_GONE: 410 },
         errorResponseBodySchema: (definedErrors, status) => {
           expect(definedErrors).toEqual([
             expect.objectContaining({ code: 'PLANET_GONE', defaultMessage: 'Planet is gone' }),

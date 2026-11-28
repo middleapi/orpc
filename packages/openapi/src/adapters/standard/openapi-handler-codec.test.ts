@@ -1066,7 +1066,7 @@ describe('openAPIHandlerCodec', () => {
   })
 
   describe('.encodeError', () => {
-    it('maps known error codes to HTTP status via COMMON_ERROR_STATUS_MAP', () => {
+    it('maps known error codes to HTTP status via COMMON_ERROR_STATUSES', () => {
       const serializer = {
         serialize: vi.fn().mockReturnValueOnce('__serialized_error__'),
         deserialize: vi.fn(),
@@ -1164,7 +1164,7 @@ describe('openAPIHandlerCodec', () => {
         { procedure },
         {
           serializer,
-          errorStatusMap: { BAD_GATEWAY: 599 },
+          errorStatuses: { BAD_GATEWAY: 599 },
         },
       )
 
@@ -1189,7 +1189,7 @@ describe('openAPIHandlerCodec', () => {
         { procedure },
         {
           serializer,
-          errorStatusMap: {},
+          errorStatuses: {},
         },
       )
 

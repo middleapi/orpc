@@ -45,7 +45,7 @@ The `handler` can be any supported oRPC handler, such as [RPCHandler](/docs/rpc/
 
 ## Custom Error
 
-By default the plugin throws `FORBIDDEN`. Use `error` to throw your own, which is [defined](/docs/error-handling#orpcerror-compatibility) when its `code` and `data` match an error the matched procedure declares. A custom code responds with `400` unless you map it in [`errorStatusMap`](/docs/rpc/handler#custom-error-response).
+By default the plugin throws `FORBIDDEN`. Use `error` to throw your own, which is [defined](/docs/error-handling#orpcerror-compatibility) when its `code` and `data` match an error the matched procedure declares. A custom code responds with `400` unless you map it in [`errorStatuses`](/docs/rpc/handler#custom-error-response).
 
 ```ts
 new GetMethodCsrfProtectionHandlerPlugin({

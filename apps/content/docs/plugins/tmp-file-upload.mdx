@@ -112,7 +112,7 @@ A multipart body splits across the first two limits, fields and part headers aga
 
 The plugin subsumes the [Request Limit Plugin](/docs/plugins/request-limit). When the [Request Compression Plugin](/docs/plugins/request-compression) is present, limits apply to the decompressed payload rather than the compressed wire size.
 
-To reject with your own error instead, use `error`. It is [defined](/docs/error-handling#orpcerror-compatibility) when its `code` and `data` match an error the matched procedure declares. A custom code responds with `400` unless you map it in [`errorStatusMap`](/docs/rpc/handler#custom-error-response).
+To reject with your own error instead, use `error`. It is [defined](/docs/error-handling#orpcerror-compatibility) when its `code` and `data` match an error the matched procedure declares. A custom code responds with `400` unless you map it in [`errorStatuses`](/docs/rpc/handler#custom-error-response).
 
 ```ts
 new TmpFileUploadHandlerPlugin({

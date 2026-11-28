@@ -1,5 +1,5 @@
 import { downgradeSpecV31ToV30, downgradeSpecV32ToV31 } from '@openapi-spec/downgrader'
-import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
+import { COMMON_ERROR_STATUSES } from '@orpc/client'
 import type { AnyProcedureContract, AnySchema, RouterContract } from '@orpc/contract'
 import type {
   JsonSchema,
@@ -117,11 +117,11 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
 
   /**
    * Mapping ORPCError Code -> HTTP Status Code
-   * Codes missing from the map fall back to `DEFAULT_ERROR_STATUS` (400).
+   * Codes missing from it fall back to `DEFAULT_ERROR_STATUS` (400).
    *
-   * @default COMMON_ERROR_STATUS_MAP
+   * @default COMMON_ERROR_STATUSES
    */
-  errorStatusMap?: Record<string, number> | undefined
+  errorStatuses?: Record<string, number> | undefined
 }
 
 /**
@@ -157,7 +157,7 @@ export class OpenAPIGenerator {
     const ctx: OpenAPIOperationContext = {
       registry: new OpenAPIComponentRegistry(doc, options.componentName),
       convertSchemas: (schemas, direction) => this.convertSchemas(schemas, direction),
-      errorStatusMap: options.errorStatusMap ?? COMMON_ERROR_STATUS_MAP,
+      errorStatuses: options.errorStatuses ?? COMMON_ERROR_STATUSES,
       errorResponseBodySchema: options.errorResponseBodySchema,
       errorResponseContentType: options.errorResponseContentType ?? 'application/json',
     }

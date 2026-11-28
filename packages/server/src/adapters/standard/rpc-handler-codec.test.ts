@@ -227,7 +227,7 @@ describe('rpcHandlerCodec', () => {
       ).toEqual(DEFAULT_ERROR_STATUS)
     })
 
-    it('custom status with errorStatusCodes option', () => {
+    it('custom status with errorStatuses option', () => {
       const serializer = {
         serialize: vi
           .fn()
@@ -238,7 +238,7 @@ describe('rpcHandlerCodec', () => {
 
       const codec = new RPCHandlerCodec(router, {
         serializer,
-        errorStatusMap: { BAD_GATEWAY: 599 },
+        errorStatuses: { BAD_GATEWAY: 599 },
       })
 
       const overriddenError = new ORPCError('BAD_GATEWAY')

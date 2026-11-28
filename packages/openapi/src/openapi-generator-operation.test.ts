@@ -1,4 +1,4 @@
-import { COMMON_ERROR_STATUS_MAP } from '@orpc/client'
+import { COMMON_ERROR_STATUSES } from '@orpc/client'
 import type { AnyProcedureContract, AnySchema, ErrorMap } from '@orpc/contract'
 import { asyncIteratorObject, error } from '@orpc/contract'
 import type { JsonSchema } from '@orpc/json-schema'
@@ -21,7 +21,7 @@ describe('openAPIGenerator operation builders', () => {
   function createContext(
     options: {
       schemas?: Record<string, any>
-      errorStatusMap?: Record<string, number>
+      errorStatuses?: Record<string, number>
       errorResponseBodySchema?: OpenAPIOperationContext['errorResponseBodySchema']
       errorResponseContentType?: string
     } = {},
@@ -51,7 +51,7 @@ describe('openAPIGenerator operation builders', () => {
           results.every(([, optional]) => optional),
         ]
       },
-      errorStatusMap: options.errorStatusMap ?? COMMON_ERROR_STATUS_MAP,
+      errorStatuses: options.errorStatuses ?? COMMON_ERROR_STATUSES,
       errorResponseBodySchema: options.errorResponseBodySchema,
       errorResponseContentType: options.errorResponseContentType ?? 'application/json',
     }
@@ -1663,7 +1663,7 @@ describe('openAPIGenerator operation builders', () => {
 
     it('hoists each defined error into components named after its code', () => {
       const { doc, ctx, operation } = createContext({
-        errorStatusMap: { 'BAD_REQUEST': 400, 'BAD_REQUEST_2': 400, 'custom-timeout': 408 },
+        errorStatuses: { 'BAD_REQUEST': 400, 'BAD_REQUEST_2': 400, 'custom-timeout': 408 },
       })
 
       buildErrorResponse(
@@ -1747,7 +1747,7 @@ describe('openAPIGenerator operation builders', () => {
       })
     })
 
-    it('uses the common status map by default and falls back to 400 for unknown codes', () => {
+    it('uses the common error statuses by default and falls back to 400 for unknown codes', () => {
       const { ctx, operation } = createContext()
 
       buildErrorResponse(
@@ -1764,7 +1764,7 @@ describe('openAPIGenerator operation builders', () => {
       expect(Object.keys(operation.responses ?? {})).toEqual(['400', '404'])
     })
 
-    it('ignores inherited properties of the status map for prototype-named codes', () => {
+    it('ignores inherited properties of the error statuses for prototype-named codes', () => {
       const { ctx, operation } = createContext()
 
       buildErrorResponse(

@@ -97,7 +97,7 @@ Most v1 names still compile through deprecated aliases (strike-through hints, no
    - Routing: `.route`, `.prefix`, `.tag`, `.$route` are gone from the builder. Use `.meta(openapi({ method, path, prefix, tags }))` from `@orpc/openapi`, or restore `.route` with `import '@orpc/openapi/extensions/route'`.
    - `.callable` and `.actionable`: use `call`/`createRouterClient` from `@orpc/server` and `createServerFunctionable` from `@orpc/next`, or the corresponding extension imports.
    - `RPCLink`: the single `url` split into `origin` plus a path-only `url`.
-   - Errors: `status` was removed from `ORPCError` and `.errors` definitions; map codes to HTTP status with `errorStatusMap` on the handler.
+   - Errors: `status` was removed from `ORPCError` and `.errors` definitions; map codes to HTTP status with `errorStatuses` on the handler.
    - `safe()`: the third tuple element is now the typed error itself (or `null`) and a fourth `isSuccess` element was added.
    - Option renames, scoped: handler `rootInterceptors` to `routingInterceptors` (handler `clientInterceptors` still exists, unchanged); link `clientInterceptors` to `transportInterceptors`. Flat `eventIterator*` options moved under the adapter's request/response mapping: `toFetchResponse.eventStream` on the fetch handler, `sendStandardResponse.eventStream` on Node, `toFetchRequest.eventStream` on the link.
    - `adapterInterceptors` was removed from handlers and links, because regular interceptors can now customize body parsing behavior.

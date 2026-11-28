@@ -8,7 +8,7 @@ import type {
   StandardLinkOptions,
   StandardLinkPlugin,
 } from '../adapters/standard/index'
-import { COMMON_ERROR_STATUS_MAP, ORPCError, ResponseError } from '../error'
+import { COMMON_ERROR_STATUSES, ORPCError, ResponseError } from '../error'
 import type { ClientContext } from '../types'
 
 export interface RetryLinkPluginAttemptOptions<
@@ -108,8 +108,8 @@ export function isRetryableError(error: unknown): boolean {
   return (
     status < 400 ||
     status >= 500 ||
-    status === COMMON_ERROR_STATUS_MAP.TIMEOUT ||
-    status === COMMON_ERROR_STATUS_MAP.TOO_MANY_REQUESTS
+    status === COMMON_ERROR_STATUSES.TIMEOUT ||
+    status === COMMON_ERROR_STATUSES.TOO_MANY_REQUESTS
   )
 }
 

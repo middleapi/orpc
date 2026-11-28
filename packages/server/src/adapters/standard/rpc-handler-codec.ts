@@ -1,5 +1,5 @@
 import type { AnyORPCError } from '@orpc/client'
-import { COMMON_ERROR_STATUS_MAP, RPCSerializer } from '@orpc/client'
+import { COMMON_ERROR_STATUSES, RPCSerializer } from '@orpc/client'
 import type { Promisable, Public, Value } from '@orpc/shared'
 import { getOwn, parseEmptyableJSON, value } from '@orpc/shared'
 import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
@@ -45,23 +45,23 @@ export interface RPCHandlerCodecOptions<T extends Context> extends RPCMatcherOpt
   /**
    * Mapping ORPCError Code -> HTTP Status Code
    * The status code should be in the `4xx` or `5xx` range (must be greater than or equal to `400`).
-   * Codes missing from the map fall back to `DEFAULT_ERROR_STATUS` (400).
+   * Codes missing from it fall back to `DEFAULT_ERROR_STATUS` (400).
    *
-   * @default COMMON_ERROR_STATUS_MAP
+   * @default COMMON_ERROR_STATUSES
    */
-  errorStatusMap?: Record<string, number> | undefined
+  errorStatuses?: Record<string, number> | undefined
 }
 
 export class RPCHandlerCodec<T extends Context> implements StandardHandlerCodec<T> {
   private readonly matcher: RPCMatcher
   private readonly serializer: Public<RPCSerializer>
-  private readonly errorStatusMap: Exclude<RPCHandlerCodecOptions<T>['errorStatusMap'], undefined>
+  private readonly errorStatuses: Exclude<RPCHandlerCodecOptions<T>['errorStatuses'], undefined>
   private readonly outputStatus: Exclude<RPCHandlerCodecOptions<T>['outputStatus'], undefined>
 
   constructor(router: AnyRouter, options: RPCHandlerCodecOptions<T> = {}) {
     this.matcher = new RPCMatcher(router, options)
     this.serializer = options.serializer ?? new RPCSerializer()
-    this.errorStatusMap = options.errorStatusMap ?? COMMON_ERROR_STATUS_MAP
+    this.errorStatuses = options.errorStatuses ?? COMMON_ERROR_STATUSES
     this.outputStatus = options.outputStatus ?? DEFAULT_SUCCESS_STATUS
   }
 
@@ -110,7 +110,7 @@ export class RPCHandlerCodec<T extends Context> implements StandardHandlerCodec<
     _path: string[],
     _options: ResolvedStandardHandlerHandleOptions<T>,
   ): Promisable<StandardResponse> {
-    const status = getOwn(this.errorStatusMap, error.code) ?? DEFAULT_ERROR_STATUS
+    const status = getOwn(this.errorStatuses, error.code) ?? DEFAULT_ERROR_STATUS
 
     return {
       headers: {},

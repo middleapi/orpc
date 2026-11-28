@@ -1,4 +1,4 @@
-import { COMMON_ERROR_STATUS_MAP, ORPCError } from '@orpc/client'
+import { COMMON_ERROR_STATUSES, ORPCError } from '@orpc/client'
 import { toArray } from '@orpc/shared'
 
 import { RPCHandler } from '../adapters/fetch/index'
@@ -68,7 +68,7 @@ describe('rethrowHandlerPlugin', () => {
     filter.mockReturnValueOnce(false)
 
     const { response } = await handler.handle(new Request('http://localhost'))
-    expect(response?.status).toBe(COMMON_ERROR_STATUS_MAP.NOT_ACCEPTABLE)
+    expect(response?.status).toBe(COMMON_ERROR_STATUSES.NOT_ACCEPTABLE)
   })
 
   it('throws when another interceptor corrupts the plugin context', async () => {

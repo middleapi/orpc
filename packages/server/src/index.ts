@@ -64,7 +64,7 @@ export type {
 } from '@orpc/client'
 
 export {
-  COMMON_ERROR_STATUS_MAP,
+  COMMON_ERROR_STATUSES,
   isDefinedError,
   ORPCError,
   RPCJsonSerializer,
