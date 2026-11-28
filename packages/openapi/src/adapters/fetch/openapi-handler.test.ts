@@ -89,6 +89,36 @@ describe('openapiHandler', () => {
     )
   })
 
+  it('round-trips params with literal text around them in a segment', async () => {
+    const router = {
+      publish: os
+        .meta(openapi({ method: 'POST', path: '/apps/{id}:publish' }))
+        .handler(({ input }) => input),
+      download: os
+        .meta(openapi({ method: 'GET', path: '/p/{name}-{version}.zip' }))
+        .handler(({ input }) => input),
+    }
+
+    const handler = new OpenAPIHandler(router)
+
+    const client = createORPCClient<any>(
+      new OpenAPILink(router, {
+        fetch: async (url: string, init: RequestInit) =>
+          (await handler.handle(new Request(url, init))).response!,
+        origin: 'http://localhost:3000',
+      }),
+    )
+
+    await expect(client.publish({ id: 'a:b c', draft: true })).resolves.toEqual({
+      id: 'a:b c',
+      draft: true,
+    })
+    await expect(client.download({ name: 'router', version: '1.2' })).resolves.toEqual({
+      name: 'router',
+      version: '1.2',
+    })
+  })
+
   it('supports standard handler plugins', async () => {
     const plugin: StandardHandlerPlugin<any> = {
       name: 'test',

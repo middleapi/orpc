@@ -712,6 +712,60 @@ describe('openAPILinkCodec', () => {
         expect(request.url).toBe('/api/items/a%2Fb/docs/v1/read%20me')
       })
 
+      it('fills params with literal text around them in a segment', async () => {
+        const codec = new OpenAPILinkCodec(
+          {
+            publish: oc.meta(openapi({ path: '/apps/{id}:publish' })),
+            download: oc.meta(
+              openapi({ path: '/p/{name}-{version}.zip', inputStructure: 'detailed' }),
+            ),
+          },
+          { url: '/api', serializer },
+        )
+
+        const publish = await codec.encodeInput({ id: 'a:b', draft: true }, ['publish'], {
+          context: {},
+        })
+
+        expect(publish.url).toBe('/api/apps/a%3Ab:publish')
+        expect(publish.body).toEqual({ draft: true })
+
+        const download = await codec.encodeInput(
+          { params: { name: 'router', version: '1.2' } },
+          ['download'],
+          { context: {} },
+        )
+
+        expect(download.url).toBe('/api/p/router-1.2.zip')
+      })
+
+      it('throws when a param would be read back cut short at the text after it in its segment', async () => {
+        const codec = new OpenAPILinkCodec(
+          {
+            item: oc.meta(openapi({ path: '/p/{name}-{version}.zip/{a}:{b}/{c}aa{d}' })),
+          },
+          { url: '/api', serializer },
+        )
+
+        const valid = { name: 'n', version: 'v-1', a: 'a', b: 'b:c', c: 'ax', d: 'd' }
+
+        await expect(codec.encodeInput(valid, ['item'], { context: {} })).resolves.toMatchObject({
+          url: '/api/p/n-v-1.zip/a:b%3Ac/axaad',
+        })
+
+        for (const [name, value, text] of [
+          ['name', 'a-b', '-'],
+          ['a', 'x:y', ':'],
+          ['c', 'xa', 'aa'],
+        ] as const) {
+          await expect(
+            codec.encodeInput({ ...valid, [name]: value }, ['item'], { context: {} }),
+          ).rejects.toThrow(
+            `Path param "${name}" would be read back cut short at "${text}", the text after it in the path, in call to procedure (item).`,
+          )
+        }
+      })
+
       it('treats scalar values as primitive for array/object params', async () => {
         const codec = new OpenAPILinkCodec(
           {

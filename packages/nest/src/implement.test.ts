@@ -340,6 +340,15 @@ describe('routing', () => {
       )
       .input(z.object({ rest: z.string() })),
 
+    segmentPath: oc
+      .meta(
+        openapi({
+          path: '/files/{name}.json',
+          method: 'GET',
+        }),
+      )
+      .input(z.object({ name: z.string() })),
+
     prefixedPath: oc.meta(
       openapi({
         path: '/static',
@@ -398,6 +407,11 @@ describe('routing', () => {
       return implement(contract.restPath).handler(({ input }) => `rest: ${input.rest}`)
     }
 
+    @Implement(contract.segmentPath)
+    segmentPath() {
+      return implement(contract.segmentPath).handler(({ input }) => `name: ${input.name}`)
+    }
+
     @Implement(contract.prefixedPath)
     prefixedPath() {
       return implement(contract.prefixedPath).handler(({ input }) => `prefixed path`)
@@ -434,6 +448,7 @@ describe('routing', () => {
           ({ input }) => `param: ${input.param}`,
         ),
         restPath: implement(contract.restPath).handler(({ input }) => `rest: ${input.rest}`),
+        segmentPath: implement(contract.segmentPath).handler(({ input }) => `name: ${input.name}`),
         prefixedPath: implement(contract.prefixedPath).handler(() => `prefixed path`),
         dynamicPrefix: implement(contract.dynamicPrefix).handler(
           ({ input }) => `prefix: ${input.prefix}`,
@@ -490,6 +505,13 @@ describe('routing', () => {
 
         expect(res.statusCode).toEqual(200)
         expect(res.body).toEqual('rest: some/long/path')
+      })
+
+      it('should handle a param with literal text around it in a segment', async () => {
+        const res = await supertest(httpServer).get('/files/report.json')
+
+        expect(res.statusCode).toEqual(200)
+        expect(res.body).toEqual('name: report')
       })
 
       it('should handle prefixed path', async () => {

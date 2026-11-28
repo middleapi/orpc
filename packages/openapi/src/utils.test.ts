@@ -43,22 +43,36 @@ describe('getDynamicPathParams', () => {
     ])
   })
 
-  it('treat params are embedded within static segments as static', () => {
-    expect(getDynamicPathParams('/orgs/{name}fix')).toEqual(undefined)
-    expect(getDynamicPathParams('/orgs/{name}fix/post')).toEqual(undefined)
-    expect(getDynamicPathParams('/orgs/fix{name}')).toEqual(undefined)
-    expect(getDynamicPathParams('/orgs/fix{name}/post')).toEqual(undefined)
-
-    expect(getDynamicPathParams('/orgs/{name}fix/{name}')).toEqual([
-      { segment: '{name}', parameterName: 'name', startIndex: 16, allowsSlash: false },
+  it('reads params with literal text around them in a segment', () => {
+    expect(getDynamicPathParams('/files/{name}.json')).toEqual([
+      { segment: '{name}', parameterName: 'name', startIndex: 7, allowsSlash: false },
     ])
-    expect(getDynamicPathParams('/orgs/fix{name}/{name}')).toEqual([
-      { segment: '{name}', parameterName: 'name', startIndex: 16, allowsSlash: false },
+    expect(getDynamicPathParams('/apps/{id}:publish/{+rest}')).toEqual([
+      { segment: '{id}', parameterName: 'id', startIndex: 6, allowsSlash: false },
+      { segment: '{+rest}', parameterName: 'rest', startIndex: 19, allowsSlash: true },
+    ])
+    expect(getDynamicPathParams('/v{version}/p/{name}-{version}.zip')).toEqual([
+      { segment: '{version}', parameterName: 'version', startIndex: 2, allowsSlash: false },
+      { segment: '{name}', parameterName: 'name', startIndex: 14, allowsSlash: false },
+      { segment: '{version}', parameterName: 'version', startIndex: 21, allowsSlash: false },
+    ])
+    expect(getDynamicPathParams('/orgs/{{name}}')).toEqual([
+      { segment: '{name}', parameterName: 'name', startIndex: 7, allowsSlash: false },
+    ])
+  })
+
+  it('treat params that touch in a segment as static', () => {
+    expect(getDynamicPathParams('/orgs/{a}{b}')).toEqual(undefined)
+    expect(getDynamicPathParams('/orgs/x{a}{b}.json')).toEqual(undefined)
+
+    expect(getDynamicPathParams('/orgs/{a}{b}/{id}')).toEqual([
+      { segment: '{id}', parameterName: 'id', startIndex: 13, allowsSlash: false },
     ])
   })
 
   it('treat unsupported params patterns as static', () => {
     expect(getDynamicPathParams('/orgs/{?name}')).toEqual(undefined)
+    expect(getDynamicPathParams('/orgs/x{+name}')).toEqual(undefined)
     expect(getDynamicPathParams('/orgs/{!name}')).toEqual(undefined)
     expect(getDynamicPathParams('/orgs/{&name}')).toEqual(undefined)
 
@@ -95,7 +109,6 @@ describe('getDynamicPathParams', () => {
   it('treat malformed braces as static', () => {
     expect(getDynamicPathParams('/orgs/{name')).toEqual(undefined)
     expect(getDynamicPathParams('/orgs/name}')).toEqual(undefined)
-    expect(getDynamicPathParams('/orgs/{{name}}')).toEqual(undefined)
 
     expect(getDynamicPathParams('/orgs/{name/{id}')).toEqual([
       { segment: '{id}', parameterName: 'id', startIndex: 12, allowsSlash: false },

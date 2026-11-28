@@ -605,6 +605,11 @@ describe('openAPIGenerator basic & options', () => {
       paths: ['/users/{id}', '/users/{name}'] as const,
       message: 'GET /users/{name} is already documented by the procedure at first',
     },
+    {
+      name: 'params with text around them that differ only by name',
+      paths: ['/files/{id}.json', '/files/{name}.json'] as const,
+      message: 'GET /files/{name}.json is already documented by the procedure at first',
+    },
   ])('reports a collision instead of overwriting for $name', async ({ paths, message }) => {
     const input = z.object({ id: z.string(), p: z.string(), name: z.string() })
     const result = generator.generate({
@@ -614,6 +619,18 @@ describe('openAPIGenerator basic & options', () => {
 
     await expect(result).rejects.toThrow('(1 error)')
     await expect(result).rejects.toThrow(`Procedure at second: ${message}`)
+  })
+
+  it('documents params with literal text around them in a segment as path parameters', async () => {
+    const doc = await generator.generate({
+      publish: oc
+        .meta(openapi({ method: 'POST', path: '/apps/{id}:publish' }))
+        .input(z.object({ id: z.string() })),
+    })
+
+    expect(doc.paths?.['/apps/{id}:publish']?.post?.parameters).toEqual([
+      expect.objectContaining({ name: 'id', in: 'path', required: true }),
+    ])
   })
 
   it('does not report collisions for filtered-out procedures', async () => {

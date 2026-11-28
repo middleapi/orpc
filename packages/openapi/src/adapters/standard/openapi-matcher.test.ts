@@ -213,7 +213,7 @@ describe('openAPIMatcher', () => {
         .meta(openapi({ method: 'GET', path: '/items:batchGet' }))
         .handler(() => 'batch')
       const braces = os
-        .meta(openapi({ method: 'GET', path: '/a/{id}.json' }))
+        .meta(openapi({ method: 'GET', path: '/a/{a}{b}.json' }))
         .handler(() => 'braces')
       const question = os.meta(openapi({ method: 'GET', path: '/what?' })).handler(() => 'question')
 
@@ -256,12 +256,14 @@ describe('openAPIMatcher', () => {
       })
       await expect(matcher.match('GET', '/itemsfoo', undefined)).resolves.toBeUndefined()
 
-      // only whole-segment `{name}` is a param
-      await expect(matcher.match('GET', '/a/%7Bid%7D.json', undefined)).resolves.toMatchObject({
+      // params that touch in a segment are literal text
+      await expect(
+        matcher.match('GET', '/a/%7Ba%7D%7Bb%7D.json', undefined),
+      ).resolves.toMatchObject({
         procedure: braces,
         params: undefined,
       })
-      await expect(matcher.match('GET', '/a/id.json', undefined)).resolves.toBeUndefined()
+      await expect(matcher.match('GET', '/a/xy.json', undefined)).resolves.toBeUndefined()
 
       await expect(matcher.match('GET', '/what%3F', undefined)).resolves.toMatchObject({
         procedure: question,
@@ -471,6 +473,32 @@ describe('openAPIMatcher', () => {
           params: undefined,
         })
       }
+    })
+
+    it('matches params with literal text around them in a segment, also in lazy prefixes', async () => {
+      const publish = os
+        .meta(openapi({ method: 'POST', path: '/apps/{id}:publish' }))
+        .handler(() => 'ok')
+      const info = os.meta(openapi({ method: 'GET', path: '/info' })).handler(() => 'info')
+
+      const matcher = new OpenAPIMatcher({
+        publish,
+        versioned: os
+          .meta(openapi({ prefix: '/v{version}' }))
+          .lazy(async () => ({ default: { info } })),
+      })
+
+      await expect(matcher.match('POST', '/apps/a%3Ab:publish', undefined)).resolves.toEqual({
+        path: ['publish'],
+        procedure: publish,
+        params: { id: 'a:b' },
+      })
+      await expect(matcher.match('POST', '/apps/:publish', undefined)).resolves.toBeUndefined()
+
+      await expect(matcher.match('GET', '/v2/info', undefined)).resolves.toMatchObject({
+        path: ['versioned', 'info'],
+        params: { version: '2' },
+      })
     })
   })
 

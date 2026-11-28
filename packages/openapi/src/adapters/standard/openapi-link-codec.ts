@@ -14,6 +14,7 @@ import {
   isNonPrimitive,
   mergeHttpPath,
   pathToHttpPath,
+  safeDecodeURIComponent,
   safeEncodeURIComponent,
   stringifyJSON,
   value,
@@ -95,6 +96,40 @@ export interface OpenAPILinkCodecOptions<T extends ClientContext> {
 
 const DOT_SEGMENT_REGEX = /(?:^|\/)\.{1,2}(?:\/|$)/
 
+/**
+ * Puts the encoded value of `params[index]` in its place in `pathname`. A server
+ * reads params in one segment left to right, each as short as it can be, so a
+ * value that runs into the text after it would be read back cut short.
+ */
+function fillPathParam(
+  pathname: `/${string}`,
+  params: NonNullable<ReturnType<typeof getDynamicPathParams>>,
+  index: number,
+  encoded: string,
+  path: string[],
+): `/${string}` {
+  const param = params[index]!
+  const end = param.startIndex + param.segment.length
+  const next = params[index + 1]
+
+  if (next !== undefined) {
+    const between = pathname.slice(end, next.startIndex)
+
+    if (!between.includes('/')) {
+      const text = safeDecodeURIComponent(between)
+      const value = safeDecodeURIComponent(encoded)
+
+      if ((value + text).indexOf(text, 1) < value.length) {
+        throw new TypeError(
+          `Path param "${param.parameterName}" would be read back cut short at "${text}", the text after it in the path, in call to procedure (${path.join('.')}).`,
+        )
+      }
+    }
+  }
+
+  return `${pathname.slice(0, param.startIndex)}${encoded}${pathname.slice(end)}` as `/${string}`
+}
+
 export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCodec<T> {
   private readonly baseUrl: Exclude<OpenAPILinkCodecOptions<T>['url'], undefined>
   private readonly headers: Exclude<OpenAPILinkCodecOptions<T>['headers'], undefined>
@@ -161,8 +196,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
             meta?.paramsStyles?.[param.parameterName],
             path,
           )
-          pathname =
-            `${pathname.slice(0, param.startIndex)}${encoded}${pathname.slice(param.startIndex + param.segment.length)}` as `/${string}`
+          pathname = fillPathParam(pathname, dynamicParams, i, encoded, path)
           delete remaining[param.parameterName]
         }
 
@@ -226,8 +260,7 @@ export class OpenAPILinkCodec<T extends ClientContext> implements StandardLinkCo
           meta?.paramsStyles?.[param.parameterName],
           path,
         )
-        pathname =
-          `${pathname.slice(0, param.startIndex)}${encoded}${pathname.slice(param.startIndex + param.segment.length)}` as `/${string}`
+        pathname = fillPathParam(pathname, dynamicParams, i, encoded, path)
       }
     }
 
