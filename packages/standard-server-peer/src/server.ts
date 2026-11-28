@@ -2,7 +2,7 @@ import type { AsyncIdQueueCloseOptions, Promisable } from '@orpc/shared'
 import type { StandardRequest, StandardResponse } from '@orpc/standard-server'
 import type { DecodedRequestMessage, DecodedResponseMessage, EventIteratorPayload } from './codec'
 import type { EncodedMessage, EncodedMessageSendFn } from './types'
-import { AbortError, AsyncIdQueue, getGlobalOtelConfig, isAsyncIteratorObject, runWithSpan } from '@orpc/shared'
+import { AbortError, AsyncIdQueue, getGlobalOtelConfig, isAsyncIteratorObject, runWithSpan, sequential } from '@orpc/shared'
 import { HibernationEventIterator, isEventIteratorHeaders } from '@orpc/standard-server'
 import { decodeRequestMessage, encodeResponseMessage, MessageType } from './codec'
 import { resolveEventIterator, toEventIterator } from './event-iterator'
@@ -26,6 +26,12 @@ export interface ServerPeerCloseOptions extends AsyncIdQueueCloseOptions {
 
 export class ServerPeer {
   private readonly peer: experimental_ServerPeerWithoutCodec
+
+  /**
+   * Decodes sequentially, a request message takes longer to decode than the messages after it,
+   * so they could otherwise reach the peer first and be dropped.
+   */
+  private readonly decode = sequential(decodeRequestMessage)
 
   constructor(
     send: EncodedMessageSendFn,
@@ -52,7 +58,7 @@ export class ServerPeer {
     raw: EncodedMessage,
     handleRequest?: ServerPeerHandleRequestFn,
   ): Promise<[id: string, StandardRequest | undefined]> {
-    return this.peer.message(await decodeRequestMessage(raw), handleRequest)
+    return this.peer.message(await this.decode(raw), handleRequest)
   }
 
   /**

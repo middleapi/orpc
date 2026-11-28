@@ -1,4 +1,4 @@
-import type { SupportedMessagePort } from '@orpc/client/message-port'
+import type { SupportedMessagePort, SupportedMessagePortData } from '@orpc/client/message-port'
 import type { MaybeOptionalOptions, Promisable, Value } from '@orpc/shared'
 import type { DecodedRequestMessage, DecodedResponseMessage, serializeRequestMessage } from '@orpc/standard-server-peer'
 import type { Context } from '../../context'
@@ -7,7 +7,7 @@ import type {
   HandleStandardServerPeerMessageOptions,
 } from '../standard-peer'
 import { onMessagePortClose, onMessagePortMessage, postMessagePortMessage } from '@orpc/client/message-port'
-import { isObject, resolveMaybeOptionalOptions, value } from '@orpc/shared'
+import { isObject, resolveMaybeOptionalOptions, sequential, value } from '@orpc/shared'
 import { decodeRequestMessage, deserializeRequestMessage, encodeResponseMessage, serializeResponseMessage, experimental_ServerPeerWithoutCodec as ServerPeerWithoutCodec } from '@orpc/standard-server-peer'
 import { createServerPeerHandleRequestFn, isValidServerPeerRequestMessage } from '../standard-peer'
 
@@ -60,21 +60,29 @@ export class MessagePortHandler<T extends Context> {
       }
     })
 
+    /**
+     * Decodes sequentially, a request message takes longer to decode than the messages after it,
+     * so they could otherwise reach the peer first and be dropped.
+     */
+    const decode = sequential(async (message: SupportedMessagePortData): Promise<DecodedRequestMessage | undefined> => {
+      try {
+        const decodedMessage = isObject(message)
+          ? deserializeRequestMessage(message as any as ReturnType<typeof serializeRequestMessage>)
+          : await decodeRequestMessage(message)
+
+        return isValidServerPeerRequestMessage(decodedMessage) ? decodedMessage : undefined
+      }
+      catch {
+        return undefined // Ignore malformed messages, so they cannot cause an unhandled rejection
+      }
+    })
+
     onMessagePortMessage(port, async (message) => {
       const handleFn = createServerPeerHandleRequestFn(this.standardHandler, resolveMaybeOptionalOptions(rest))
 
-      let decodedMessage: DecodedRequestMessage
+      const decodedMessage = await decode(message)
 
-      try {
-        decodedMessage = isObject(message)
-          ? deserializeRequestMessage(message as any as ReturnType<typeof serializeRequestMessage>)
-          : await decodeRequestMessage(message)
-      }
-      catch {
-        return // Ignore malformed messages, so they cannot cause an unhandled rejection
-      }
-
-      if (!isValidServerPeerRequestMessage(decodedMessage)) {
+      if (!decodedMessage) {
         return
       }
 
