@@ -8,3 +8,4 @@ export type {
   experimental_CloudflareTracerOptions,
 } from './tracer'
 export { experimental_CloudflareTracer } from './tracer'
+export * from './workers-cache'

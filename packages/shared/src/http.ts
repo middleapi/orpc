@@ -252,3 +252,45 @@ export function isCompressibleContentType(contentType: string | null | undefined
 
   return COMPRESSIBLE_CONTENT_TYPE_REGEX.test(contentType)
 }
+
+/**
+ * Characters a cache tag cannot carry literally: `%` and `,` because they are
+ * the encoding's own syntax, `A-Z` because caches like Cloudflare Workers
+ * Caching fold case, and anything outside printable ASCII because it cannot
+ * appear in a header value.
+ */
+const UNSAFE_CACHE_TAG_CHARS = /[^\x21-\x7E]|[%,A-Z]/gu
+
+/**
+ * Percent-encodes {@link UNSAFE_CACHE_TAG_CHARS} in a cache tag, so typical
+ * tags stay readable. Use it where tags travel one at a time, such as a purge API.
+ *
+ * @see {@link https://orpc.dev/docs/helpers/cache#handler-plugin | Cache Helpers - Handler Plugin}
+ */
+export function encodeCacheTag(tag: string): string {
+  // encodeURIComponent leaves A-Z alone, so they are escaped by hand.
+  return tag.replace(UNSAFE_CACHE_TAG_CHARS, (char) =>
+    char >= 'A' && char <= 'Z'
+      ? `%${char.charCodeAt(0).toString(16).toUpperCase()}`
+      : safeEncodeURIComponent(char),
+  )
+}
+
+/**
+ * Joins {@link encodeCacheTag}-encoded tags with commas into a header value.
+ *
+ * @see {@link https://orpc.dev/docs/helpers/cache#handler-plugin | Cache Helpers - Handler Plugin}
+ */
+export function encodeCacheTagHeader(tags: readonly string[]): string {
+  return tags.map(encodeCacheTag).join(',')
+}
+
+/**
+ * Decodes a header value produced by {@link encodeCacheTagHeader} back into
+ * tags, empty ones included. Every non-empty tag list round-trips exactly.
+ *
+ * @see {@link https://orpc.dev/docs/helpers/cache#handler-plugin | Cache Helpers - Handler Plugin}
+ */
+export function decodeCacheTagHeader(header: string): string[] {
+  return header.split(',').map(safeDecodeURIComponent)
+}

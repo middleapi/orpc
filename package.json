@@ -23,6 +23,7 @@
     "@orpc/contract": "workspace:*",
     "@orpc/effect": "workspace:*",
     "@orpc/evlog": "workspace:*",
+    "@orpc/experimental-cache": "workspace:*",
     "@orpc/experimental-lock": "workspace:*",
     "@orpc/experimental-openapi-inference": "workspace:*",
     "@orpc/hibernation": "workspace:*",

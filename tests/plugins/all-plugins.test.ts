@@ -14,6 +14,7 @@ import {
 import { oc } from '@orpc/contract'
 import { RequestValidationLinkPlugin, ResponseValidationLinkPlugin } from '@orpc/contract/plugins'
 import { EvlogHandlerPlugin } from '@orpc/evlog'
+import { CacheHandlerPlugin } from '@orpc/experimental-cache'
 import { HibernationHandlerPlugin } from '@orpc/hibernation'
 import { SmartCoercionHandlerPlugin, SmartCoercionLinkPlugin } from '@orpc/json-schema'
 import {
@@ -86,6 +87,7 @@ const router = implementer.router({
 
 function createHandlerPlugins() {
   return [
+    new CacheHandlerPlugin({ headers: ['cache-control'] }),
     new BatchHandlerPlugin<TestContext>(),
     new BatchResponseCompressionHandlerPlugin<TestContext>({ threshold: 0 }),
     new CORSHandlerPlugin<TestContext>(),

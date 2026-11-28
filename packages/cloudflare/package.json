@@ -1,8 +1,9 @@
 {
   "name": "@orpc/cloudflare",
   "version": "2.0.0-beta.53",
-  "description": "Cloudflare integration for oRPC: Durable Object pub/sub and locking, Workers rate limiting, and Workers Traces adapters",
+  "description": "Cloudflare integration for oRPC: Durable Object pub/sub and locking, Workers rate limiting, Workers Caching, and Workers Traces adapters",
   "keywords": [
+    "cache",
     "cloudflare",
     "cloudflare-workers",
     "durable-objects",
@@ -52,6 +53,7 @@
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
+    "@orpc/experimental-cache": "workspace:*",
     "@orpc/experimental-lock": "workspace:*",
     "@orpc/publisher": "workspace:*",
     "@orpc/ratelimit": "workspace:*",
