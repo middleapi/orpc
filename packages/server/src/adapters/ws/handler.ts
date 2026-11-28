@@ -23,10 +23,7 @@ export class WsHandler<T extends Context> {
       ws.send(await encodeResponseMessage(id, type, payload))
     })
 
-    /**
-     * Decodes sequentially, a request message takes longer to decode than the messages after it,
-     * so they could otherwise reach the peer first and be dropped.
-     */
+    // Decode in order, so event iterator messages can't overtake their slower-to-decode request
     const decode = sequential(async (data: WebSocket.Data) => decodeServerPeerRequestMessage(
       Array.isArray(data) ? await readAsBuffer(new Blob(data)) : data,
     ))

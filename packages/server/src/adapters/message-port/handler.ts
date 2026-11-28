@@ -1,6 +1,6 @@
 import type { SupportedMessagePort, SupportedMessagePortData } from '@orpc/client/message-port'
 import type { MaybeOptionalOptions, Promisable, Value } from '@orpc/shared'
-import type { DecodedRequestMessage, DecodedResponseMessage, serializeRequestMessage } from '@orpc/standard-server-peer'
+import type { DecodedResponseMessage, serializeRequestMessage } from '@orpc/standard-server-peer'
 import type { Context } from '../../context'
 import type { StandardHandler } from '../standard'
 import type {
@@ -60,20 +60,15 @@ export class MessagePortHandler<T extends Context> {
       }
     })
 
-    /**
-     * Decodes sequentially, a request message takes longer to decode than the messages after it,
-     * so they could otherwise reach the peer first and be dropped.
-     */
-    const decode = sequential(async (message: SupportedMessagePortData): Promise<DecodedRequestMessage | undefined> => {
+    // Decode in order, so event iterator messages can't overtake their slower-to-decode request
+    const decode = sequential(async (message: SupportedMessagePortData) => {
       try {
-        const decodedMessage = isObject(message)
+        return isObject(message)
           ? deserializeRequestMessage(message as any as ReturnType<typeof serializeRequestMessage>)
           : await decodeRequestMessage(message)
-
-        return isValidServerPeerRequestMessage(decodedMessage) ? decodedMessage : undefined
       }
       catch {
-        return undefined // Ignore malformed messages, so they cannot cause an unhandled rejection
+        // Ignore malformed messages, so they cannot cause an unhandled rejection
       }
     })
 
@@ -82,7 +77,7 @@ export class MessagePortHandler<T extends Context> {
 
       const decodedMessage = await decode(message)
 
-      if (!decodedMessage) {
+      if (!decodedMessage || !isValidServerPeerRequestMessage(decodedMessage)) {
         return
       }
 

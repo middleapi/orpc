@@ -28,8 +28,8 @@ export class ServerPeer {
   private readonly peer: experimental_ServerPeerWithoutCodec
 
   /**
-   * Decodes sequentially, a request message takes longer to decode than the messages after it,
-   * so they could otherwise reach the peer first and be dropped.
+   * Decodes in order: a request message takes longer to decode than the event iterator messages after it,
+   * which would otherwise reach the peer first and be dropped.
    */
   private readonly decode = sequential(decodeRequestMessage)
 
