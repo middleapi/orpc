@@ -106,7 +106,7 @@ const listPlanet = os
 :::
 
 :::warning[rou3 path syntax is now literal text]
-v1 passed paths to rou3, so rou3 patterns such as `/:id`, `*`, `**`, and `**:name` worked as parameters, and so did `{name}` with any characters in `name`, like `{user.id}`. v2 reads only `{name}` and `{+name}`, where `name` is made of ASCII letters, digits, `_`, and `-`. Anything else is literal text, so those routes return 404 without any error. This also applies to the `.route` extension, which passes paths through unchanged.
+v1 passed paths to rou3, so rou3 patterns such as `/:id`, `*`, `**`, and `**:name` worked as parameters, and so did `{name}` with any characters in `name`, like `{user.id}`. v2 reads only `{name}` and `{+name}` as a whole path segment, where `name` is made of ASCII letters, digits, `_`, and `-`. Anything else, including `/users/{id}.json`, is literal text, so those routes return 404 without any error. This also applies to the `.route` extension, which passes paths through unchanged.
 
 <CodeGroup>
 
