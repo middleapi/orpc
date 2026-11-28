@@ -1,15 +1,20 @@
 import type { MaybeOptionalOptions } from '@orpc/shared'
+import type { DecodedRequestMessage } from '@orpc/standard-server-peer'
 import type { Context } from '../../context'
 import type { StandardHandler } from '../standard'
 import type { HandleStandardServerPeerMessageOptions } from '../standard-peer'
-import { readAsBuffer, resolveMaybeOptionalOptions } from '@orpc/shared'
+import { readAsBuffer, resolveMaybeOptionalOptions, sequential } from '@orpc/shared'
 import { encodeResponseMessage, experimental_ServerPeerWithoutCodec as ServerPeerWithoutCodec } from '@orpc/standard-server-peer'
 import { createServerPeerHandleRequestFn, decodeServerPeerRequestMessage } from '../standard-peer'
 
 export type MinimalWebsocket = Pick<WebSocket, 'addEventListener' | 'send'>
 
 export class WebsocketHandler<T extends Context> {
-  readonly #peers = new WeakMap<MinimalWebsocket, ServerPeerWithoutCodec>()
+  readonly #peers = new WeakMap<MinimalWebsocket, {
+    peer: ServerPeerWithoutCodec
+    decode: (data: string | ArrayBuffer | Blob) => Promise<DecodedRequestMessage | undefined>
+  }>()
+
   readonly #handler: StandardHandler<T>
 
   constructor(
@@ -46,23 +51,27 @@ export class WebsocketHandler<T extends Context> {
     data: string | ArrayBuffer | Blob,
     ...rest: MaybeOptionalOptions<HandleStandardServerPeerMessageOptions<T>>
   ): Promise<void> {
-    let peer = this.#peers.get(ws)
+    let state = this.#peers.get(ws)
 
-    if (!peer) {
-      this.#peers.set(ws, peer = new ServerPeerWithoutCodec(async ([id, type, payload]) => {
-        ws.send(await encodeResponseMessage(id, type, payload))
-      }))
+    if (!state) {
+      this.#peers.set(ws, state = {
+        peer: new ServerPeerWithoutCodec(async ([id, type, payload]) => {
+          ws.send(await encodeResponseMessage(id, type, payload))
+        }),
+        // Decode in order, so event iterator messages can't overtake their slower-to-decode request
+        decode: sequential(async data => decodeServerPeerRequestMessage(
+          data instanceof Blob ? await readAsBuffer(data) : data,
+        )),
+      })
     }
 
-    const message = await decodeServerPeerRequestMessage(
-      data instanceof Blob ? await readAsBuffer(data) : data,
-    )
+    const message = await state.decode(data)
 
     if (!message) {
       return
     }
 
-    await peer.message(
+    await state.peer.message(
       message,
       createServerPeerHandleRequestFn(this.#handler, resolveMaybeOptionalOptions(rest)),
     )
@@ -74,10 +83,10 @@ export class WebsocketHandler<T extends Context> {
    * @warning Avoid calling this directly if `.upgrade()` is used.
    */
   close(ws: MinimalWebsocket): void {
-    const peer = this.#peers.get(ws)
+    const state = this.#peers.get(ws)
 
-    if (peer) {
-      peer.close()
+    if (state) {
+      state.peer.close()
     }
   }
 }

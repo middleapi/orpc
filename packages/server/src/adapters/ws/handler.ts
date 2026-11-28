@@ -5,7 +5,7 @@ import type { StandardHandler } from '../standard'
 import type {
   HandleStandardServerPeerMessageOptions,
 } from '../standard-peer'
-import { logError, readAsBuffer, resolveMaybeOptionalOptions } from '@orpc/shared'
+import { logError, readAsBuffer, resolveMaybeOptionalOptions, sequential } from '@orpc/shared'
 import { encodeResponseMessage, experimental_ServerPeerWithoutCodec as ServerPeerWithoutCodec } from '@orpc/standard-server-peer'
 import { createServerPeerHandleRequestFn, decodeServerPeerRequestMessage } from '../standard-peer'
 
@@ -23,10 +23,13 @@ export class WsHandler<T extends Context> {
       ws.send(await encodeResponseMessage(id, type, payload))
     })
 
+    // Decode in order, so event iterator messages can't overtake their slower-to-decode request
+    const decode = sequential(async (data: WebSocket.Data) => decodeServerPeerRequestMessage(
+      Array.isArray(data) ? await readAsBuffer(new Blob(data)) : data,
+    ))
+
     ws.addEventListener('message', async (event) => {
-      const message = await decodeServerPeerRequestMessage(
-        Array.isArray(event.data) ? await readAsBuffer(new Blob(event.data)) : event.data,
-      )
+      const message = await decode(event.data)
 
       if (!message) {
         return

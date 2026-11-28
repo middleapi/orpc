@@ -166,6 +166,27 @@ describe('serverPeer', () => {
       expect(send).toHaveBeenCalledTimes(1)
     })
 
+    it('iterator messages sent right after the request are not lost', async () => {
+      const messages = [
+        await encodeRequestMessage(REQUEST_ID, MessageType.REQUEST, { ...baseRequest, body: (async function* () {})() }),
+        await encodeRequestMessage(REQUEST_ID, MessageType.EVENT_ITERATOR, { event: 'message', data: 'hello' }),
+        await encodeRequestMessage(REQUEST_ID, MessageType.EVENT_ITERATOR, { event: 'done', data: 'hello2' }),
+      ]
+
+      handle.mockImplementationOnce(async (request) => {
+        const iterator = request!.body as AsyncGenerator
+
+        await expect(iterator.next()).resolves.toEqual({ done: false, value: 'hello' })
+        await expect(iterator.next()).resolves.toEqual({ done: true, value: 'hello2' })
+
+        return baseResponse
+      })
+
+      await Promise.all(messages.map(message => peer.message(message, handle)))
+
+      expect(send).toHaveBeenCalledTimes(1)
+    })
+
     it('iterator with manually .return', async () => {
       const clientRequest = {
         ...baseRequest,
