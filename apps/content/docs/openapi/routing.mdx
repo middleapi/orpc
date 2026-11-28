@@ -46,6 +46,8 @@ const getFile = os
 
 A path can have only one `{+name}`, but more segments can follow it, as in `/files/{+path}/raw`.
 
+`{name}` can also sit inside a segment with literal text around it, as in `/files/{name}.json` or `/apps/{id}:publish`. Params in one segment need text between them, as in `/{name}-{version}.zip`, and each takes the shortest value that lets the rest match.
+
 :::info
 To customize path parameter encoding and decoding, see [Path Parameter Styles](/docs/openapi/input-and-output-mapping#path-parameter-styles).
 :::

@@ -80,6 +80,11 @@ describe('openAPIGenerator operation builders', () => {
       const path = '/planets/{id}/{+rest}' as const
       expect(toOpenAPIPath(path, getDynamicPathParams(path))).toBe('/planets/{id}/{rest}')
     })
+
+    it('keeps the literal text around params in a segment', () => {
+      const path = '/apps/{id}:publish/{+rest}' as const
+      expect(toOpenAPIPath(path, getDynamicPathParams(path))).toBe('/apps/{id}:publish/{rest}')
+    })
   })
 
   describe('buildRequest', () => {

@@ -106,7 +106,7 @@ const listPlanet = os
 :::
 
 :::warning[rou3 path syntax is now literal text]
-v1 also accepted rou3 syntax such as `/:id` and `**`. v2 reads only `{name}` and `{+name}` filling a whole path segment, so anything else is literal text and the route returns 404. This includes paths set with the `.route` extension.
+v1 also accepted rou3 syntax such as `/:id` and `**`. v2 reads only `{name}` and `{+name}` ([Path Parameters](/docs/openapi/routing#path-parameters)), so anything else is literal text and the route returns 404. This includes paths set with the `.route` extension.
 
 <CodeGroup>
 
