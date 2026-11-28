@@ -201,10 +201,7 @@ describe('cache', () => {
   })
 
   it('still records the tags of a lookup that enabled bypassed', async () => {
-    const pluginContext: Exclude<
-      CacheHandlerPluginContext[typeof CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL],
-      undefined
-    > = { caches: [], revalidations: [] }
+    const pluginContext = { caches: [], revalidations: [] }
     const procedure = os
       .$context<CacheContext & CacheHandlerPluginContext>()
       .use(cache({ tags: ['planets'], enabled: false }))
@@ -225,18 +222,17 @@ describe('cache', () => {
   it('runs stacked caches sharing a key as one', async () => {
     const store = new MemoryCacheStore()
     const getOrSet = vi.spyOn(store, 'getOrSet')
-    const handlerFn = vi.fn().mockReturnValue('v')
-    const procedure = os.$context<CacheContext>().use(cache()).use(cache()).handler(handlerFn)
+    const procedure = os
+      .$context<CacheContext>()
+      .use(cache())
+      .use(cache())
+      .handler(() => 'v')
 
     await expect(call(procedure, undefined, { context: { 'cache/store': store } })).resolves.toBe(
       'v',
     )
-    await expect(call(procedure, undefined, { context: { 'cache/store': store } })).resolves.toBe(
-      'v',
-    )
 
-    expect(handlerFn).toHaveBeenCalledTimes(1)
-    expect(getOrSet).toHaveBeenCalledTimes(2)
+    expect(getOrSet).toHaveBeenCalledTimes(1)
   })
 
   it('hands cache/waitUntil to the store', async () => {

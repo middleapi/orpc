@@ -1,3 +1,5 @@
+import { stringifyJSON } from '@orpc/shared'
+
 import type { CacheEntry, CacheGetOrSetOptions, CacheRevalidateOptions } from '../types'
 import { isCacheEntryEvicted } from '../utils'
 import type { BaseKeyValueCacheStoreOptions, CacheEnvelope } from './base-key-value'
@@ -5,13 +7,13 @@ import { BaseKeyValueCacheStore } from './base-key-value'
 
 export type MemoryCacheStoreOptions = BaseKeyValueCacheStoreOptions
 
-interface MemoryCacheStoreEntry {
+interface MemoryCacheStoreEntry extends Omit<CacheEnvelope, 'output'> {
   /**
-   * Kept serialized and cloned on each read, so every hit gets its own copy of the output.
+   * Kept as a JSON string and parsed on each read, so every hit gets its own copy.
    */
-  envelope: CacheEnvelope
+  output: string
   /**
-   * The version each tag had when the fill started, index-aligned with the envelope's tags.
+   * The version each tag had when the fill started, index-aligned with the tags.
    */
   tagVersions: readonly number[]
 }
@@ -52,7 +54,7 @@ export class MemoryCacheStore extends BaseKeyValueCacheStore {
       return undefined
     }
 
-    return this.decode(structuredClone(stored.envelope))
+    return this.decode({ ...stored, output: JSON.parse(stored.output) })
   }
 
   protected async fill(
@@ -64,15 +66,21 @@ export class MemoryCacheStore extends BaseKeyValueCacheStore {
     const { envelope, entry } = this.encode(await compute(), options)
 
     this.sweep()
-    this.entries.set(encodedKey, { envelope, tagVersions })
+    this.entries.set(encodedKey, {
+      ...envelope,
+      output: stringifyJSON(envelope.output),
+      tagVersions,
+    })
 
     return entry
   }
 
-  private shouldEvict({ envelope, tagVersions }: MemoryCacheStoreEntry): boolean {
+  private shouldEvict(stored: MemoryCacheStoreEntry): boolean {
     return (
-      isCacheEntryEvicted(envelope) ||
-      !!envelope.tags?.some((tag, index) => (this.tagVersions.get(tag) ?? 0) !== tagVersions[index])
+      isCacheEntryEvicted(stored) ||
+      !!stored.tags?.some(
+        (tag, index) => (this.tagVersions.get(tag) ?? 0) !== stored.tagVersions[index],
+      )
     )
   }
 

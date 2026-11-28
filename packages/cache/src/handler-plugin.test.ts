@@ -1,6 +1,8 @@
 import type { AnyProcedure } from '@orpc/server'
 import { call, createRouterClient, ORPCError, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
+import type { ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
+import { ResponseHeadersHandlerPlugin } from '@orpc/server/plugins'
 import type { StandardHandlerPlugin } from '@orpc/server/standard'
 import { decodeCacheTagHeader, toArray } from '@orpc/shared'
 import type { StandardHeaders } from '@standard-server/core'
@@ -227,6 +229,25 @@ describe('cacheHandlerPlugin', () => {
 
       expect(response.headers.get('cache-control')).toBe('private, no-store')
       expect(response.headers.get('cache-tag')).toBe('planets')
+    })
+
+    it('keeps a cache-control set through resHeaders', async () => {
+      const procedure = os
+        .$context<CacheContext & ResponseHeadersHandlerPluginContext>()
+        .use(cache({ ttl: 2000 }))
+        .handler(({ context }) => {
+          context.resHeaders?.set('cache-control', 'private, no-store')
+        })
+      const handler = new RPCHandler(procedure, {
+        allowMethods: ['GET'],
+        plugins: [new CacheHandlerPlugin({ headers }), new ResponseHeadersHandlerPlugin()],
+      })
+
+      const { response } = await handler.handle(new Request('http://localhost:3000'), {
+        context: { 'cache/store': new MemoryCacheStore() },
+      })
+
+      expect(response!.headers.get('cache-control')).toBe('private, no-store')
     })
 
     it('sends no-store when nothing may be reused', async () => {

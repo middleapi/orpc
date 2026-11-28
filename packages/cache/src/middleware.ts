@@ -79,7 +79,7 @@ export function cache<TInContext extends CacheContext, TInput>(
     const lookupIndex = pluginContext?.caches.length ?? 0
 
     // Recorded at its lookup position rather than appended, so the plugin finds the outermost of stacked caches first.
-    const record = (lookup: Pick<CacheHandlerPluginLookup, 'tags' | 'ttl' | 'swr'>) => {
+    const record = (lookup: Omit<CacheHandlerPluginLookup, 'procedure' | 'path'>) => {
       pluginContext?.caches.splice(lookupIndex, 0, { procedure, path, ...lookup })
     }
 

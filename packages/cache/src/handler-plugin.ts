@@ -1,4 +1,5 @@
 import type { AnyProcedure, Context, ProcedureClientInterceptor } from '@orpc/server'
+import type { ResponseHeadersHandlerPluginContext } from '@orpc/server/plugins'
 import type {
   StandardHandlerInterceptor,
   StandardHandlerOptions,
@@ -100,9 +101,7 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
         rootRevalidatedTags,
       } = await nextWithRootCacheActivity(interceptorOptions)
 
-      if (rootCache === undefined && !rootRevalidatedTags.length) {
-        return response
-      }
+      const { resHeaders } = interceptorOptions.context as ResponseHeadersHandlerPluginContext
 
       const headers: StandardHeaders = {}
       const set = (name: CacheHandlerPluginHeader, value: string | undefined) => {
@@ -119,25 +118,13 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
         rootRevalidatedTags.length ? encodeCacheTagHeader(rootRevalidatedTags) : undefined,
       )
 
-      // A `cache-control` already on the response is the procedure's own choice, so it is kept.
+      // A `cache-control` the procedure set itself, on the response or through `resHeaders`, is kept.
       if (
         rootCache !== undefined &&
-        this.headers.has('cache-control') &&
-        response.headers['cache-control'] === undefined
+        response.headers['cache-control'] === undefined &&
+        !resHeaders?.has('cache-control')
       ) {
-        /**
-         * `max-age` rather than `s-maxage`, which carries `proxy-revalidate`
-         * semantics ([RFC 9111](https://www.rfc-editor.org/rfc/rfc9111#section-5.2.2.10))
-         * and so forbids the stale reuse `stale-while-revalidate` grants.
-         * Entries without a ttl stay valid until revalidated, so caches hold
-         * them for a year and rely on tag purges.
-         */
-        const maxAge = rootCache.ttl === undefined ? 31536000 : Math.floor(rootCache.ttl / 1000)
-        const staleWhileRevalidate = Math.floor((rootCache.swr ?? 0) / 1000)
-        headers['cache-control'] =
-          maxAge || staleWhileRevalidate
-            ? `public, max-age=${maxAge}${staleWhileRevalidate ? `, stale-while-revalidate=${staleWhileRevalidate}` : ''}`
-            : 'no-store'
+        set('cache-control', encodeCacheControl(rootCache))
       }
 
       return {
@@ -151,6 +138,26 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
       interceptors: [...toArray(options.interceptors), interceptor],
     }
   }
+}
+
+/**
+ * `max-age` rather than `s-maxage`, which carries `proxy-revalidate`
+ * semantics ([RFC 9111](https://www.rfc-editor.org/rfc/rfc9111#section-5.2.2.10))
+ * and so forbids the stale reuse `stale-while-revalidate` grants. Entries
+ * without a ttl stay valid until revalidated, so caches hold them for a year
+ * and rely on tag purges.
+ */
+function encodeCacheControl({ ttl, swr = 0 }: CacheHandlerPluginLookup): string {
+  const maxAge = ttl === undefined ? 31536000 : Math.floor(ttl / 1000)
+  const staleWhileRevalidate = Math.floor(swr / 1000)
+
+  if (!maxAge && !staleWhileRevalidate) {
+    return 'no-store'
+  }
+
+  return staleWhileRevalidate
+    ? `public, max-age=${maxAge}, stale-while-revalidate=${staleWhileRevalidate}`
+    : `public, max-age=${maxAge}`
 }
 
 /**
